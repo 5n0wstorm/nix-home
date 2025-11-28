@@ -1,27 +1,52 @@
-# Edit this configuration file to define what should be installed on
-# your system. Help is available in the configuration.nix(5) man page, on
-# https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
-
-# NixOS-WSL specific options are documented on the NixOS-WSL repository:
-# https://github.com/nix-community/NixOS-WSL
+# ============================================================================
+# ELROND - WSL Development Environment
+# ============================================================================
 
 { config, lib, pkgs, ... }:
 
 {
+  # ============================================================================
+  # IMPORTS
+  # ============================================================================
+
   imports = [
+    ../common.nix
     # include NixOS-WSL modules
     <nixos-wsl/modules>
   ];
 
+  # ============================================================================
+  # HOST IDENTIFICATION
+  # ============================================================================
+
+  networking.hostName = "elrond";
+  users.motd = "WSL Development Environment";
+
+  # ============================================================================
+  # WSL CONFIGURATION
+  # ============================================================================
+
   wsl.enable = true;
   wsl.defaultUser = "dominik";
+
+  # ============================================================================
+  # DEVELOPMENT PACKAGES
+  # ============================================================================
 
   environment.systemPackages = with pkgs; [
     git
     colmena
   ];
 
+  # ============================================================================
+  # NIX SETTINGS
+  # ============================================================================
+
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  # ============================================================================
+  # SYSTEM
+  # ============================================================================
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

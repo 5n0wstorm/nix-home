@@ -25,4 +25,12 @@
   #   user = "dominik";
   #   tags = [ ];
   # };
+
+  elrond = {
+    user = "dominik";
+    tags = [
+      "wsl"
+      "development"
+    ];
+  };
 }

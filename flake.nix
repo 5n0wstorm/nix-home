@@ -39,6 +39,17 @@
       };
 
       # ==========================================================================
+      # NIXOS CONFIGURATIONS - Direct system configurations for nixos-rebuild
+      # ==========================================================================
+
+      nixosConfigurations.elrond = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ./hosts/elrond/configuration.nix
+        ];
+      };
+
+      # ==========================================================================
       # COLMENA HIVE - Fleet deployment configuration
       # ==========================================================================
 
