@@ -6,6 +6,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     colmena.url = "github:zhaofengli/colmena";
+    nixos-wsl.url = "github:nix-community/NixOS-WSL";
   };
 
   # ============================================================================
@@ -44,6 +45,9 @@
 
       nixosConfigurations.elrond = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
+        specialArgs = {
+          inherit nixos-wsl;
+        };
         modules = [
           ./hosts/elrond/configuration.nix
         ];

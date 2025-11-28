@@ -2,7 +2,7 @@
 # ELROND - WSL Development Environment
 # ============================================================================
 
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, nixos-wsl, ... }:
 
 {
   # ============================================================================
@@ -12,7 +12,7 @@
   imports = [
     ../common.nix
     # include NixOS-WSL modules
-    <nixos-wsl/modules>
+    nixos-wsl.nixosModules.wsl
   ];
 
   # ============================================================================
