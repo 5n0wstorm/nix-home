@@ -13,6 +13,8 @@
     ../common.nix
     # include NixOS-WSL modules
     nixos-wsl.nixosModules.default
+    # include sops-nix for secrets management
+    sops-nix.nixosModules.sops
   ];
 
   # ============================================================================
@@ -28,6 +30,56 @@
 
   wsl.enable = true;
   wsl.defaultUser = "dominik";
+
+  # ============================================================================
+  # SECRETS MANAGEMENT (SOPS-NIX)
+  # ============================================================================
+
+  # SOPS configuration for encrypted secrets
+  sops = {
+    # Default secrets location
+    defaultSopsFile = ../../secrets/elrond.yaml;
+
+    # Age key for decryption (this should match your .sops.yaml)
+    age.keyFile = "/var/lib/sops-nix/key.txt";
+
+    # SSH key secrets
+    secrets = {
+      "ssh_key" = {
+        path = "/home/dominik/.ssh/id_ed25519";
+        owner = "dominik";
+        group = "users";
+        mode = "0600";
+      };
+      "ssh_key_pub" = {
+        path = "/home/dominik/.ssh/id_ed25519.pub";
+        owner = "dominik";
+        group = "users";
+        mode = "0644";
+      };
+    };
+  };
+
+  # ============================================================================
+  # SSH CONFIGURATION
+  # ============================================================================
+
+  # SSH client configuration for git
+  programs.ssh = {
+    startAgent = true;
+    agentTimeout = "1h";
+
+    extraConfig = ''
+      Host github.com
+        IdentityFile /home/dominik/.ssh/id_ed25519
+        User git
+    '';
+  };
+
+  # Ensure SSH directory exists
+  systemd.tmpfiles.rules = [
+    "d /home/dominik/.ssh 0700 dominik users"
+  ];
 
   # ============================================================================
   # DEVELOPMENT PACKAGES

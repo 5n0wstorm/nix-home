@@ -7,6 +7,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     colmena.url = "github:zhaofengli/colmena";
     nixos-wsl.url = "github:nix-community/NixOS-WSL";
+    sops-nix.url = "github:Mic92/sops-nix";
   };
 
   # ============================================================================
@@ -14,7 +15,7 @@
   # ============================================================================
 
   outputs =
-    { nixpkgs, colmena, nixos-wsl, ... }:
+    { nixpkgs, colmena, nixos-wsl, sops-nix, ... }:
     let
       # Import host definitions from single source of truth
       hosts = import ./hosts.nix;
@@ -46,7 +47,7 @@
       nixosConfigurations.elrond = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = {
-          inherit nixos-wsl;
+          inherit nixos-wsl sops-nix;
         };
         modules = [
           ./hosts/elrond/configuration.nix

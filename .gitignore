@@ -1,1 +1,6 @@
 .direnv/
+
+# SOPS secrets (only ignore unencrypted versions and keys)
+secrets/*.decrypted.*
+*.key
+*keys.txt

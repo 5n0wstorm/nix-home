@@ -1,0 +1,10 @@
+# SOPS configuration for secrets encryption
+
+keys:
+  - &age-key age1g7hdqdtt5rd04sfmfmmpakhywgslxwjlexqk3sgl5ngh68u7zfjqntr0hw
+
+creation_rules:
+  - path_regex: secrets/.*\.yaml$
+    key_groups:
+      - age:
+          - *age-key
