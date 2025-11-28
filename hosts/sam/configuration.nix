@@ -1,0 +1,66 @@
+{ config, pkgs, ... }:
+
+{
+  # ============================================================================
+  # IMPORTS
+  # ============================================================================
+
+  imports = [
+    ../common.nix
+    ./hardware-configuration.nix
+    ../../modules/apps/freshrss.nix
+  ];
+
+  # ============================================================================
+  # HOST IDENTIFICATION
+  # ============================================================================
+
+  networking.hostName = "sam";
+  users.motd = "sam is calling";
+
+  # ============================================================================
+  # SERVICES
+  # ============================================================================
+
+  fleet.apps.freshrss = {
+    enable = true;
+    port = 8080;
+    timezone = "America/New_York";
+  };
+
+  virtualisation.oci-containers.containers = { };
+
+  # ============================================================================
+  # NETWORKING & FIREWALL
+  # ============================================================================
+
+  networking.firewall.allowedTCPPorts = [ ];
+
+  # ============================================================================
+  # VIRTUALIZATION
+  # ============================================================================
+
+  virtualisation = {
+    containers.enable = true;
+    podman = {
+      enable = true;
+      dockerCompat = true;
+      defaultNetwork.settings.dns_enabled = true;
+    };
+  };
+  virtualisation.oci-containers.backend = "podman";
+
+  # ============================================================================
+  # BOOTLOADER
+  # ============================================================================
+
+  boot.loader.grub.enable = true;
+  boot.loader.grub.device = "/dev/vda";
+  boot.loader.grub.useOSProber = true;
+
+  # ============================================================================
+  # SYSTEM
+  # ============================================================================
+
+  system.stateVersion = "25.05";
+}
