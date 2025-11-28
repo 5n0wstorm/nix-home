@@ -12,7 +12,7 @@
   imports = [
     ../common.nix
     # include NixOS-WSL modules
-    nixos-wsl.nixosModules.wsl
+    nixos-wsl.nixosModules.default
   ];
 
   # ============================================================================

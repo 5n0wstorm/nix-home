@@ -14,7 +14,7 @@
   # ============================================================================
 
   outputs =
-    { nixpkgs, colmena, ... }:
+    { nixpkgs, colmena, nixos-wsl, ... }:
     let
       # Import host definitions from single source of truth
       hosts = import ./hosts.nix;
