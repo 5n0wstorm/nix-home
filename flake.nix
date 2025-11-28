@@ -93,6 +93,16 @@
             ./hosts/sam/configuration.nix
           ];
         };
+
+        elrond = {
+          deployment = {
+            targetUser = hosts.elrond.user;
+            tags = hosts.elrond.tags;
+          };
+
+          imports = [
+            ./hosts/elrond/configuration.nix
+          ];
       };
     };
 }
