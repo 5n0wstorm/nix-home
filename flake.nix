@@ -103,6 +103,7 @@
           imports = [
             ./hosts/elrond/configuration.nix
           ];
+        };
       };
     };
 }
