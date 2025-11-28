@@ -1,11 +1,12 @@
-{ config, lib, pkgs, ... }:
-
-with lib;
-
-let
-  cfg = config.fleet.monitoring.nodeExporter;
-in
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+with lib; let
+  cfg = config.fleet.monitoring.nodeExporter;
+in {
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================
@@ -53,6 +54,6 @@ in
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
 
-    networking.firewall.allowedTCPPorts = [ cfg.port ];
+    networking.firewall.allowedTCPPorts = [cfg.port];
   };
 }

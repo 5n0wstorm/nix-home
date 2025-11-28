@@ -1,6 +1,8 @@
-{ config, pkgs, ... }:
-
 {
+  config,
+  pkgs,
+  ...
+}: {
   # ============================================================================
   # IMPORTS
   # ============================================================================
@@ -28,13 +30,13 @@
     timezone = "America/New_York";
   };
 
-  virtualisation.oci-containers.containers = { };
+  virtualisation.oci-containers.containers = {};
 
   # ============================================================================
   # NETWORKING & FIREWALL
   # ============================================================================
 
-  networking.firewall.allowedTCPPorts = [ ];
+  networking.firewall.allowedTCPPorts = [];
 
   # ============================================================================
   # VIRTUALIZATION

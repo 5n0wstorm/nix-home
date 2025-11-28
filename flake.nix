@@ -14,113 +14,115 @@
   # FLAKE OUTPUTS - What this flake provides
   # ============================================================================
 
-  outputs =
-    { nixpkgs, colmena, nixos-wsl, sops-nix, ... }:
-    let
-      # Import host definitions from single source of truth
-      hosts = import ./hosts.nix;
+  outputs = {
+    nixpkgs,
+    colmena,
+    nixos-wsl,
+    sops-nix,
+    ...
+  }: let
+    # Import host definitions from single source of truth
+    hosts = import ./hosts.nix;
+    # For scaling up your homelab, you'd likely want automated host generation:
+    # mkHost = name: hostConfig: {
+    #   deployment = {
+    #     targetHost = hostConfig.ip;
+    #     targetUser = hostConfig.user;
+    #     tags = hostConfig.tags;
+    #   };
+    #   imports = [ ./hosts/${name}/configuration.nix ];
+    # };
+    # hostConfigs = builtins.mapAttrs mkHost hosts;
+  in {
+    # ==========================================================================
+    # DEVELOPMENT SHELL - Local development environment
+    # ==========================================================================
 
-      # For scaling up your homelab, you'd likely want automated host generation:
-      # mkHost = name: hostConfig: {
-      #   deployment = {
-      #     targetHost = hostConfig.ip;
-      #     targetUser = hostConfig.user;
-      #     tags = hostConfig.tags;
-      #   };
-      #   imports = [ ./hosts/${name}/configuration.nix ];
-      # };
-      # hostConfigs = builtins.mapAttrs mkHost hosts;
-    in
-    {
-      # ==========================================================================
-      # DEVELOPMENT SHELL - Local development environment
-      # ==========================================================================
+    devShells.x86_64-linux.default = nixpkgs.legacyPackages.x86_64-linux.mkShell {
+      buildInputs = [colmena.packages.x86_64-linux.colmena];
+    };
 
-      devShells.x86_64-linux.default = nixpkgs.legacyPackages.x86_64-linux.mkShell {
-        buildInputs = [ colmena.packages.x86_64-linux.colmena ];
+    # ==========================================================================
+    # NIXOS CONFIGURATIONS - Direct system configurations for nixos-rebuild
+    # ==========================================================================
+
+    nixosConfigurations.elrond = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = {
+        inherit nixos-wsl;
+      };
+      modules = [
+        ./hosts/elrond/configuration.nix
+        sops-nix.nixosModules.sops
+      ];
+    };
+
+    # ==========================================================================
+    # COLMENA HIVE - Fleet deployment configuration
+    # ==========================================================================
+
+    colmenaHive = colmena.lib.makeHive {
+      # ========================================================================
+      # GLOBAL CONFIGURATION - Settings applied to all hosts
+      # ========================================================================
+
+      meta = {
+        nixpkgs = import nixpkgs {
+          system = "x86_64-linux";
+          overlays = [];
+        };
       };
 
-      # ==========================================================================
-      # NIXOS CONFIGURATIONS - Direct system configurations for nixos-rebuild
-      # ==========================================================================
+      # ========================================================================
+      # HOST DEFINITIONS - Individual server configurations
+      # ========================================================================
 
-      nixosConfigurations.elrond = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = {
-          inherit nixos-wsl;
+      galadriel = {
+        deployment = {
+          targetHost = hosts.galadriel.ip;
+          targetUser = hosts.galadriel.user;
+          tags = hosts.galadriel.tags;
         };
-        modules = [
-          ./hosts/elrond/configuration.nix
-          sops-nix.nixosModules.sops
+
+        imports = [
+          ./hosts/galadriel/configuration.nix
         ];
       };
 
-      # ==========================================================================
-      # COLMENA HIVE - Fleet deployment configuration
-      # ==========================================================================
-
-      colmenaHive = colmena.lib.makeHive {
-        # ========================================================================
-        # GLOBAL CONFIGURATION - Settings applied to all hosts
-        # ========================================================================
-
-        meta = {
-          nixpkgs = import nixpkgs {
-            system = "x86_64-linux";
-            overlays = [ ];
-          };
+      frodo = {
+        deployment = {
+          targetHost = hosts.frodo.ip;
+          targetUser = hosts.frodo.user;
+          tags = hosts.frodo.tags;
         };
 
-        # ========================================================================
-        # HOST DEFINITIONS - Individual server configurations
-        # ========================================================================
+        imports = [
+          ./hosts/frodo/configuration.nix
+        ];
+      };
 
-        galadriel = {
-          deployment = {
-            targetHost = hosts.galadriel.ip;
-            targetUser = hosts.galadriel.user;
-            tags = hosts.galadriel.tags;
-          };
-
-          imports = [
-            ./hosts/galadriel/configuration.nix
-          ];
+      sam = {
+        deployment = {
+          targetHost = hosts.sam.ip;
+          targetUser = hosts.sam.user;
+          tags = hosts.sam.tags;
         };
 
-        frodo = {
-          deployment = {
-            targetHost = hosts.frodo.ip;
-            targetUser = hosts.frodo.user;
-            tags = hosts.frodo.tags;
-          };
+        imports = [
+          ./hosts/sam/configuration.nix
+        ];
+      };
 
-          imports = [
-            ./hosts/frodo/configuration.nix
-          ];
+      elrond = {
+        deployment = {
+          targetUser = hosts.elrond.user;
+          tags = hosts.elrond.tags;
         };
 
-        sam = {
-          deployment = {
-            targetHost = hosts.sam.ip;
-            targetUser = hosts.sam.user;
-            tags = hosts.sam.tags;
-          };
-
-          imports = [
-            ./hosts/sam/configuration.nix
-          ];
-        };
-
-        elrond = {
-          deployment = {
-            targetUser = hosts.elrond.user;
-            tags = hosts.elrond.tags;
-          };
-
-          imports = [
-            ./hosts/elrond/configuration.nix
-          ];
-        };
+        imports = [
+          ./hosts/elrond/configuration.nix
+        ];
       };
     };
+  };
 }

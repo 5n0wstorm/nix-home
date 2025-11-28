@@ -3,13 +3,9 @@
   lib,
   ...
 }:
-
-with lib;
-
-let
+with lib; let
   cfg = config.fleet.monitoring.prometheus;
-in
-{
+in {
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================
@@ -25,13 +21,13 @@ in
 
     scrapeConfigs = mkOption {
       type = types.listOf types.attrs;
-      default = [ ];
+      default = [];
       description = "Additional scrape configurations";
     };
 
     nodeExporterTargets = mkOption {
       type = types.listOf types.str;
-      default = [ ];
+      default = [];
       description = "List of node exporter targets (host:port)";
     };
   };
@@ -49,34 +45,35 @@ in
       enable = true;
       port = cfg.port;
 
-      scrapeConfigs = [
-        # Self-monitoring
-        {
-          job_name = "prometheus";
-          static_configs = [
-            {
-              targets = [ "localhost:${toString cfg.port}" ];
-            }
-          ];
-        }
+      scrapeConfigs =
+        [
+          # Self-monitoring
+          {
+            job_name = "prometheus";
+            static_configs = [
+              {
+                targets = ["localhost:${toString cfg.port}"];
+              }
+            ];
+          }
 
-        # Node exporters - auto-discover fleet hosts
-        {
-          job_name = "node-exporter";
-          static_configs = [
-            {
-              targets = cfg.nodeExporterTargets;
-            }
-          ];
-        }
-      ]
-      ++ cfg.scrapeConfigs;
+          # Node exporters - auto-discover fleet hosts
+          {
+            job_name = "node-exporter";
+            static_configs = [
+              {
+                targets = cfg.nodeExporterTargets;
+              }
+            ];
+          }
+        ]
+        ++ cfg.scrapeConfigs;
     };
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
 
-    networking.firewall.allowedTCPPorts = [ cfg.port ];
+    networking.firewall.allowedTCPPorts = [cfg.port];
   };
 }

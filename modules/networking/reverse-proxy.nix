@@ -3,10 +3,7 @@
   lib,
   ...
 }:
-
-with lib;
-
-let
+with lib; let
   cfg = config.fleet.networking.reverseProxy;
 
   # Helper function to create a virtual host configuration
@@ -28,8 +25,7 @@ let
       '';
     };
   };
-in
-{
+in {
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================

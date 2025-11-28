@@ -3,13 +3,9 @@
   lib,
   ...
 }:
-
-with lib;
-
-let
+with lib; let
   cfg = config.fleet.dev.jenkins;
-in
-{
+in {
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================
@@ -49,6 +45,6 @@ in
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
 
-    networking.firewall.allowedTCPPorts = [ cfg.port ];
+    networking.firewall.allowedTCPPorts = [cfg.port];
   };
 }

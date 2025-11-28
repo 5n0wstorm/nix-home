@@ -4,13 +4,9 @@
   pkgs,
   ...
 }:
-
-with lib;
-
-let
+with lib; let
   cfg = config.fleet.dev.gitea;
-in
-{
+in {
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================
@@ -106,6 +102,6 @@ in
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
 
-    networking.firewall.allowedTCPPorts = [ cfg.port ];
+    networking.firewall.allowedTCPPorts = [cfg.port];
   };
 }

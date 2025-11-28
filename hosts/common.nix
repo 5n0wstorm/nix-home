@@ -1,8 +1,4 @@
-{
-  pkgs,
-  ...
-}:
-{
+{pkgs, ...}: {
   # ============================================================================
   # IMPORTS
   # ============================================================================
@@ -22,7 +18,7 @@
         "flakes"
       ];
       auto-optimise-store = true;
-      trusted-users = [ "@wheel" ];
+      trusted-users = ["@wheel"];
     };
     gc = {
       automatic = true;
@@ -62,7 +58,7 @@
 
   networking.networkmanager.enable = true;
   networking.firewall.enable = true;
-  networking.firewall.allowedTCPPorts = [ 22 ];
+  networking.firewall.allowedTCPPorts = [22];
 
   # ============================================================================
   # SERVICES

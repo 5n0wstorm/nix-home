@@ -3,13 +3,9 @@
   lib,
   ...
 }:
-
-with lib;
-
-let
+with lib; let
   cfg = config.fleet.apps.freshrss;
-in
-{
+in {
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================
@@ -64,7 +60,7 @@ in
       createHome = true;
     };
 
-    users.groups.${cfg.group} = { };
+    users.groups.${cfg.group} = {};
 
     # --------------------------------------------------------------------------
     # DATA DIRECTORY SETUP
@@ -104,15 +100,15 @@ in
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
 
-    networking.firewall.allowedTCPPorts = [ cfg.port ];
+    networking.firewall.allowedTCPPorts = [cfg.port];
 
     # --------------------------------------------------------------------------
     # SYSTEMD SERVICE DEPENDENCIES
     # --------------------------------------------------------------------------
 
     systemd.services."podman-freshrss" = {
-      requires = [ "podman.service" ];
-      after = [ "podman.service" ];
+      requires = ["podman.service"];
+      after = ["podman.service"];
     };
   };
 }
