@@ -38,7 +38,7 @@
 
   users.users.dominik = {
     isNormalUser = true;
-    description = "Dominik :)";
+    description = "Bossman himself";
     extraGroups = [
       "networkmanager"
       "wheel"
