@@ -35,7 +35,10 @@ with lib;
 # 3. GitHub Deploy Keys: Repository-specific keys instead of personal keys
 #    - Best for CI/CD, limits access scope
 #
-# The rebuild script automatically handles SSH setup for git operations.
+# The rebuild script automatically:
+# - Handles SSH setup for git operations
+# - Interactively prompts for age key if missing (for sops-nix secrets)
+# - Manages SSH agent and key loading
 # ============================================================================
   let
     cfg = config.fleet.dev.rebuild;
