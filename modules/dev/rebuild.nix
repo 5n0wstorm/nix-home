@@ -139,18 +139,59 @@ with lib;
 
       echo "Changes committed successfully!"
 
-      # Set up SSH for git operations
-      export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent"
-      if [ -z "$SSH_AUTH_SOCK" ] || [ ! -S "$SSH_AUTH_SOCK" ]; then
-          # Start SSH agent if not running
-          eval "$(ssh-agent -s)" > /dev/null
-          export SSH_AUTH_SOCK="$SSH_AGENT_PID"
-      fi
+    # Check if age key exists for sops-nix
+    if [ ! -f "/var/lib/sops-nix/key.txt" ]; then
+        echo "Age key not found at /var/lib/sops-nix/key.txt"
+        echo "This is required for decrypting secrets with sops-nix."
+        echo ""
+        echo "Please provide your age private key (from ~/.config/sops/age/keys.txt on your host):"
+        echo "The key should look like: AGE-SECRET-KEY-1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        echo ""
 
-      # Add SSH key to agent if not already added
-      if ! ssh-add -l | grep -q "id_ed25519"; then
-          ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
-      fi
+        # Create directory if it doesn't exist
+        sudo mkdir -p /var/lib/sops-nix
+
+        # Read age key interactively
+        echo -n "Enter your age private key: "
+        read -r AGE_KEY
+
+        if [ -z "$AGE_KEY" ]; then
+            echo "No key provided. Skipping secrets setup."
+            echo "You can set up the age key later and run rebuild again."
+            exit 1
+        fi
+
+        # Get the comment line if it exists
+        echo -n "Enter the comment line (optional, press Enter to skip): "
+        read -r AGE_COMMENT
+
+        # Create the key file
+        {
+            if [ -n "$AGE_COMMENT" ]; then
+                echo "$AGE_COMMENT"
+            fi
+            echo "$AGE_KEY"
+        } | sudo tee /var/lib/sops-nix/key.txt > /dev/null
+
+        sudo chmod 600 /var/lib/sops-nix/key.txt
+        sudo chown root:root /var/lib/sops-nix/key.txt
+
+        echo "Age key saved successfully!"
+        echo ""
+    fi
+
+    # Set up SSH for git operations
+    export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent"
+    if [ -z "$SSH_AUTH_SOCK" ] || [ ! -S "$SSH_AUTH_SOCK" ]; then
+        # Start SSH agent if not running
+        eval "$(ssh-agent -s)" > /dev/null
+        export SSH_AUTH_SOCK="$SSH_AGENT_PID"
+    fi
+
+    # Add SSH key to agent if not already added
+    if ! ssh-add -l | grep -q "id_ed25519"; then
+        ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
+    fi
 
       # Push to remote repository
       echo "Pushing changes to remote repository..."
