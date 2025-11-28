@@ -2,7 +2,7 @@
 # ELROND - WSL Development Environment
 # ============================================================================
 
-{ config, lib, pkgs, nixos-wsl, sops-nix, ... }:
+{ config, lib, pkgs, nixos-wsl, ... }:
 
 {
   # ============================================================================
@@ -13,8 +13,6 @@
     ../common.nix
     # include NixOS-WSL modules
     nixos-wsl.nixosModules.default
-    # include sops-nix for secrets management
-    sops-nix.nixosModules.sops
   ];
 
   # ============================================================================

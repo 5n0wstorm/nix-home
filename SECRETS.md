@@ -2,6 +2,8 @@
 
 This repository uses [sops-nix](https://github.com/Mic92/sops-nix) for managing encrypted secrets securely in the repository.
 
+**Status**: ✅ Configured and ready for elrond host
+
 ## 🚀 Quick Setup
 
 ### 1. Generate Age Key

@@ -47,10 +47,11 @@
       nixosConfigurations.elrond = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = {
-          inherit nixos-wsl sops-nix;
+          inherit nixos-wsl;
         };
         modules = [
           ./hosts/elrond/configuration.nix
+          sops-nix.nixosModules.sops
         ];
       };
 

@@ -10,19 +10,34 @@ with lib;
 # ============================================================================
 # REBUILD MODULE - Enhanced NixOS rebuild script with git integration
 #
-# SSH KEY SETUP:
-# 1. SSH Agent Forwarding (current): SSH keys are stored on your host machine
-#    and forwarded to WSL. This is the most secure option for development.
+# USAGE:
+#   rebuild-system [hostname] [options]
 #
-# 2. sops-nix (recommended for production): Encrypt SSH keys and store them
-#    in the repository. Add to flake inputs and configure secrets.
+# OPTIONS:
+#   --force, -f      Force rebuild even without changes
+#   --hostname, -h   Specify hostname (default: current hostname)
+#   --help           Show help message
 #
-# 3. GitHub Deploy Keys: Use repository-specific deploy keys instead of
-#    personal SSH keys.
+# EXAMPLES:
+#   rebuild-system                    # Rebuild current host if changes detected
+#   rebuild-system --force           # Force rebuild current host
+#   rebuild-system galadriel         # Rebuild galadriel if changes detected
+#   rebuild-system galadriel --force # Force rebuild galadriel
 #
-# To use SSH agent forwarding:
-# - Ensure your SSH key is added to ssh-agent on your host
-# - The WSL configuration enables SSH agent forwarding automatically
+# SSH KEY SETUP OPTIONS:
+# 1. SSH Agent Forwarding: SSH keys stored on host machine, forwarded to WSL
+#    - Most secure for development
+#    - Requires: ssh-add on host, SSH agent forwarding in WSL
+#
+# 2. sops-nix (implemented): Encrypted SSH keys stored in repository
+#    - Production-ready, keys encrypted with age
+#    - Setup: Generate age key, configure .sops.yaml, encrypt secrets
+#    - Currently configured for elrond host
+#
+# 3. GitHub Deploy Keys: Repository-specific keys instead of personal keys
+#    - Best for CI/CD, limits access scope
+#
+# The rebuild script automatically handles SSH setup for git operations.
 # ============================================================================
 
 let
@@ -32,12 +47,42 @@ let
     #!/usr/bin/env bash
 
     # A rebuild script that commits on a successful build
+    # Usage: rebuild-system [hostname] [--force|-f] [--hostname|-h <host>]
     set -e
 
-    # Default hostname if not provided
-    HOSTNAME=''${1:-$(hostname)}
+    # Parse command line arguments
+    FORCE_REBUILD=false
+    HOSTNAME=$(hostname)
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --force|-f)
+                FORCE_REBUILD=true
+                shift
+                ;;
+            --hostname|-h)
+                HOSTNAME="$2"
+                shift 2
+                ;;
+            --help)
+                echo "Usage: rebuild-system [hostname] [options]"
+                echo "Options:"
+                echo "  --force, -f      Force rebuild even without changes"
+                echo "  --hostname, -h   Specify hostname (default: current hostname)"
+                echo "  --help           Show this help message"
+                exit 0
+                ;;
+            *)
+                HOSTNAME="$1"
+                shift
+                ;;
+        esac
+    done
 
     echo "Hostname: $HOSTNAME"
+    if [ "$FORCE_REBUILD" = true ]; then
+        echo "Force rebuild enabled - will rebuild even without changes"
+    fi
 
     # Find the git repository root (where flake.nix is located)
     REPO_ROOT="$(pwd)"
@@ -63,14 +108,21 @@ let
         exit 1
     fi
 
-    # Early return if no changes were detected
-    if git diff --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"; then
-        echo "No changes detected in configuration files, exiting."
-        exit 0
+    # Check for changes (unless force rebuild is enabled)
+    if [ "$FORCE_REBUILD" = false ]; then
+        if git diff --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"; then
+            echo "No changes detected in configuration files, exiting."
+            echo "Use --force or -f to rebuild anyway."
+            exit 0
+        fi
     fi
 
-    echo "Analysing changes..."
-    git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"
+    if [ "$FORCE_REBUILD" = true ]; then
+        echo "Force rebuilding - skipping change analysis"
+    else
+        echo "Analysing changes..."
+        git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"
+    fi
 
     echo "Rebuilding NixOS..."
     # Autoformat nix files
