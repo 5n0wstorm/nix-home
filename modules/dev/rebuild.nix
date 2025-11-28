@@ -21,9 +21,27 @@ let
 
     echo "Hostname: $HOSTNAME"
 
+    # Find the git repository root (where flake.nix is located)
+    REPO_ROOT="$(pwd)"
+    while [ "$REPO_ROOT" != "/" ] && [ ! -f "$REPO_ROOT/flake.nix" ]; do
+        REPO_ROOT="$(dirname "$REPO_ROOT")"
+    done
+
+    if [ ! -f "$REPO_ROOT/flake.nix" ]; then
+        echo "Error: Could not find flake.nix in current directory or parent directories"
+        echo "Current directory: $(pwd)"
+        echo "Make sure you're running this from your nix-home git repository or a subdirectory"
+        exit 1
+    fi
+
+    cd "$REPO_ROOT"
+    echo "Repository root: $(pwd)"
+
     # Check if we're in a git repository
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
         echo "Error: Not in a git repository"
+        echo "Current directory: $(pwd)"
+        echo "Make sure you're running this from your nix-home git repository"
         exit 1
     fi
 
