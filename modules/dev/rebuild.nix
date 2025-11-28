@@ -13,6 +13,7 @@ with lib;
 # USAGE:
 #   rebuild-system [hostname] [options]
 #   setup-age-key                          # Interactive age key setup for sops-nix
+#   setup-age-key                          # Interactive age key setup for sops-nix
 #
 # OPTIONS:
 #   --force, -f      Force rebuild even without changes
@@ -271,9 +272,9 @@ rebuildScript = pkgs.writeShellScriptBin "rebuild-system" ''
     # SHELL ALIASES
     # --------------------------------------------------------------------------
 
-    environment.shellAliases = {
-      rebuild = "rebuild-system";
-      setup-age = "setup-age-key";
+      environment.shellAliases = {
+        rebuild = "rebuild-system";
+        setup-age = "setup-age-key";
+      };
     };
-  };
-}
+  }
