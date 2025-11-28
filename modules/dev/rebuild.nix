@@ -4,12 +4,15 @@
   pkgs,
   ...
 }:
+
 with lib;
+
 # ============================================================================
 # REBUILD MODULE - Enhanced NixOS rebuild script with git integration
 #
 # USAGE:
 #   rebuild-system [hostname] [options]
+#   setup-age-key                          # Interactive age key setup for sops-nix
 #
 # OPTIONS:
 #   --force, -f      Force rebuild even without changes
@@ -37,212 +40,240 @@ with lib;
 #
 # The rebuild script automatically:
 # - Handles SSH setup for git operations
-# - Interactively prompts for age key if missing (for sops-nix secrets)
+# - Checks for age key before proceeding
 # - Manages SSH agent and key loading
 # ============================================================================
   let
     cfg = config.fleet.dev.rebuild;
 
-    rebuildScript = pkgs.writeShellScriptBin "rebuild-system" ''
-        #!/usr/bin/env bash
+    ageKeySetupScript = pkgs.writeShellScriptBin "setup-age-key" ''
+  #!/usr/bin/env bash
 
-        # A rebuild script that commits on a successful build
-        # Usage: rebuild-system [hostname] [--force|-f] [--hostname|-h <host>]
-        set -e
+  # Script to interactively set up age key for sops-nix
+  set -e
 
-        # Parse command line arguments
-        FORCE_REBUILD=false
-        HOSTNAME=$(hostname)
+  KEY_FILE="/var/lib/sops-nix/key.txt"
 
-        while [[ $# -gt 0 ]]; do
-            case $1 in
-                --force|-f)
-                    FORCE_REBUILD=true
-                    shift
-                    ;;
-                --hostname|-h)
-                    HOSTNAME="$2"
-                    shift 2
-                    ;;
-                --help)
-                    echo "Usage: rebuild-system [hostname] [options]"
-                    echo "Options:"
-                    echo "  --force, -f      Force rebuild even without changes"
-                    echo "  --hostname, -h   Specify hostname (default: current hostname)"
-                    echo "  --help           Show this help message"
-                    exit 0
-                    ;;
-                *)
-                    HOSTNAME="$1"
-                    shift
-                    ;;
-            esac
-        done
+  if [ -f "$KEY_FILE" ]; then
+    echo "Age key already exists at $KEY_FILE"
+    echo "Remove it first if you want to replace it: sudo rm $KEY_FILE"
+    exit 0
+  fi
 
-        echo "Hostname: $HOSTNAME"
-        if [ "$FORCE_REBUILD" = true ]; then
-            echo "Force rebuild enabled - will rebuild even without changes"
-        fi
+  echo "Setting up age key for sops-nix secrets decryption..."
+  echo ""
+  echo "This key is required to decrypt secrets stored in the repository."
+  echo "Get your age private key from: ~/.config/sops/age/keys.txt on your host machine"
+  echo ""
+  echo "The key should look like:"
+  echo "AGE-SECRET-KEY-1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+  echo ""
 
-        # Find the git repository root (where flake.nix is located)
-        REPO_ROOT="$(pwd)"
-        while [ "$REPO_ROOT" != "/" ] && [ ! -f "$REPO_ROOT/flake.nix" ]; do
-            REPO_ROOT="$(dirname "$REPO_ROOT")"
-        done
+  # Create directory if it doesn't exist
+  sudo mkdir -p /var/lib/sops-nix
 
-        if [ ! -f "$REPO_ROOT/flake.nix" ]; then
-            echo "Error: Could not find flake.nix in current directory or parent directories"
-            echo "Current directory: $(pwd)"
-            echo "Make sure you're running this from your nix-home git repository or a subdirectory"
-            exit 1
-        fi
+  # Read age key interactively
+  echo -n "Enter your age private key: "
+  read -r AGE_KEY
 
-        cd "$REPO_ROOT"
-        echo "Repository root: $(pwd)"
+  if [ -z "$AGE_KEY" ]; then
+    echo "No key provided. Aborting."
+    exit 1
+  fi
 
-        # Check if we're in a git repository
-        if ! git rev-parse --git-dir > /dev/null 2>&1; then
-            echo "Error: Not in a git repository"
-            echo "Current directory: $(pwd)"
-            echo "Make sure you're running this from your nix-home git repository"
-            exit 1
-        fi
+  # Get the comment line if it exists
+  echo -n "Enter the comment line (optional, press Enter to skip): "
+  read -r AGE_COMMENT
 
-        # Check for changes (unless force rebuild is enabled)
-        if [ "$FORCE_REBUILD" = false ]; then
-            if git diff --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"; then
-                echo "No changes detected in configuration files, exiting."
-                echo "Use --force or -f to rebuild anyway."
-                exit 0
-            fi
-        fi
+  # Create the key file
+  {
+    if [ -n "$AGE_COMMENT" ]; then
+      echo "$AGE_COMMENT"
+    fi
+    echo "$AGE_KEY"
+  } | sudo tee "$KEY_FILE" > /dev/null
 
-        if [ "$FORCE_REBUILD" = true ]; then
-            echo "Force rebuilding - skipping change analysis"
-        else
-            echo "Analysing changes..."
-            git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"
-        fi
+  sudo chmod 600 "$KEY_FILE"
+  sudo chown root:root "$KEY_FILE"
 
-        echo "Rebuilding NixOS..."
-        # Autoformat nix files
-        ${pkgs.alejandra}/bin/alejandra --quiet hosts/ modules/ flake.nix hosts.nix 2>/dev/null || true
+  echo ""
+  echo "✅ Age key saved successfully to $KEY_FILE"
+  echo "You can now run: rebuild -f"
+'';
 
-        # Rebuild system
-        sudo nixos-rebuild switch --flake ".#$HOSTNAME" --show-trace
+rebuildScript = pkgs.writeShellScriptBin "rebuild-system" ''
+      #!/usr/bin/env bash
 
-        echo "NixOS Rebuild Completed!"
+      # A rebuild script that commits on a successful build
+      # Usage: rebuild-system [hostname] [--force|-f] [--hostname|-h <host>]
+      set -e
 
-        # Get current generation info
-        current=$(sudo nixos-rebuild list-generations --json | ${pkgs.jq}/bin/jq -r '.[] | select(.current == true) | .generation')
+      # Parse command line arguments
+      FORCE_REBUILD=false
+      HOSTNAME=$(hostname)
 
-        # Commit changes
-        git add hosts/ modules/ flake.nix flake.lock hosts.nix
-        git commit -m "rebuild($HOSTNAME): generation $current"
+      while [[ $# -gt 0 ]]; do
+          case $1 in
+              --force|-f)
+                  FORCE_REBUILD=true
+                  shift
+                  ;;
+              --hostname|-h)
+                  HOSTNAME="$2"
+                  shift 2
+                  ;;
+              --help)
+                  echo "Usage: rebuild-system [hostname] [options]"
+                  echo "Options:"
+                  echo "  --force, -f      Force rebuild even without changes"
+                  echo "  --hostname, -h   Specify hostname (default: current hostname)"
+                  echo "  --help           Show this help message"
+                  exit 0
+                  ;;
+              *)
+                  HOSTNAME="$1"
+                  shift
+                  ;;
+          esac
+      done
 
-        echo "Changes committed successfully!"
+      echo "Hostname: $HOSTNAME"
+      if [ "$FORCE_REBUILD" = true ]; then
+          echo "Force rebuild enabled - will rebuild even without changes"
+      fi
 
-      # Check if age key exists for sops-nix
-      if [ ! -f "/var/lib/sops-nix/key.txt" ]; then
-          echo "Age key not found at /var/lib/sops-nix/key.txt"
-          echo "This is required for decrypting secrets with sops-nix."
-          echo ""
-          echo "Please provide your age private key (from ~/.config/sops/age/keys.txt on your host):"
-          echo "The key should look like: AGE-SECRET-KEY-1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-          echo ""
+      # Find the git repository root (where flake.nix is located)
+      REPO_ROOT="$(pwd)"
+      while [ "$REPO_ROOT" != "/" ] && [ ! -f "$REPO_ROOT/flake.nix" ]; do
+          REPO_ROOT="$(dirname "$REPO_ROOT")"
+      done
 
-          # Create directory if it doesn't exist
-          sudo mkdir -p /var/lib/sops-nix
+      if [ ! -f "$REPO_ROOT/flake.nix" ]; then
+          echo "Error: Could not find flake.nix in current directory or parent directories"
+          echo "Current directory: $(pwd)"
+          echo "Make sure you're running this from your nix-home git repository or a subdirectory"
+          exit 1
+      fi
 
-          # Read age key interactively
-          echo -n "Enter your age private key: "
-          read -r AGE_KEY
+      cd "$REPO_ROOT"
+      echo "Repository root: $(pwd)"
 
-          if [ -z "$AGE_KEY" ]; then
-              echo "No key provided. Skipping secrets setup."
-              echo "You can set up the age key later and run rebuild again."
-              exit 1
+      # Check if we're in a git repository
+      if ! git rev-parse --git-dir > /dev/null 2>&1; then
+          echo "Error: Not in a git repository"
+          echo "Current directory: $(pwd)"
+          echo "Make sure you're running this from your nix-home git repository"
+          exit 1
+      fi
+
+      # Check for changes (unless force rebuild is enabled)
+      if [ "$FORCE_REBUILD" = false ]; then
+          if git diff --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"; then
+              echo "No changes detected in configuration files, exiting."
+              echo "Use --force or -f to rebuild anyway."
+              exit 0
           fi
-
-          # Get the comment line if it exists
-          echo -n "Enter the comment line (optional, press Enter to skip): "
-          read -r AGE_COMMENT
-
-          # Create the key file
-          {
-              if [ -n "$AGE_COMMENT" ]; then
-                  echo "$AGE_COMMENT"
-              fi
-              echo "$AGE_KEY"
-          } | sudo tee /var/lib/sops-nix/key.txt > /dev/null
-
-          sudo chmod 600 /var/lib/sops-nix/key.txt
-          sudo chown root:root /var/lib/sops-nix/key.txt
-
-          echo "Age key saved successfully!"
-          echo ""
       fi
 
-      # Set up SSH for git operations
-      export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent"
-      if [ -z "$SSH_AUTH_SOCK" ] || [ ! -S "$SSH_AUTH_SOCK" ]; then
-          # Start SSH agent if not running
-          eval "$(ssh-agent -s)" > /dev/null
-          export SSH_AUTH_SOCK="$SSH_AGENT_PID"
+      if [ "$FORCE_REBUILD" = true ]; then
+          echo "Force rebuilding - skipping change analysis"
+      else
+          echo "Analysing changes..."
+          git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"
       fi
 
-      # Add SSH key to agent if not already added
-      if ! ssh-add -l | grep -q "id_ed25519"; then
-          ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
-      fi
+      echo "Rebuilding NixOS..."
+      # Autoformat nix files
+      ${pkgs.alejandra}/bin/alejandra --quiet hosts/ modules/ flake.nix hosts.nix 2>/dev/null || true
 
-        # Push to remote repository
-        echo "Pushing changes to remote repository..."
-        if git push origin main 2>/dev/null; then
-            echo "Changes pushed successfully!"
-        else
-            echo "Warning: Failed to push changes. SSH key may not be properly configured."
-            echo "Try: ssh-add /home/dominik/.ssh/id_ed25519 && git push origin main"
-        fi
+      # Rebuild system
+      sudo nixos-rebuild switch --flake ".#$HOSTNAME" --show-trace
+
+      echo "NixOS Rebuild Completed!"
+
+      # Get current generation info
+      current=$(sudo nixos-rebuild list-generations --json | ${pkgs.jq}/bin/jq -r '.[] | select(.current == true) | .generation')
+
+      # Commit changes
+      git add hosts/ modules/ flake.nix flake.lock hosts.nix
+      git commit -m "rebuild($HOSTNAME): generation $current"
+
+      echo "Changes committed successfully!"
+
+    # Check if age key exists for sops-nix
+    if [ ! -f "/var/lib/sops-nix/key.txt" ]; then
+        echo "⚠️  Age key not found at /var/lib/sops-nix/key.txt"
+        echo "This is required for decrypting secrets with sops-nix."
+        echo ""
+        echo "Run this command first to set up your age key:"
+        echo "  setup-age-key"
+        echo ""
+        echo "Then run rebuild again."
+        exit 1
+    fi
+
+    # Set up SSH for git operations
+    export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent"
+    if [ -z "$SSH_AUTH_SOCK" ] || [ ! -S "$SSH_AUTH_SOCK" ]; then
+        # Start SSH agent if not running
+        eval "$(ssh-agent -s)" > /dev/null
+        export SSH_AUTH_SOCK="$SSH_AGENT_PID"
+    fi
+
+    # Add SSH key to agent if not already added
+    if ! ssh-add -l | grep -q "id_ed25519"; then
+        ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
+    fi
+
+      # Push to remote repository
+      echo "Pushing changes to remote repository..."
+      if git push origin main 2>/dev/null; then
+          echo "Changes pushed successfully!"
+      else
+          echo "Warning: Failed to push changes. SSH key may not be properly configured."
+          echo "Try: ssh-add /home/dominik/.ssh/id_ed25519 && git push origin main"
+      fi
     '';
   in {
     # ============================================================================
     # MODULE OPTIONS
     # ============================================================================
 
-    options.fleet.dev.rebuild = {
-      enable = mkEnableOption "NixOS rebuild script with auto-commit functionality";
+  options.fleet.dev.rebuild = {
+    enable = mkEnableOption "NixOS rebuild script with auto-commit functionality";
 
-      package = mkOption {
-        type = types.package;
-        default = rebuildScript;
-        description = "The rebuild script package";
-      };
+    package = mkOption {
+      type = types.package;
+      default = rebuildScript;
+      description = "The rebuild script package";
     };
+  };
 
-    # ============================================================================
-    # MODULE IMPLEMENTATION
-    # ============================================================================
+  # ============================================================================
+  # MODULE IMPLEMENTATION
+  # ============================================================================
 
-    config = mkIf cfg.enable {
-      # --------------------------------------------------------------------------
-      # INSTALL REBUILD SCRIPT
-      # --------------------------------------------------------------------------
+  config = mkIf cfg.enable {
+    # --------------------------------------------------------------------------
+    # INSTALL REBUILD SCRIPT
+    # --------------------------------------------------------------------------
 
       environment.systemPackages = [
         cfg.package
+        ageKeySetupScript
         pkgs.alejandra # Nix formatter
         pkgs.jq # JSON processor for generation info
         pkgs.sops # Secrets encryption/decryption
         pkgs.age # Age encryption tool
       ];
 
-      # --------------------------------------------------------------------------
-      # SHELL ALIASES
-      # --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # SHELL ALIASES
+    # --------------------------------------------------------------------------
 
-      environment.shellAliases = {
-        rebuild = "rebuild-system";
-      };
+    environment.shellAliases = {
+      rebuild = "rebuild-system";
+      setup-age = "setup-age-key";
     };
-  }
+  };
+}
