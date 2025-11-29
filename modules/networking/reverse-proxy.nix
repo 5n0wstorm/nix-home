@@ -164,7 +164,6 @@ in {
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto $scheme;
           proxy_set_header X-Forwarded-Host $host;
-          proxy_http_version 1.1;
           ${extraConfig}
           ${labels."fleet.reverse-proxy.nginx-extra-config" or ""}
         '';
