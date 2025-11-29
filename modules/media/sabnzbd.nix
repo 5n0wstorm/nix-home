@@ -15,11 +15,17 @@ in {
     enable = mkEnableOption "SABnzbd usenet downloader";
 
     # Note: SABnzbd port is configured in its own config file at /var/lib/sabnzbd/sabnzbd.ini
-    # Default is 8080. This option is for reverse proxy and homepage integration.
+    # Using 8085 to avoid conflict with qBittorrent (8080)
     port = mkOption {
       type = types.port;
-      default = 8080;
+      default = 8085;
       description = "Port for SABnzbd web interface (must match sabnzbd.ini config)";
+    };
+
+    configDir = mkOption {
+      type = types.str;
+      default = "/var/lib/sabnzbd";
+      description = "Configuration directory for SABnzbd";
     };
 
     domain = mkOption {
@@ -123,8 +129,18 @@ in {
       enable = true;
       user = cfg.user;
       group = cfg.group;
+      configFile = "${cfg.configDir}/sabnzbd.ini";
       openFirewall = cfg.openFirewall;
     };
+
+    # --------------------------------------------------------------------------
+    # DIRECTORY SETUP
+    # --------------------------------------------------------------------------
+
+    # Ensure config directory exists with proper permissions
+    systemd.tmpfiles.rules = [
+      "d ${cfg.configDir} 0750 ${cfg.user} ${cfg.group} -"
+    ];
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
