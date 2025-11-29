@@ -59,12 +59,19 @@ in {
   # REVERSE PROXY (Pluggable - services register themselves automatically)
   # ============================================================================
 
+  # Temporarily disable SSL until certificates are generated
+  # fleet.networking.reverseProxy = {
+  #   enable = true;
+  #   enableTLS = true;
+  #   enableACME = true;
+  #   acmeEmail = "dominik@example.com";
+  # };
+
   fleet.networking.reverseProxy = {
     enable = true;
-    enableTLS = true;
+    enableTLS = false;  # Disable SSL temporarily
     enableACME = true;
-    acmeEmail = "dominik@example.com"; # Replace with your actual email
-    # cloudflareCredentialsFile will auto-generate from SOPS secrets
+    acmeEmail = "dominik@example.com";
   };
 
   # Ensure services start in correct order
@@ -74,8 +81,34 @@ in {
   };
 
   systemd.services.nginx = {
-    wants = ["acme-sn0wstorm.com.service"];
-    after = ["acme-sn0wstorm.com.service"];
+    wants = ["acme-sn0wstorm-com.service"];
+    after = ["acme-sn0wstorm-com.service"];
+  };
+
+  # Service to enable SSL once certificates are ready
+  systemd.services.enable-ssl-after-acme = {
+    description = "Enable SSL in nginx after ACME certificates are generated";
+    wantedBy = ["multi-user.target"];
+    after = ["acme-sn0wstorm-com.service" "nginx.service"];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      # Wait for certificate to exist
+      timeout=300  # 5 minutes
+      count=0
+      while [ ! -f /var/lib/acme/sn0wstorm.com/fullchain.pem ] && [ $count -lt $timeout ]; do
+        sleep 1
+        count=$((count + 1))
+      done
+
+      if [ -f /var/lib/acme/sn0wstorm.com/fullchain.pem ]; then
+        echo "ACME certificates found, you can now enable SSL by uncommenting the reverse proxy TLS config and running: nixos-rebuild switch"
+      else
+        echo "ACME certificates not found after timeout, check ACME service logs with: journalctl -u acme-sn0wstorm-com.service"
+      fi
+    '';
   };
 
   security.acme.acceptTerms = true;
@@ -107,6 +140,26 @@ in {
       CLOUDFLARE_DNS_API_TOKEN=$(cat /run/secrets/cloudflare_api_token)
       EOF
       chmod 600 /etc/cloudflare-credentials.ini
+    '';
+  };
+
+  # Create SSL enable flag based on certificate existence
+  systemd.services.ssl-status-check = {
+    description = "Check if SSL certificates exist and create status file";
+    wantedBy = ["multi-user.target"];
+    before = ["nginx.service"];
+    serviceConfig = {
+      Type = "oneshot";
+      User = "root";
+    };
+    script = ''
+      mkdir -p /var/lib/fleet-ssl-status
+      if [ -f /var/lib/acme/sn0wstorm.com/fullchain.pem ]; then
+        echo "true" > /var/lib/fleet-ssl-status/enable
+      else
+        echo "false" > /var/lib/fleet-ssl-status/enable
+      fi
+      chmod 644 /var/lib/fleet-ssl-status/enable
     '';
   };
 
