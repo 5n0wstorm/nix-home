@@ -3,8 +3,7 @@
   lib,
   ...
 }:
-with lib;
-{
+with lib; {
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================
@@ -66,7 +65,7 @@ with lib;
               "fleet.reverse-proxy.enable" = "true";
               "fleet.reverse-proxy.domain" = "myapp.local";
               "fleet.reverse-proxy.ssl" = "true";
-              "fleet.reverse-proxy.ssl-type" = "acme";  # "acme" or "selfsigned"
+              "fleet.reverse-proxy.ssl-type" = "acme"; # "acme" or "selfsigned"
               "fleet.reverse-proxy.websockets" = "false";
               "fleet.reverse-proxy.extra-config" = "client_max_body_size 100M;";
             };
@@ -155,7 +154,7 @@ with lib;
       port = labels."fleet.reverse-proxy.port" or serviceConfig.port or 80;
       extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
       enableSSL = labels."fleet.reverse-proxy.ssl" != "false";
-      sslType = labels."fleet.reverse-proxy.ssl-type" or "acme";  # "acme" or "selfsigned"
+      sslType = labels."fleet.reverse-proxy.ssl-type" or "acme"; # "acme" or "selfsigned"
       useACME = cfg.enableACME && enableSSL && sslType == "acme";
       useSelfSigned = cfg.enableTLS && enableSSL && sslType == "selfsigned";
     in {
@@ -177,289 +176,296 @@ with lib;
         '';
       };
     };
+  in
+    mkIf cfg.enable {
+      # --------------------------------------------------------------------------
+      # NGINX SERVICE
+      # --------------------------------------------------------------------------
 
-  in mkIf cfg.enable {
+      services.nginx = {
+        enable = true;
 
-    # --------------------------------------------------------------------------
-    # NGINX SERVICE
-    # --------------------------------------------------------------------------
+        # Default configuration
+        recommendedGzipSettings = true;
+        recommendedOptimisation = true;
+        recommendedProxySettings = true;
+        recommendedTlsSettings = true;
 
-    services.nginx = {
-      enable = true;
-
-      # Default configuration
-      recommendedGzipSettings = true;
-      recommendedOptimisation = true;
-      recommendedProxySettings = true;
-      recommendedTlsSettings = true;
-
-      # Generate virtual hosts from manual routes and service registry
-      virtualHosts = mapAttrs mkVirtualHost cfg.routes //
-        (mapAttrs mkServiceVirtualHost
-          (filterAttrs (serviceName: serviceConfig:
-            (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true"
-          ) cfg.serviceRegistry));
-    };
-
-    # --------------------------------------------------------------------------
-    # ACME / LET'S ENCRYPT CONFIGURATION
-    # --------------------------------------------------------------------------
-
-    security.acme = mkIf cfg.enableACME {
-      acceptTerms = true;
-      defaults = {
-        email = cfg.acmeEmail;
-        dnsProvider = "cloudflare";
-        credentialsFile = if cfg.cloudflareCredentialsFile != null
-          then cfg.cloudflareCredentialsFile
-          else "/etc/cloudflare-credentials.ini";
-        group = "nginx";
-        # Prefer existing certificates to avoid unnecessary DNS challenges
-        renewInterval = "monthly";
+        # Generate virtual hosts from manual routes and service registry
+        virtualHosts =
+          mapAttrs mkVirtualHost cfg.routes
+          // (mapAttrs mkServiceVirtualHost
+            (filterAttrs (
+                serviceName: serviceConfig:
+                  (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true"
+              )
+              cfg.serviceRegistry));
       };
 
-      # Pre-populate certificates from SOPS if they exist
-      certs = let
+      # --------------------------------------------------------------------------
+      # ACME / LET'S ENCRYPT CONFIGURATION
+      # --------------------------------------------------------------------------
+
+      security.acme = mkIf cfg.enableACME {
+        acceptTerms = true;
+        defaults = {
+          email = cfg.acmeEmail;
+          dnsProvider = "cloudflare";
+          credentialsFile =
+            if cfg.cloudflareCredentialsFile != null
+            then cfg.cloudflareCredentialsFile
+            else "/etc/cloudflare-credentials.ini";
+          group = "nginx";
+          # Prefer existing certificates to avoid unnecessary DNS challenges
+          renewInterval = "monthly";
+        };
+
+        # Pre-populate certificates from SOPS if they exist
+        certs = let
+          serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
+        in
+          mkMerge (map (domain: {
+              "${domain}" = {
+                # If certificate exists in SOPS, use it; otherwise generate new one
+                webroot = null;
+                dnsProvider = "cloudflare";
+                credentialsFile =
+                  if cfg.cloudflareCredentialsFile != null
+                  then cfg.cloudflareCredentialsFile
+                  else "/etc/cloudflare-credentials.ini";
+                group = "nginx";
+                email = cfg.acmeEmail;
+              };
+            })
+            serviceDomains);
+      };
+
+      # --------------------------------------------------------------------------
+      # CLOUDFLARE CREDENTIALS FOR ACME DNS CHALLENGE
+      # --------------------------------------------------------------------------
+
+      # Systemd services for ACME and credentials
+      systemd.services = mkIf cfg.enableACME (let
         serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
-      in mkMerge (map (domain: {
-      "${domain}" = {
-        # If certificate exists in SOPS, use it; otherwise generate new one
-        webroot = null;
-        dnsProvider = "cloudflare";
-        credentialsFile = if cfg.cloudflareCredentialsFile != null
-          then cfg.cloudflareCredentialsFile
-          else "/etc/cloudflare-credentials.ini";
-        group = "nginx";
-        email = cfg.acmeEmail;
-      };
-      }) serviceDomains);
-    };
+        tokenPath = config.sops.secrets."cloudflare_api_token".path or "/run/secrets/cloudflare_api_token";
+      in
+        mkMerge ([
+            {
+              # Cloudflare credentials setup service
+              "cloudflare-acme-credentials" = {
+                description = "Create Cloudflare credentials for ACME DNS challenges";
+                wantedBy = ["multi-user.target"];
+                before = ["acme-setup.service"];
+                after = ["sops-nix.service"];
+                serviceConfig = {
+                  Type = "oneshot";
+                  RemainAfterExit = true;
+                  User = "root";
+                };
+                script = ''
+                  # Read the Cloudflare token from SOPS secret
+                  CLOUDFLARE_TOKEN=$(cat ${tokenPath} 2>/dev/null || echo "")
 
-    # --------------------------------------------------------------------------
-    # CLOUDFLARE CREDENTIALS FOR ACME DNS CHALLENGE
-    # --------------------------------------------------------------------------
+                  if [[ -z "$CLOUDFLARE_TOKEN" ]]; then
+                    echo "ERROR: Could not read Cloudflare API token from SOPS secret"
+                    exit 1
+                  fi
 
-    # Systemd services for ACME and credentials
-    systemd.services = mkIf cfg.enableACME (let
-      serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
-      tokenPath = config.sops.secrets."cloudflare_api_token".path or "/run/secrets/cloudflare_api_token";
-    in mkMerge ([
-      {
-        # Cloudflare credentials setup service
-        "cloudflare-acme-credentials" = {
-          description = "Create Cloudflare credentials for ACME DNS challenges";
-          wantedBy = ["multi-user.target"];
-          before = ["acme-setup.service"];
-          after = ["sops-nix.service"];
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            User = "root";
-          };
-          script = ''
-            # Read the Cloudflare token from SOPS secret
-            CLOUDFLARE_TOKEN=$(cat ${tokenPath} 2>/dev/null || echo "")
+                  # Create credentials file in the format expected by lego
+                  cat > /etc/cloudflare-credentials.ini << EOF
+                  CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_TOKEN
+                  EOF
 
-            if [[ -z "$CLOUDFLARE_TOKEN" ]]; then
-              echo "ERROR: Could not read Cloudflare API token from SOPS secret"
-              exit 1
+                  chmod 400 /etc/cloudflare-credentials.ini
+                  chown acme:nginx /etc/cloudflare-credentials.ini
+
+                  echo "Cloudflare credentials created for ACME DNS challenges"
+                '';
+              };
+
+              # ACME certificate backup service
+              "acme-cert-backup" = mkIf cfg.enableACME {
+                description = "Backup ACME certificates to SOPS-managed location";
+                wantedBy = ["multi-user.target"];
+                after = ["acme-finished.target"];
+
+                serviceConfig = {
+                  Type = "oneshot";
+                  RemainAfterExit = true;
+                  User = "root";
+                };
+
+                script = let
+                  certBackupDir = "/var/lib/fleet-acme-certs";
+                in ''
+                  set -euo pipefail
+
+                  # Create backup directory if it doesn't exist
+                  mkdir -p "${certBackupDir}"
+
+                  # Function to backup certificates for a domain
+                  backup_cert() {
+                    local domain="$1"
+                    local acme_dir="/var/lib/acme/$domain"
+                    local backup_dir="${certBackupDir}/$domain"
+
+                    if [[ -d "$acme_dir" && -f "$acme_dir/fullchain.pem" && -f "$acme_dir/key.pem" ]]; then
+                      echo "Backing up certificates for $domain..."
+                      mkdir -p "$backup_dir"
+                      cp "$acme_dir/fullchain.pem" "$backup_dir/"
+                      cp "$acme_dir/key.pem" "$backup_dir/"
+                      chmod 600 "$backup_dir"/*.pem
+                    fi
+                  }
+
+                  # Backup certificates for all service domains that use ACME
+                  ${concatMapStringsSep "\n" (domain: "backup_cert \"${domain}\"") serviceDomains}
+                '';
+              };
+
+              # ACME certificate restore service
+              "acme-cert-restore" = mkIf cfg.enableACME {
+                description = "Restore ACME certificates from SOPS secrets";
+                wantedBy = ["multi-user.target"];
+                before = ["nginx.service"];
+                after = ["sops-nix.service"];
+
+                serviceConfig = {
+                  Type = "oneshot";
+                  RemainAfterExit = true;
+                  User = "root";
+                };
+
+                script = let
+                  acmeDir = "/var/lib/acme";
+                in ''
+                  set -euo pipefail
+
+                  # Function to restore certificates for a domain
+                  restore_cert() {
+                    local domain="$1"
+                    local domain_dir="${acmeDir}/$domain"
+
+                    # Check if encrypted certificates exist in SOPS
+                    local fullchain_key="''${domain}_acme_fullchain"
+                    local key_key="''${domain}_acme_key"
+
+                    local has_fullchain=false
+                    local has_key=false
+
+                    # Check if the secrets exist (this is a bit hacky but works)
+                    if [[ -f "/run/secrets/''${fullchain_key}" ]]; then
+                      has_fullchain=true
+                    fi
+                    if [[ -f "/run/secrets/''${key_key}" ]]; then
+                      has_key=true
+                    fi
+
+                    if [[ "$has_fullchain" == "true" && "$has_key" == "true" ]]; then
+                      echo "Restoring certificates for ''${domain} from SOPS..."
+                      mkdir -p "$domain_dir"
+                      cp "/run/secrets/''${fullchain_key}" "$domain_dir/fullchain.pem"
+                      cp "/run/secrets/''${key_key}" "$domain_dir/key.pem"
+                      chmod 600 "$domain_dir/key.pem"
+                      chmod 644 "$domain_dir/fullchain.pem"
+                      chown -R acme:acme "$domain_dir"
+                      echo "Certificates restored for ''${domain}"
+                    else
+                      echo "No encrypted certificates found for ''${domain}, will generate new ones"
+                    fi
+                  }
+
+                  # Restore certificates for all service domains that use ACME
+                  ${concatMapStringsSep "\n" (domain: "restore_cert \"${domain}\"") serviceDomains}
+                '';
+              };
+
+              # Set global environment for ACME setup
+              "acme-setup".serviceConfig.Environment = [
+                "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
+              ];
+            }
+          ]
+          ++ (map (domain: {
+              "acme-${domain}".serviceConfig.Environment = [
+                "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
+              ];
+            })
+            serviceDomains)));
+
+      # --------------------------------------------------------------------------
+
+      # --------------------------------------------------------------------------
+      # CERTIFICATE ENCRYPTION HELPER SCRIPT
+      # --------------------------------------------------------------------------
+
+      # Create a helper script for encrypting certificates with SOPS
+      environment.etc."fleet-cert-encrypt.sh" = mkIf cfg.enableACME {
+        text = ''
+          #!/bin/bash
+          # Helper script to encrypt ACME certificates with SOPS for reproducible builds
+          # Usage: fleet-cert-encrypt.sh [domain]
+
+          set -euo pipefail
+
+          CERT_BACKUP_DIR="/var/lib/fleet-acme-certs"
+          SOPS_CONFIG="${config.sops.defaultSopsFile or "/etc/nixos/secrets/secrets.yaml"}"
+
+          if [[ $# -eq 0 ]]; then
+            echo "Usage: $0 <domain> [domain2] ..."
+            echo "Available domains with certificates:"
+            find "''${CERT_BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
+            exit 1
+          fi
+
+          for domain in "$@"; do
+            cert_dir="''${CERT_BACKUP_DIR}/''${domain}"
+            if [[ ! -d "$cert_dir" ]]; then
+              echo "Error: Certificate directory not found: $cert_dir"
+              echo "Run 'fleet-cert-backup' service first or wait for ACME to generate certificates"
+              continue
             fi
 
-            # Create credentials file in the format expected by lego
-            cat > /etc/cloudflare-credentials.ini << EOF
-            CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_TOKEN
-            EOF
+            echo "Encrypting certificates for $domain..."
 
-            chmod 400 /etc/cloudflare-credentials.ini
-            chown acme:nginx /etc/cloudflare-credentials.ini
+            # Encrypt fullchain.pem
+            if [[ -f "$cert_dir/fullchain.pem" ]]; then
+              fullchain_key="''${domain}_acme_fullchain"
+              echo "Encrypting fullchain.pem as ''${fullchain_key}"
+              sops --encrypt --input-type binary "$cert_dir/fullchain.pem" > "$cert_dir/fullchain.pem.enc"
+              mv "$cert_dir/fullchain.pem.enc" "$SOPS_CONFIG.tmp"
+              # Note: You need to manually merge this into your main SOPS file
+              echo "Certificate encrypted. Run: sops edit $SOPS_CONFIG"
+              echo "Add the encrypted content as: ''${fullchain_key}: |"
+              cat "$SOPS_CONFIG.tmp"
+              rm "$SOPS_CONFIG.tmp"
+            fi
 
-            echo "Cloudflare credentials created for ACME DNS challenges"
-          '';
-        };
+            # Encrypt key.pem
+            if [[ -f "$cert_dir/key.pem" ]]; then
+              key_key="''${domain}_acme_key"
+              echo "Encrypting key.pem as ''${key_key}"
+              sops --encrypt --input-type binary "$cert_dir/key.pem" > "$cert_dir/key.pem.enc"
+              mv "$cert_dir/key.pem.enc" "$SOPS_CONFIG.tmp"
+              echo "Private key encrypted. Run: sops edit $SOPS_CONFIG"
+              echo "Add the encrypted content as: ''${key_key}: |"
+              cat "$SOPS_CONFIG.tmp"
+              rm "$SOPS_CONFIG.tmp"
+            fi
+          done
 
-        # ACME certificate backup service
-        "acme-cert-backup" = mkIf cfg.enableACME {
-          description = "Backup ACME certificates to SOPS-managed location";
-          wantedBy = ["multi-user.target"];
-          after = ["acme-finished.target"];
+          echo "Certificates encrypted. Remember to commit the updated SOPS file!"
+        '';
+        mode = "0755";
+      };
 
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            User = "root";
-          };
+      # --------------------------------------------------------------------------
+      # FIREWALL CONFIGURATION
+      # --------------------------------------------------------------------------
 
-          script = let
-            certBackupDir = "/var/lib/fleet-acme-certs";
-          in ''
-            set -euo pipefail
-
-            # Create backup directory if it doesn't exist
-            mkdir -p "${certBackupDir}"
-
-            # Function to backup certificates for a domain
-            backup_cert() {
-              local domain="$1"
-              local acme_dir="/var/lib/acme/$domain"
-              local backup_dir="${certBackupDir}/$domain"
-
-              if [[ -d "$acme_dir" && -f "$acme_dir/fullchain.pem" && -f "$acme_dir/key.pem" ]]; then
-                echo "Backing up certificates for $domain..."
-                mkdir -p "$backup_dir"
-                cp "$acme_dir/fullchain.pem" "$backup_dir/"
-                cp "$acme_dir/key.pem" "$backup_dir/"
-                chmod 600 "$backup_dir"/*.pem
-              fi
-            }
-
-            # Backup certificates for all service domains that use ACME
-            ${concatMapStringsSep "\n" (domain: "backup_cert \"${domain}\"") serviceDomains}
-          '';
-        };
-
-        # ACME certificate restore service
-        "acme-cert-restore" = mkIf cfg.enableACME {
-          description = "Restore ACME certificates from SOPS secrets";
-          wantedBy = ["multi-user.target"];
-          before = ["nginx.service"];
-          after = ["sops-nix.service"];
-
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            User = "root";
-          };
-
-          script = let
-            acmeDir = "/var/lib/acme";
-          in ''
-            set -euo pipefail
-
-            # Function to restore certificates for a domain
-            restore_cert() {
-              local domain="$1"
-              local domain_dir="${acmeDir}/$domain"
-
-              # Check if encrypted certificates exist in SOPS
-              local fullchain_key="''${domain}_acme_fullchain"
-              local key_key="''${domain}_acme_key"
-
-              local has_fullchain=false
-              local has_key=false
-
-              # Check if the secrets exist (this is a bit hacky but works)
-              if [[ -f "/run/secrets/''${fullchain_key}" ]]; then
-                has_fullchain=true
-              fi
-              if [[ -f "/run/secrets/''${key_key}" ]]; then
-                has_key=true
-              fi
-
-              if [[ "$has_fullchain" == "true" && "$has_key" == "true" ]]; then
-                echo "Restoring certificates for ''${domain} from SOPS..."
-                mkdir -p "$domain_dir"
-                cp "/run/secrets/''${fullchain_key}" "$domain_dir/fullchain.pem"
-                cp "/run/secrets/''${key_key}" "$domain_dir/key.pem"
-                chmod 600 "$domain_dir/key.pem"
-                chmod 644 "$domain_dir/fullchain.pem"
-                chown -R acme:acme "$domain_dir"
-                echo "Certificates restored for ''${domain}"
-              else
-                echo "No encrypted certificates found for ''${domain}, will generate new ones"
-              fi
-            }
-
-            # Restore certificates for all service domains that use ACME
-            ${concatMapStringsSep "\n" (domain: "restore_cert \"${domain}\"") serviceDomains}
-          '';
-        };
-
-        # Set global environment for ACME setup
-        "acme-setup".serviceConfig.Environment = [
-          "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
-        ];
-      }
-    ] ++ (map (domain: {
-      "acme-${domain}".serviceConfig.Environment = [
-        "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
+      networking.firewall.allowedTCPPorts = [
+        cfg.httpPort
+        cfg.httpsPort
       ];
-    }) serviceDomains)));
-
-    # --------------------------------------------------------------------------
-
-
-    # --------------------------------------------------------------------------
-    # CERTIFICATE ENCRYPTION HELPER SCRIPT
-    # --------------------------------------------------------------------------
-
-    # Create a helper script for encrypting certificates with SOPS
-    environment.etc."fleet-cert-encrypt.sh" = mkIf cfg.enableACME {
-      text = ''
-        #!/bin/bash
-        # Helper script to encrypt ACME certificates with SOPS for reproducible builds
-        # Usage: fleet-cert-encrypt.sh [domain]
-
-        set -euo pipefail
-
-        CERT_BACKUP_DIR="/var/lib/fleet-acme-certs"
-        SOPS_CONFIG="${config.sops.defaultSopsFile or "/etc/nixos/secrets/secrets.yaml"}"
-
-        if [[ $# -eq 0 ]]; then
-          echo "Usage: $0 <domain> [domain2] ..."
-          echo "Available domains with certificates:"
-          find "''${CERT_BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
-          exit 1
-        fi
-
-        for domain in "$@"; do
-          cert_dir="''${CERT_BACKUP_DIR}/''${domain}"
-          if [[ ! -d "$cert_dir" ]]; then
-            echo "Error: Certificate directory not found: $cert_dir"
-            echo "Run 'fleet-cert-backup' service first or wait for ACME to generate certificates"
-            continue
-          fi
-
-          echo "Encrypting certificates for $domain..."
-
-          # Encrypt fullchain.pem
-          if [[ -f "$cert_dir/fullchain.pem" ]]; then
-            fullchain_key="''${domain}_acme_fullchain"
-            echo "Encrypting fullchain.pem as ''${fullchain_key}"
-            sops --encrypt --input-type binary "$cert_dir/fullchain.pem" > "$cert_dir/fullchain.pem.enc"
-            mv "$cert_dir/fullchain.pem.enc" "$SOPS_CONFIG.tmp"
-            # Note: You need to manually merge this into your main SOPS file
-            echo "Certificate encrypted. Run: sops edit $SOPS_CONFIG"
-            echo "Add the encrypted content as: ''${fullchain_key}: |"
-            cat "$SOPS_CONFIG.tmp"
-            rm "$SOPS_CONFIG.tmp"
-          fi
-
-          # Encrypt key.pem
-          if [[ -f "$cert_dir/key.pem" ]]; then
-            key_key="''${domain}_acme_key"
-            echo "Encrypting key.pem as ''${key_key}"
-            sops --encrypt --input-type binary "$cert_dir/key.pem" > "$cert_dir/key.pem.enc"
-            mv "$cert_dir/key.pem.enc" "$SOPS_CONFIG.tmp"
-            echo "Private key encrypted. Run: sops edit $SOPS_CONFIG"
-            echo "Add the encrypted content as: ''${key_key}: |"
-            cat "$SOPS_CONFIG.tmp"
-            rm "$SOPS_CONFIG.tmp"
-          fi
-        done
-
-        echo "Certificates encrypted. Remember to commit the updated SOPS file!"
-      '';
-      mode = "0755";
     };
-
-
-    # --------------------------------------------------------------------------
-    # FIREWALL CONFIGURATION
-    # --------------------------------------------------------------------------
-
-    networking.firewall.allowedTCPPorts = [
-      cfg.httpPort
-      cfg.httpsPort
-    ];
-  };
 }

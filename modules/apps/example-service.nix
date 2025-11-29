@@ -50,8 +50,11 @@ in {
         "fleet.reverse-proxy.enable" = "true";
         "fleet.reverse-proxy.domain" = cfg.domain;
         "fleet.reverse-proxy.ssl" = "true";
-        "fleet.reverse-proxy.ssl-type" = "acme";  # Use Let's Encrypt ACME certificates
-        "fleet.reverse-proxy.websockets" = if cfg.websockets then "true" else "false";
+        "fleet.reverse-proxy.ssl-type" = "acme"; # Use Let's Encrypt ACME certificates
+        "fleet.reverse-proxy.websockets" =
+          if cfg.websockets
+          then "true"
+          else "false";
         "fleet.reverse-proxy.extra-config" = cfg.extraConfig;
       };
     };
