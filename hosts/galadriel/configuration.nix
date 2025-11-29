@@ -32,10 +32,33 @@ in {
 
   fleet.dev.jenkins.enable = true;
 
-  services.cfdyndns = {
-    enable = true;
-    apiTokenFile = "/run/secrets/cloudflare_api_token";
-    records = ["sn0wstorm.com"];
+  # ============================================================================
+  # CLOUDFLARE DYNAMIC DNS SERVICE
+  # ============================================================================
+
+  systemd.services.cloudflare-ddns = {
+    description = "Cloudflare Dynamic DNS Updater";
+    after = ["network.target"];
+    wants = ["network.target"];
+
+    serviceConfig = {
+      Type = "oneshot";
+      LoadCredential = "CLOUDFLARE_APITOKEN_FILE:/run/secrets/cloudflare_api_token";
+      DynamicUser = true;
+      ExecStart = "${pkgs.cloudflare-dynamic-dns}/bin/cloudflare-dynamic-dns --token $(${pkgs.systemd}/bin/systemd-creds cat CLOUDFLARE_APITOKEN_FILE) --domains sn0wstorm.com --ipcmd 'curl -fsSL https://api.ipify.org'";
+      RemainAfterExit = false;
+    };
+  };
+
+  systemd.timers.cloudflare-ddns = {
+    description = "Timer for Cloudflare Dynamic DNS updates";
+    wantedBy = ["timers.target"];
+
+    timerConfig = {
+      OnBootSec = "1min";
+      OnUnitActiveSec = "5min";
+      Persistent = true;
+    };
   };
 
   fleet.monitoring.prometheus = {
