@@ -18,6 +18,7 @@ in {
     ../../modules/dev/jenkins.nix
     ../../modules/networking/reverse-proxy.nix
     ../../modules/apps/homepage.nix
+    ../../modules/apps/vaultwarden.nix
   ];
 
   # ============================================================================
@@ -32,6 +33,16 @@ in {
   # ============================================================================
 
   fleet.dev.jenkins.enable = true;
+
+  # Vaultwarden Password Manager
+  fleet.apps.vaultwarden = {
+    enable = true;
+    domain = "bitwarden.sn0wstorm.com";
+    signupsAllowed = false;
+    invitationsAllowed = true;
+    # To enable admin panel, create environment file with ADMIN_TOKEN:
+    # environmentFile = "/run/secrets/vaultwarden-env";
+  };
 
   # Homepage Dashboard
   fleet.apps.homepage = {
