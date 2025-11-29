@@ -222,16 +222,16 @@ with lib;
       certs = let
         serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
       in mkMerge (map (domain: {
-        "${domain}" = {
-          # If certificate exists in SOPS, use it; otherwise generate new one
-          webroot = null;
-          dnsProvider = "cloudflare";
-          credentialsFile = if cfg.cloudflareCredentialsFile != null
-            then cfg.cloudflareCredentialsFile
-            else "/etc/cloudflare-credentials.ini";
-          group = "nginx";
-          email = cfg.acmeEmail;
-        };
+      "${domain}" = {
+        # If certificate exists in SOPS, use it; otherwise generate new one
+        webroot = null;
+        dnsProvider = "cloudflare";
+        credentialsFile = if cfg.cloudflareCredentialsFile != null
+          then cfg.cloudflareCredentialsFile
+          else "/etc/cloudflare-credentials.ini";
+        group = "nginx";
+        email = cfg.acmeEmail;
+      };
       }) serviceDomains);
     };
 
@@ -239,15 +239,55 @@ with lib;
     # CLOUDFLARE CREDENTIALS FOR ACME DNS CHALLENGE
     # --------------------------------------------------------------------------
 
-    environment.etc."cloudflare-credentials.ini" = mkIf (cfg.enableACME && cfg.cloudflareCredentialsFile == null) {
-      text = ''
-        # Cloudflare API credentials for ACME DNS challenge
-        dns_cloudflare_api_token = ${config.sops.secrets."cloudflare_api_token".path or "/run/secrets/cloudflare_api_token"}
+    # Create Cloudflare credentials file for ACME
+    systemd.services.cloudflare-acme-credentials = mkIf cfg.enableACME {
+      description = "Create Cloudflare credentials for ACME DNS challenges";
+      wantedBy = ["multi-user.target"];
+      before = ["acme-setup.service"];
+      after = ["sops-nix.service"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "root";
+      };
+      script = ''
+        # Read the Cloudflare token from SOPS secret
+        CLOUDFLARE_TOKEN=$(cat ${config.sops.secrets."cloudflare_api_token".path or "/run/secrets/cloudflare_api_token"} 2>/dev/null || echo "")
+
+        if [[ -z "$CLOUDFLARE_TOKEN" ]]; then
+          echo "ERROR: Could not read Cloudflare API token from SOPS secret"
+          exit 1
+        fi
+
+        # Create credentials file in the format expected by lego
+        # lego reads environment variables from this file when --dns.credentials is used
+        cat > /etc/cloudflare-credentials.ini << EOF
+        CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_TOKEN
+        EOF
+
+        chmod 400 /etc/cloudflare-credentials.ini
+        chown acme:nginx /etc/cloudflare-credentials.ini
+
+        echo "Cloudflare credentials created for ACME DNS challenges"
       '';
-      mode = "0400";
-      user = "acme";
-      group = "acme";
     };
+
+    # Set environment variables for ACME services
+    systemd.services = mkIf cfg.enableACME (let
+      serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
+      tokenPath = config.sops.secrets."cloudflare_api_token".path or "/run/secrets/cloudflare_api_token";
+    in mkMerge ([
+      {
+        # Set global environment for ACME setup
+        "acme-setup".serviceConfig.Environment = [
+          "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
+        ];
+      }
+    ] ++ (map (domain: {
+      "acme-${domain}".serviceConfig.Environment = [
+        "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
+      ];
+    }) serviceDomains)));
 
     # --------------------------------------------------------------------------
     # ACME CERTIFICATE MANAGEMENT
