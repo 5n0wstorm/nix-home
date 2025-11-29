@@ -239,45 +239,44 @@ with lib;
     # CLOUDFLARE CREDENTIALS FOR ACME DNS CHALLENGE
     # --------------------------------------------------------------------------
 
-    # Create Cloudflare credentials file for ACME
-    systemd.services.cloudflare-acme-credentials = mkIf cfg.enableACME {
-      description = "Create Cloudflare credentials for ACME DNS challenges";
-      wantedBy = ["multi-user.target"];
-      before = ["acme-setup.service"];
-      after = ["sops-nix.service"];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        User = "root";
-      };
-      script = ''
-        # Read the Cloudflare token from SOPS secret
-        CLOUDFLARE_TOKEN=$(cat ${config.sops.secrets."cloudflare_api_token".path or "/run/secrets/cloudflare_api_token"} 2>/dev/null || echo "")
-
-        if [[ -z "$CLOUDFLARE_TOKEN" ]]; then
-          echo "ERROR: Could not read Cloudflare API token from SOPS secret"
-          exit 1
-        fi
-
-        # Create credentials file in the format expected by lego
-        # lego reads environment variables from this file when --dns.credentials is used
-        cat > /etc/cloudflare-credentials.ini << EOF
-        CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_TOKEN
-        EOF
-
-        chmod 400 /etc/cloudflare-credentials.ini
-        chown acme:nginx /etc/cloudflare-credentials.ini
-
-        echo "Cloudflare credentials created for ACME DNS challenges"
-      '';
-    };
-
-    # Set environment variables for ACME services
+    # Systemd services for ACME and credentials
     systemd.services = mkIf cfg.enableACME (let
       serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
       tokenPath = config.sops.secrets."cloudflare_api_token".path or "/run/secrets/cloudflare_api_token";
     in mkMerge ([
       {
+        # Cloudflare credentials setup service
+        "cloudflare-acme-credentials" = {
+          description = "Create Cloudflare credentials for ACME DNS challenges";
+          wantedBy = ["multi-user.target"];
+          before = ["acme-setup.service"];
+          after = ["sops-nix.service"];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            User = "root";
+          };
+          script = ''
+            # Read the Cloudflare token from SOPS secret
+            CLOUDFLARE_TOKEN=$(cat ${tokenPath} 2>/dev/null || echo "")
+
+            if [[ -z "$CLOUDFLARE_TOKEN" ]]; then
+              echo "ERROR: Could not read Cloudflare API token from SOPS secret"
+              exit 1
+            fi
+
+            # Create credentials file in the format expected by lego
+            cat > /etc/cloudflare-credentials.ini << EOF
+            CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_TOKEN
+            EOF
+
+            chmod 400 /etc/cloudflare-credentials.ini
+            chown acme:nginx /etc/cloudflare-credentials.ini
+
+            echo "Cloudflare credentials created for ACME DNS challenges"
+          '';
+        };
+
         # Set global environment for ACME setup
         "acme-setup".serviceConfig.Environment = [
           "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
