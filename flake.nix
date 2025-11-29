@@ -114,6 +114,7 @@
 
         imports = [
           ./hosts/galadriel/configuration.nix
+          sops-nix.nixosModules.sops
         ];
       };
 
@@ -141,14 +142,17 @@
         ];
       };
 
-      elrond = {
+      elrond = {name, ...}: {
         deployment = {
           targetUser = hosts.elrond.user;
           tags = hosts.elrond.tags;
         };
 
+        _module.args.nixos-wsl = nixos-wsl;
+
         imports = [
           ./hosts/elrond/configuration.nix
+          sops-nix.nixosModules.sops
         ];
       };
     };
