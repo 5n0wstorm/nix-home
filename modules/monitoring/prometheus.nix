@@ -75,5 +75,18 @@ in {
     # --------------------------------------------------------------------------
 
     networking.firewall.allowedTCPPorts = [cfg.port];
+
+    # ----------------------------------------------------------------------------
+    # REVERSE PROXY SERVICE REGISTRATION
+    # ----------------------------------------------------------------------------
+
+    fleet.networking.reverseProxy.serviceRegistry."prometheus" = {
+      port = cfg.port;
+      labels = {
+        "fleet.reverse-proxy.enable" = "true";
+        "fleet.reverse-proxy.domain" = "prometheus.sn0wstorm.com";
+        "fleet.reverse-proxy.ssl" = "true";
+      };
+    };
   };
 }

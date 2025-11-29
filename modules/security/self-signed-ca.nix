@@ -9,6 +9,20 @@ with lib;
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================
+  #
+  # This module provides self-signed certificate generation using minica,
+  # which supports both regular domains and wildcard certificates.
+  #
+  # Wildcard certificates are useful for development environments where
+  # you need certificates for multiple subdomains of the same domain.
+  #
+  # Example usage:
+  #   fleet.security.selfSignedCA = {
+  #     enable = true;
+  #     wildcardDomains = ["*.local"];
+  #     domains = ["specific.example.com"];
+  #   };
+  #
 
   options.fleet.security.selfSignedCA = {
     enable = mkEnableOption "Self-signed Certificate Authority";
@@ -24,6 +38,13 @@ with lib;
       default = [];
       description = "List of domains to generate certificates for";
       example = ["jenkins.local" "grafana.local"];
+    };
+
+    wildcardDomains = mkOption {
+      type = types.listOf types.str;
+      default = [];
+      description = "List of wildcard domains to generate certificates for";
+      example = ["*.local" "*.example.com"];
     };
 
     validityDays = mkOption {
@@ -51,6 +72,7 @@ with lib;
     ) serviceRegistry);
 
     allDomains = cfg.domains ++ serviceDomains;
+    allWildcardDomains = cfg.wildcardDomains;
   in mkIf cfg.enable {
     # --------------------------------------------------------------------------
     # CA AND CERTIFICATE GENERATION
@@ -71,71 +93,59 @@ with lib;
         set -euo pipefail
 
         CA_DIR="/var/lib/fleet-ca"
-        CERTS_DIR="$CA_DIR/certs"
 
-        # Create directories
-        mkdir -p "$CA_DIR" "$CERTS_DIR"
+        # Create CA directory
+        mkdir -p "$CA_DIR"
 
-        # Generate CA private key if it doesn't exist
-        if [[ ! -f "$CA_DIR/ca-key.pem" ]]; then
-          echo "Generating CA private key..."
-          ${pkgs.openssl}/bin/openssl genrsa -out "$CA_DIR/ca-key.pem" 4096
-          chmod 600 "$CA_DIR/ca-key.pem"
+        # Change to CA directory for minica operations
+        cd "$CA_DIR"
+
+        # Generate CA and certificates using minica if not already done
+        if [[ ! -f "minica.pem" ]]; then
+          echo "Generating CA and certificates with minica..."
+
+          # Build minica command arguments
+          MINICA_ARGS=()
+
+          # Add wildcard domains
+          ${concatMapStringsSep "\n" (domain: ''
+            [[ -n "${domain}" ]] && MINICA_ARGS+=("${domain}")
+          '') allWildcardDomains}
+
+          # Add regular domains
+          ${concatMapStringsSep "\n" (domain: ''
+            [[ -n "${domain}" ]] && MINICA_ARGS+=("${domain}")
+          '') allDomains}
+
+          # Generate certificates if we have domains
+          if [[ ''${#MINICA_ARGS[@]} -gt 0 ]]; then
+            echo "Generating certificates for: ''${MINICA_ARGS[*]}"
+            ${pkgs.minica}/bin/minica \
+              --ca-cert=minica.pem \
+              --ca-key=minica-key.pem \
+              --domains="''${MINICA_ARGS[*]}" \
+              --validity-days=${toString cfg.validityDays}
+
+            # Set proper permissions
+            chmod 600 minica-key.pem
+            chmod 644 minica.pem
+            find . -name "*.pem" -type f -exec chmod 644 {} \;
+            find . -name "*-key.pem" -type f -exec chmod 600 {} \;
+          else
+            echo "No domains specified, generating minimal CA only..."
+            ${pkgs.minica}/bin/minica \
+              --ca-cert=minica.pem \
+              --ca-key=minica-key.pem \
+              --domains="${cfg.caName}.local"
+          fi
         fi
 
-        # Generate CA certificate if it doesn't exist
-        if [[ ! -f "$CA_DIR/ca-cert.pem" ]]; then
-          echo "Generating CA certificate..."
-          ${pkgs.openssl}/bin/openssl req -new -x509 -key "$CA_DIR/ca-key.pem" \
-            -out "$CA_DIR/ca-cert.pem" -days ${toString cfg.validityDays} \
-            -subj "/C=US/ST=Internal/L=Fleet/O=${cfg.caName}/CN=${cfg.caName}"
-          chmod 644 "$CA_DIR/ca-cert.pem"
-        fi
+        # Create symlinks for backward compatibility and easy access
+        ln -sf minica.pem ca-cert.pem
+        ln -sf minica-key.pem ca-key.pem
 
-        # Generate certificates for each domain
-        ${concatMapStringsSep "\n" (domain: ''
-          # Skip if domain is empty or already processed
-          [[ -z "${domain}" ]] && continue
-          ''
-                      DOMAIN_DIR="$CERTS_DIR/${domain}"
-                      mkdir -p "$DOMAIN_DIR"
-
-                      # Generate domain private key
-                      if [[ ! -f "$DOMAIN_DIR/key.pem" ]]; then
-                        echo "Generating private key for ${domain}..."
-                        ${pkgs.openssl}/bin/openssl genrsa -out "$DOMAIN_DIR/key.pem" 2048
-                        chmod 600 "$DOMAIN_DIR/key.pem"
-                      fi
-
-                      # Generate certificate signing request
-                      if [[ ! -f "$DOMAIN_DIR/cert.pem" ]]; then
-                        echo "Generating certificate for ${domain}..."
-                        ${pkgs.openssl}/bin/openssl req -new -key "$DOMAIN_DIR/key.pem" \
-                          -out "$DOMAIN_DIR/csr.pem" \
-                          -subj "/C=US/ST=Internal/L=Fleet/O=Fleet Services/CN=''${domain}"
-
-                        # Sign the certificate with our CA
-                        ${pkgs.openssl}/bin/openssl x509 -req -in "$DOMAIN_DIR/csr.pem" \
-                          -CA "$CA_DIR/ca-cert.pem" -CAkey "$CA_DIR/ca-key.pem" \
-                          -CAcreateserial -out "$DOMAIN_DIR/cert.pem" \
-                          -days ${toString cfg.validityDays} \
-                          -extensions v3_req -extfile <(cat <<EOF
-            [v3_req]
-            keyUsage = keyEncipherment, dataEncipherment
-            extendedKeyUsage = serverAuth
-            subjectAltName = DNS:''${domain}
-            EOF
-                        )
-
-                        # Clean up CSR
-                        rm "$DOMAIN_DIR/csr.pem"
-                        chmod 644 "$DOMAIN_DIR/cert.pem"
-                      fi
-
-                      # Set ownership for nginx
-                      chown -R nginx:nginx "$DOMAIN_DIR"
-          '')
-          allDomains}
+        # Set ownership for nginx
+        chown -R nginx:nginx "$CA_DIR"
 
         echo "Fleet CA setup complete!"
         echo "CA certificate available at: $CA_DIR/ca-cert.pem"

@@ -24,7 +24,7 @@ The `modules/` directory contains reusable pieces for different services. Want t
 
 All the servers import `hosts/common.nix` which sets up SSH keys, basic security, and monitoring. Individual servers add whatever services they need on top of that.
 
-The reverse proxy on the galadriel server routes traffic to services running on different machines. Self-signed certificates handle TLS so you don't get browser warnings.
+The reverse proxy on the galadriel server routes traffic to services running on different machines. Let's Encrypt ACME certificates with Cloudflare DNS challenge provide trusted TLS certificates.
 
 ## Commands
 

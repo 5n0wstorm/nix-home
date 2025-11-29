@@ -39,7 +39,7 @@ fleet.networking.reverseProxy.serviceRegistry.myService = {
 | `fleet.reverse-proxy.enable` | string | `"false"` | Enable reverse proxy for this service |
 | `fleet.reverse-proxy.domain` | string | `"<service-name>.local"` | Domain name for the service |
 | `fleet.reverse-proxy.ssl` | string | `"true"` | Enable SSL/TLS for this domain |
-| `fleet.reverse-proxy.ssl-type` | string | `"acme"` | Certificate type: `"acme"` (Let's Encrypt) or `"selfsigned"` |
+| `fleet.reverse-proxy.ssl-type` | string | `"acme"` | Certificate type: `"acme"` (Let's Encrypt) |
 | `fleet.reverse-proxy.websockets` | string | `"false"` | Enable WebSocket proxying |
 | `fleet.reverse-proxy.target` | string | `"127.0.0.1"` | Target host IP or hostname |
 | `fleet.reverse-proxy.port` | string | service port | Target port number |
@@ -134,7 +134,7 @@ If you have existing manual routes, they will continue to work alongside the plu
 
 1. Add service registration to your service modules (as shown above)
 2. Remove manual routes from host configurations
-3. Remove manual domains from `fleet.security.selfSignedCA.domains`
+3. Remove manual domains from `fleet.security.selfSignedCA.domains` (if using self-signed)
 
 ### Benefits
 
@@ -151,7 +151,7 @@ To test the system:
 1. Enable a service with reverse proxy labels
 2. Deploy the configuration: `colmena apply --on <host> --dry-run switch`
 3. Check that nginx virtual hosts are created: `systemctl status nginx`
-4. Verify SSL certificates are generated: `ls /var/lib/acme/<domain>/` (for ACME) or `ls /var/lib/fleet-ca/certs/<domain>/` (for self-signed)
+4. Verify SSL certificates are generated: `ls /var/lib/acme/<domain>/` (for ACME)
 5. Test access via HTTPS: `curl https://<domain>.local`
 
 ## ACME Certificate Management for Reproducible Builds

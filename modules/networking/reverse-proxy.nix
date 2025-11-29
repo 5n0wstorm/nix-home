@@ -65,7 +65,7 @@ with lib; {
               "fleet.reverse-proxy.enable" = "true";
               "fleet.reverse-proxy.domain" = "myapp.local";
               "fleet.reverse-proxy.ssl" = "true";
-              "fleet.reverse-proxy.ssl-type" = "acme"; # "acme" or "selfsigned"
+              "fleet.reverse-proxy.ssl-type" = "acme"; # Let's Encrypt ACME
               "fleet.reverse-proxy.websockets" = "false";
               "fleet.reverse-proxy.extra-config" = "client_max_body_size 100M;";
             };
@@ -149,16 +149,16 @@ with lib; {
     # Helper function to create virtual host from service registry entry
     mkServiceVirtualHost = serviceName: serviceConfig: let
       labels = serviceConfig.labels or {};
-      domain = labels."fleet.reverse-proxy.domain" or "${serviceName}.local";
+      domain = labels."fleet.reverse-proxy.domain" or "${serviceName}.sn0wstorm.com";
       target = labels."fleet.reverse-proxy.target" or "127.0.0.1";
       port = labels."fleet.reverse-proxy.port" or serviceConfig.port or 80;
       extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
       enableSSL = labels."fleet.reverse-proxy.ssl" != "false";
     in {
-      # Use wildcard certificate for all services
-      sslCertificate = mkIf (cfg.enableTLS && enableSSL) "/var/lib/acme/sn0wstorm.com/fullchain.pem";
-      sslCertificateKey = mkIf (cfg.enableTLS && enableSSL) "/var/lib/acme/sn0wstorm.com/key.pem";
-      forceSSL = cfg.enableTLS && enableSSL;
+      # Use wildcard Let's Encrypt certificate for all services
+      sslCertificate = mkIf (cfg.enableTLS && enableSSL && cfg.enableACME) "/var/lib/acme/sn0wstorm.com/fullchain.pem";
+      sslCertificateKey = mkIf (cfg.enableTLS && enableSSL && cfg.enableACME) "/var/lib/acme/sn0wstorm.com/key.pem";
+      forceSSL = cfg.enableTLS && enableSSL && cfg.enableACME;
 
       locations."/" = {
         proxyPass = "http://${target}:${toString port}";

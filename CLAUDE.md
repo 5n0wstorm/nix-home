@@ -19,7 +19,7 @@ The fleet uses a custom module system under the `fleet.*` namespace:
 - `fleet.monitoring.*`: Prometheus, Grafana, Node Exporter
 - `fleet.dev.*`: Jenkins, Gitea
 - `fleet.networking.*`: Reverse proxy with TLS
-- `fleet.security.*`: Self-signed CA management
+- `fleet.security.*`: Certificate management (ACME/Let's Encrypt only)
 
 ### Host Architecture
 

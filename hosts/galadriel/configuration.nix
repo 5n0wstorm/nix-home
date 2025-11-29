@@ -16,7 +16,6 @@ in {
     ../../modules/monitoring/grafana.nix
     ../../modules/dev/jenkins.nix
     ../../modules/networking/reverse-proxy.nix
-    # ../../modules/security/self-signed-ca.nix  # Disabled - using ACME only
   ];
 
   # ============================================================================
@@ -53,27 +52,12 @@ in {
 
   fleet.monitoring.grafana = {
     enable = true;
-    prometheusUrl = "http://localhost:9090";
+    prometheusUrl = "https://prometheus.sn0wstorm.com";
   };
 
-  # --------------------------------------------------------------------------
-  # TLS CERTIFICATES
-  # --------------------------------------------------------------------------
-
-  # Self-signed CA disabled - using ACME certificates for all services
-  # fleet.security.selfSignedCA = {
-  #   enable = true;
-  #   caName = "Fleet Internal CA";
-  #   domains = [
-  #     "prometheus.local"
-  #     "git.local"
-  #     "rss.local"
-  #   ];
-  # };
-
-  # --------------------------------------------------------------------------
+  # ============================================================================
   # REVERSE PROXY (Pluggable - services register themselves automatically)
-  # --------------------------------------------------------------------------
+  # ============================================================================
 
   fleet.networking.reverseProxy = {
     enable = true;
@@ -125,9 +109,9 @@ in {
     };
   };
 
-  # --------------------------------------------------------------------------
+  # ============================================================================
   # SOPS AGE KEY DIRECTORY
-  # --------------------------------------------------------------------------
+  # ============================================================================
 
   # Ensure dominik's directories exist
   systemd.tmpfiles.rules = [
@@ -137,7 +121,7 @@ in {
     "d /home/dominik/.config/sops/age 0755 dominik users -"
   ];
 
-  # --------------------------------------------------------------------------
+  # ============================================================================
 
   networking = {
     useDHCP = false;
