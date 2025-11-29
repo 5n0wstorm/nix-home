@@ -11,19 +11,19 @@
     ];
   };
 
-  # frodo = {
-  #   ip = "192.168.2.11";
-  #   user = "dominik";
-  #   tags = [
-  #     "git"
-  #   ];
-  # };
+  frodo = {
+    ip = "192.168.2.11";
+    user = "dominik";
+    tags = [
+      "git"
+    ];
+  };
 
-  # sam = {
-  #   ip = "192.168.2.12";
-  #   user = "dominik";
-  #   tags = [ ];
-  # };
+  sam = {
+    ip = "192.168.2.12";
+    user = "dominik";
+    tags = [ ];
+  };
 
   elrond = {
     user = "dominik";
