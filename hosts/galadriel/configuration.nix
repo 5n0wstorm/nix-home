@@ -125,6 +125,18 @@ in {
     # SOPS secrets
     secrets = {
       "cloudflare_api_token" = {};
+      "ssh_key" = {
+        path = "/home/dominik/.ssh/id_ed25519";
+        owner = "dominik";
+        group = "users";
+        mode = "0600";
+      };
+      "ssh_key_pub" = {
+        path = "/home/dominik/.ssh/id_ed25519.pub";
+        owner = "dominik";
+        group = "users";
+        mode = "0644";
+      };
       "git_user_name" = {};
       "git_user_email" = {};
     };
@@ -134,8 +146,9 @@ in {
   # SOPS AGE KEY DIRECTORY
   # --------------------------------------------------------------------------
 
-  # Ensure dominik's SOPS directory exists
+  # Ensure dominik's directories exist
   systemd.tmpfiles.rules = [
+    "d /home/dominik/.ssh 0700 dominik users"
     "d /home/dominik/.config 0755 dominik users -"
     "d /home/dominik/.config/sops 0755 dominik users -"
     "d /home/dominik/.config/sops/age 0755 dominik users -"
@@ -173,6 +186,22 @@ in {
       name = "$(cat /run/secrets/git_user_name)";
       email = "$(cat /run/secrets/git_user_email)";
     };
+  };
+
+  # ============================================================================
+  # SSH CONFIGURATION
+  # ============================================================================
+
+  # SSH client configuration for git
+  programs.ssh = {
+    startAgent = true;
+    agentTimeout = "1h";
+
+    extraConfig = ''
+      Host github.com
+        IdentityFile /home/dominik/.ssh/id_ed25519
+        User git
+    '';
   };
 
   # ============================================================================
