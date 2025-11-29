@@ -6,6 +6,18 @@
 }:
 with lib; let
   cfg = config.fleet.security.selfSignedCA;
+
+  # Get domains from service registry that use self-signed certificates
+  serviceRegistry = config.fleet.networking.reverseProxy.serviceRegistry or {};
+  serviceDomains = mapAttrsToList (serviceName: serviceConfig:
+    serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local"
+  ) (filterAttrs (serviceName: serviceConfig:
+    (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" &&
+    (serviceConfig.labels."fleet.reverse-proxy.ssl" or "true") != "false" &&
+    (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "selfsigned"
+  ) serviceRegistry);
+
+  allDomains = cfg.domains ++ serviceDomains;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -81,6 +93,9 @@ in {
 
         # Generate certificates for each domain
         ${concatMapStringsSep "\n" (domain: ''
+          # Skip if domain is empty or already processed
+          [[ -z "${domain}" ]] && continue
+          ''
                       DOMAIN_DIR="$CERTS_DIR/${domain}"
                       mkdir -p "$DOMAIN_DIR"
 
@@ -119,7 +134,7 @@ in {
                       # Set ownership for nginx
                       chown -R nginx:nginx "$DOMAIN_DIR"
           '')
-          cfg.domains}
+          allDomains}
 
         echo "Fleet CA setup complete!"
         echo "CA certificate available at: $CA_DIR/ca-cert.pem"

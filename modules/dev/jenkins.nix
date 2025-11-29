@@ -31,6 +31,23 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
+    # Register with reverse proxy service registry
+    fleet.networking.reverseProxy.serviceRegistry.jenkins = {
+      port = cfg.port;
+      labels = {
+        "fleet.reverse-proxy.enable" = "true";
+        "fleet.reverse-proxy.domain" = "jenkins.sn0wstorm.com";
+        "fleet.reverse-proxy.ssl" = "true";
+        "fleet.reverse-proxy.ssl-type" = "acme";
+        "fleet.reverse-proxy.websockets" = "true";
+        "fleet.reverse-proxy.extra-config" = ''
+          client_max_body_size 500M;
+          proxy_read_timeout 300;
+          proxy_send_timeout 300;
+        '';
+      };
+    };
+
     # --------------------------------------------------------------------------
     # JENKINS SERVICE
     # --------------------------------------------------------------------------

@@ -16,7 +16,6 @@ in {
     ../../modules/monitoring/grafana.nix
     ../../modules/dev/jenkins.nix
     ../../modules/networking/reverse-proxy.nix
-    ../../modules/security/self-signed-ca.nix
   ];
 
   # ============================================================================
@@ -53,7 +52,6 @@ in {
 
   fleet.monitoring.grafana = {
     enable = true;
-    domain = hosts.galadriel.ip;
     prometheusUrl = "http://localhost:9090";
   };
 
@@ -64,9 +62,9 @@ in {
   fleet.security.selfSignedCA = {
     enable = true;
     caName = "Fleet Internal CA";
+    # Only domains that use self-signed certificates (not ACME)
+    # Services using ACME will get Let's Encrypt certificates automatically
     domains = [
-      "jenkins.local"
-      "grafana.local"
       "prometheus.local"
       "git.local"
       "rss.local"
@@ -74,44 +72,15 @@ in {
   };
 
   # --------------------------------------------------------------------------
-  # REVERSE PROXY
+  # REVERSE PROXY (Pluggable - services register themselves automatically)
   # --------------------------------------------------------------------------
 
   fleet.networking.reverseProxy = {
     enable = true;
     enableTLS = true;
-    routes = {
-      "jenkins.local" = {
-        target = hosts.galadriel.ip;
-        port = 8080;
-        description = "Jenkins CI/CD";
-      };
-      "grafana.local" = {
-        target = hosts.galadriel.ip;
-        port = 3000;
-        description = "Grafana monitoring dashboard";
-      };
-      "prometheus.local" = {
-        target = hosts.galadriel.ip;
-        port = 9090;
-        description = "Prometheus metrics";
-      };
-      "git.local" = {
-        target = hosts.frodo.ip;
-        port = 3000;
-        description = "Gitea repository hosting";
-        extraConfig = ''
-          client_max_body_size 500M;
-          proxy_read_timeout 300;
-          proxy_send_timeout 300;
-        '';
-      };
-      "rss.local" = {
-        target = hosts.sam.ip;
-        port = 8080;
-        description = "FreshRSS feed aggregator";
-      };
-    };
+    enableACME = true;
+    acmeEmail = "dominik@example.com"; # Replace with your actual email
+    # cloudflareCredentialsFile will auto-generate from SOPS secrets
   };
 
   # ============================================================================
@@ -129,6 +98,7 @@ in {
     # SOPS secrets
     secrets = {
       "cloudflare_api_token" = {};
+      "cloudflare_credentials" = {};
       "ssh_key" = {
         path = "/home/dominik/.ssh/id_ed25519";
         owner = "dominik";
@@ -144,6 +114,28 @@ in {
       "git_user_name" = {};
       "git_user_email" = {};
     };
+  };
+
+  # --------------------------------------------------------------------------
+  # CLOUDFLARE ACME CREDENTIALS
+  # --------------------------------------------------------------------------
+
+  # Create Cloudflare credentials file for ACME
+  systemd.services.cloudflare-acme-credentials = {
+    description = "Create Cloudflare credentials for ACME DNS challenge";
+    wantedBy = ["multi-user.target"];
+    before = ["nginx.service"];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      User = "root";
+    };
+    script = ''
+      # Create credentials file from SOPS secret
+      echo "CLOUDFLARE_TOKEN=$(cat /run/secrets/cloudflare_api_token)" > /run/secrets/cloudflare_credentials
+      chmod 600 /run/secrets/cloudflare_credentials
+      chown root:root /run/secrets/cloudflare_credentials
+    '';
   };
 
   # --------------------------------------------------------------------------
