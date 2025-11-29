@@ -101,10 +101,11 @@ in {
     };
 
     # Manual bookmarks
+    # Structure: [ { CategoryName = [ { BookmarkName = { abbr, href, ... } } ] } ]
     bookmarks = mkOption {
-      type = types.listOf (types.attrsOf (types.listOf (types.attrsOf types.str)));
+      type = types.listOf (types.attrsOf (types.listOf (types.attrsOf (types.attrsOf types.str))));
       default = [];
-      description = "Manual bookmarks configuration";
+      description = "Manual bookmarks configuration for homepage-dashboard";
       example = [
         {
           Developer = [
