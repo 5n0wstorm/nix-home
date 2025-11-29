@@ -6,6 +6,7 @@
 }:
 with lib; let
   cfg = config.fleet.dev.gitea;
+  homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -43,6 +44,39 @@ in {
       default = false;
       description = "Disable user registration";
     };
+
+    # Homepage dashboard integration
+    homepage = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Register this service with the homepage dashboard";
+      };
+
+      name = mkOption {
+        type = types.str;
+        default = "Gitea";
+        description = "Display name on homepage";
+      };
+
+      description = mkOption {
+        type = types.str;
+        default = "Git repository hosting";
+        description = "Description shown on homepage";
+      };
+
+      icon = mkOption {
+        type = types.str;
+        default = "si-gitea";
+        description = "Icon for homepage (mdi-*, si-*, or URL)";
+      };
+
+      category = mkOption {
+        type = types.enum ["Apps" "Dev" "Monitoring" "Infrastructure" "Media" "Services"];
+        default = "Dev";
+        description = "Category on the homepage dashboard";
+      };
+    };
   };
 
   # ============================================================================
@@ -50,6 +84,18 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
+    # --------------------------------------------------------------------------
+    # HOMEPAGE DASHBOARD REGISTRATION
+    # --------------------------------------------------------------------------
+
+    fleet.apps.homepage.serviceRegistry.gitea = mkIf (cfg.homepage.enable && homepageCfg.enable) {
+      name = cfg.homepage.name;
+      description = cfg.homepage.description;
+      icon = cfg.homepage.icon;
+      href = "http://${cfg.domain}:${toString cfg.port}";
+      category = cfg.homepage.category;
+    };
+
     # --------------------------------------------------------------------------
     # GITEA SERVICE
     # --------------------------------------------------------------------------

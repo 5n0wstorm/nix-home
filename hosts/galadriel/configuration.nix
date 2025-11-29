@@ -17,6 +17,7 @@ in {
     ../../modules/monitoring/grafana.nix
     ../../modules/dev/jenkins.nix
     ../../modules/networking/reverse-proxy.nix
+    ../../modules/apps/homepage.nix
   ];
 
   # ============================================================================
@@ -31,6 +32,26 @@ in {
   # ============================================================================
 
   fleet.dev.jenkins.enable = true;
+
+  # Homepage Dashboard
+  fleet.apps.homepage = {
+    enable = true;
+    domain = "home.sn0wstorm.com";
+    title = "Fleet Dashboard";
+    bookmarks = [
+      {
+        Developer = [
+          {GitHub = {abbr = "GH"; href = "https://github.com/";};}
+          {NixOS = {abbr = "NIX"; href = "https://nixos.org/";};}
+        ];
+      }
+      {
+        Cloud = [
+          {Cloudflare = {abbr = "CF"; href = "https://dash.cloudflare.com/";};}
+        ];
+      }
+    ];
+  };
 
   # ============================================================================
   # CLOUDFLARE DYNAMIC DNS SERVICE

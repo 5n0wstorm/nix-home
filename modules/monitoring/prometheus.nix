@@ -5,6 +5,7 @@
 }:
 with lib; let
   cfg = config.fleet.monitoring.prometheus;
+  homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -30,6 +31,39 @@ in {
       default = [];
       description = "List of node exporter targets (host:port)";
     };
+
+    # Homepage dashboard integration
+    homepage = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Register this service with the homepage dashboard";
+      };
+
+      name = mkOption {
+        type = types.str;
+        default = "Prometheus";
+        description = "Display name on homepage";
+      };
+
+      description = mkOption {
+        type = types.str;
+        default = "Metrics collection & alerting";
+        description = "Description shown on homepage";
+      };
+
+      icon = mkOption {
+        type = types.str;
+        default = "si-prometheus";
+        description = "Icon for homepage (mdi-*, si-*, or URL)";
+      };
+
+      category = mkOption {
+        type = types.enum ["Apps" "Dev" "Monitoring" "Infrastructure" "Media" "Services"];
+        default = "Monitoring";
+        description = "Category on the homepage dashboard";
+      };
+    };
   };
 
   # ============================================================================
@@ -37,6 +71,23 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
+    # --------------------------------------------------------------------------
+    # HOMEPAGE DASHBOARD REGISTRATION
+    # --------------------------------------------------------------------------
+
+    fleet.apps.homepage.serviceRegistry.prometheus = mkIf (cfg.homepage.enable && homepageCfg.enable) {
+      name = cfg.homepage.name;
+      description = cfg.homepage.description;
+      icon = cfg.homepage.icon;
+      href = "https://prometheus.sn0wstorm.com";
+      category = cfg.homepage.category;
+      widget = {
+        type = "prometheus";
+        url = "http://localhost:${toString cfg.port}";
+        fields = ["targets_up" "targets_down" "targets_total"];
+      };
+    };
+
     # --------------------------------------------------------------------------
     # PROMETHEUS SERVICE
     # --------------------------------------------------------------------------

@@ -6,6 +6,7 @@
 }:
 with lib; let
   cfg = config.fleet.monitoring.grafana;
+  homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -31,6 +32,39 @@ in {
       default = "localhost";
       description = "Domain name for Grafana";
     };
+
+    # Homepage dashboard integration
+    homepage = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Register this service with the homepage dashboard";
+      };
+
+      name = mkOption {
+        type = types.str;
+        default = "Grafana";
+        description = "Display name on homepage";
+      };
+
+      description = mkOption {
+        type = types.str;
+        default = "Metrics visualization & dashboards";
+        description = "Description shown on homepage";
+      };
+
+      icon = mkOption {
+        type = types.str;
+        default = "si-grafana";
+        description = "Icon for homepage (mdi-*, si-*, or URL)";
+      };
+
+      category = mkOption {
+        type = types.enum ["Apps" "Dev" "Monitoring" "Infrastructure" "Media" "Services"];
+        default = "Monitoring";
+        description = "Category on the homepage dashboard";
+      };
+    };
   };
 
   # ============================================================================
@@ -38,7 +72,27 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
-    # Register with reverse proxy service registry
+    # --------------------------------------------------------------------------
+    # HOMEPAGE DASHBOARD REGISTRATION
+    # --------------------------------------------------------------------------
+
+    fleet.apps.homepage.serviceRegistry.grafana = mkIf (cfg.homepage.enable && homepageCfg.enable) {
+      name = cfg.homepage.name;
+      description = cfg.homepage.description;
+      icon = cfg.homepage.icon;
+      href = "https://grafana.sn0wstorm.com";
+      category = cfg.homepage.category;
+      widget = {
+        type = "grafana";
+        url = "http://localhost:${toString cfg.port}";
+        fields = ["dashboards" "datasources" "alertstriggered"];
+      };
+    };
+
+    # --------------------------------------------------------------------------
+    # REVERSE PROXY REGISTRATION
+    # --------------------------------------------------------------------------
+
     fleet.networking.reverseProxy.serviceRegistry.grafana = {
       port = cfg.port;
       labels = {

@@ -1,10 +1,12 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 with lib; let
   cfg = config.fleet.apps.exampleService;
+  homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -36,6 +38,39 @@ in {
       default = "";
       description = "Additional nginx configuration";
     };
+
+    # Homepage dashboard integration
+    homepage = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Register this service with the homepage dashboard";
+      };
+
+      name = mkOption {
+        type = types.str;
+        default = "Example Service";
+        description = "Display name on homepage";
+      };
+
+      description = mkOption {
+        type = types.str;
+        default = "Demo service for reverse proxy";
+        description = "Description shown on homepage";
+      };
+
+      icon = mkOption {
+        type = types.str;
+        default = "mdi-application";
+        description = "Icon for homepage (mdi-*, si-*, or URL)";
+      };
+
+      category = mkOption {
+        type = types.enum ["Apps" "Dev" "Monitoring" "Infrastructure" "Media" "Services"];
+        default = "Services";
+        description = "Category on the homepage dashboard";
+      };
+    };
   };
 
   # ============================================================================
@@ -43,7 +78,22 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
-    # Register with reverse proxy service registry
+    # --------------------------------------------------------------------------
+    # HOMEPAGE DASHBOARD REGISTRATION
+    # --------------------------------------------------------------------------
+
+    fleet.apps.homepage.serviceRegistry.exampleService = mkIf (cfg.homepage.enable && homepageCfg.enable) {
+      name = cfg.homepage.name;
+      description = cfg.homepage.description;
+      icon = cfg.homepage.icon;
+      href = "https://${cfg.domain}";
+      category = cfg.homepage.category;
+    };
+
+    # --------------------------------------------------------------------------
+    # REVERSE PROXY REGISTRATION
+    # --------------------------------------------------------------------------
+
     fleet.networking.reverseProxy.serviceRegistry.exampleService = {
       port = cfg.port;
       labels = {

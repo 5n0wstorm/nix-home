@@ -5,6 +5,7 @@
 }:
 with lib; let
   cfg = config.fleet.apps.freshrss;
+  homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -17,6 +18,12 @@ in {
       type = types.port;
       default = 8080;
       description = "Port for FreshRSS web interface";
+    };
+
+    domain = mkOption {
+      type = types.str;
+      default = "freshrss.local";
+      description = "Domain name for FreshRSS";
     };
 
     dataDir = mkOption {
@@ -42,6 +49,39 @@ in {
       default = "freshrss";
       description = "Group to run FreshRSS container as";
     };
+
+    # Homepage dashboard integration
+    homepage = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Register this service with the homepage dashboard";
+      };
+
+      name = mkOption {
+        type = types.str;
+        default = "FreshRSS";
+        description = "Display name on homepage";
+      };
+
+      description = mkOption {
+        type = types.str;
+        default = "RSS feed aggregator";
+        description = "Description shown on homepage";
+      };
+
+      icon = mkOption {
+        type = types.str;
+        default = "si-rss";
+        description = "Icon for homepage (mdi-*, si-*, or URL)";
+      };
+
+      category = mkOption {
+        type = types.enum ["Apps" "Dev" "Monitoring" "Infrastructure" "Media" "Services"];
+        default = "Apps";
+        description = "Category on the homepage dashboard";
+      };
+    };
   };
 
   # ============================================================================
@@ -49,6 +89,18 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
+    # --------------------------------------------------------------------------
+    # HOMEPAGE DASHBOARD REGISTRATION
+    # --------------------------------------------------------------------------
+
+    fleet.apps.homepage.serviceRegistry.freshrss = mkIf (cfg.homepage.enable && homepageCfg.enable) {
+      name = cfg.homepage.name;
+      description = cfg.homepage.description;
+      icon = cfg.homepage.icon;
+      href = "http://${cfg.domain}:${toString cfg.port}";
+      category = cfg.homepage.category;
+    };
+
     # --------------------------------------------------------------------------
     # USER AND GROUP SETUP
     # --------------------------------------------------------------------------
