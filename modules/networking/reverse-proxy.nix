@@ -277,6 +277,103 @@ with lib;
           '';
         };
 
+        # ACME certificate backup service
+        "acme-cert-backup" = mkIf cfg.enableACME {
+          description = "Backup ACME certificates to SOPS-managed location";
+          wantedBy = ["multi-user.target"];
+          after = ["acme-finished.target"];
+
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            User = "root";
+          };
+
+          script = let
+            certBackupDir = "/var/lib/fleet-acme-certs";
+          in ''
+            set -euo pipefail
+
+            # Create backup directory if it doesn't exist
+            mkdir -p "${certBackupDir}"
+
+            # Function to backup certificates for a domain
+            backup_cert() {
+              local domain="$1"
+              local acme_dir="/var/lib/acme/$domain"
+              local backup_dir="${certBackupDir}/$domain"
+
+              if [[ -d "$acme_dir" && -f "$acme_dir/fullchain.pem" && -f "$acme_dir/key.pem" ]]; then
+                echo "Backing up certificates for $domain..."
+                mkdir -p "$backup_dir"
+                cp "$acme_dir/fullchain.pem" "$backup_dir/"
+                cp "$acme_dir/key.pem" "$backup_dir/"
+                chmod 600 "$backup_dir"/*.pem
+              fi
+            }
+
+            # Backup certificates for all service domains that use ACME
+            ${concatMapStringsSep "\n" (domain: "backup_cert \"${domain}\"") serviceDomains}
+          '';
+        };
+
+        # ACME certificate restore service
+        "acme-cert-restore" = mkIf cfg.enableACME {
+          description = "Restore ACME certificates from SOPS secrets";
+          wantedBy = ["multi-user.target"];
+          before = ["nginx.service"];
+          after = ["sops-nix.service"];
+
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            User = "root";
+          };
+
+          script = let
+            acmeDir = "/var/lib/acme";
+          in ''
+            set -euo pipefail
+
+            # Function to restore certificates for a domain
+            restore_cert() {
+              local domain="$1"
+              local domain_dir="${acmeDir}/$domain"
+
+              # Check if encrypted certificates exist in SOPS
+              local fullchain_key="''${domain}_acme_fullchain"
+              local key_key="''${domain}_acme_key"
+
+              local has_fullchain=false
+              local has_key=false
+
+              # Check if the secrets exist (this is a bit hacky but works)
+              if [[ -f "/run/secrets/''${fullchain_key}" ]]; then
+                has_fullchain=true
+              fi
+              if [[ -f "/run/secrets/''${key_key}" ]]; then
+                has_key=true
+              fi
+
+              if [[ "$has_fullchain" == "true" && "$has_key" == "true" ]]; then
+                echo "Restoring certificates for ''${domain} from SOPS..."
+                mkdir -p "$domain_dir"
+                cp "/run/secrets/''${fullchain_key}" "$domain_dir/fullchain.pem"
+                cp "/run/secrets/''${key_key}" "$domain_dir/key.pem"
+                chmod 600 "$domain_dir/key.pem"
+                chmod 644 "$domain_dir/fullchain.pem"
+                chown -R acme:acme "$domain_dir"
+                echo "Certificates restored for ''${domain}"
+              else
+                echo "No encrypted certificates found for ''${domain}, will generate new ones"
+              fi
+            }
+
+            # Restore certificates for all service domains that use ACME
+            ${concatMapStringsSep "\n" (domain: "restore_cert \"${domain}\"") serviceDomains}
+          '';
+        };
+
         # Set global environment for ACME setup
         "acme-setup".serviceConfig.Environment = [
           "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
