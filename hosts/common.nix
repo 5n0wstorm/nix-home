@@ -40,7 +40,7 @@
 
   programs.nh = {
     enable = true;
-    flake = "/home/dominik/nix-home/flake.nix"; # Default flake path for nh commands
+    flake = "/home/dominik/nix-home"; # Default flake path for nh commands
     clean = {
       enable = true;
       dates = "weekly";
