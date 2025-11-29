@@ -158,7 +158,6 @@ in {
     downloadDir = "/media/downloads";
   };
 
-
   fleet.media.sabnzbd = {
     enable = true;
     domain = "sabnzbd.sn0wstorm.com";
