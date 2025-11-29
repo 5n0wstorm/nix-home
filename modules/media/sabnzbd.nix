@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 with lib; let
@@ -13,6 +14,23 @@ in {
 
   options.fleet.media.sabnzbd = {
     enable = mkEnableOption "SABnzbd usenet downloader";
+
+    package = mkOption {
+      type = types.package;
+      default = pkgs.sabnzbd;
+      defaultText = literalExpression "pkgs.sabnzbd";
+      description = ''
+        SABnzbd package to use. Override this to pin to a specific version.
+        
+        To use an older version, pin nixpkgs in your flake.nix:
+        ```nix
+        sabnzbd-pinned = import (builtins.fetchTarball {
+          url = "https://github.com/NixOS/nixpkgs/archive/<commit>.tar.gz";
+        }) { };
+        ```
+        Then set: package = sabnzbd-pinned.sabnzbd;
+      '';
+    };
 
     # Note: SABnzbd port is configured in its own config file at /var/lib/sabnzbd/sabnzbd.ini
     # Using 8085 to avoid conflict with qBittorrent (8080)
@@ -127,6 +145,7 @@ in {
 
     services.sabnzbd = {
       enable = true;
+      package = cfg.package;
       user = cfg.user;
       group = cfg.group;
       configFile = "${cfg.configDir}/sabnzbd.ini";

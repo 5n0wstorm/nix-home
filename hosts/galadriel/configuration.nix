@@ -1,6 +1,7 @@
 {
   config,
   pkgs,
+  pinnedPkgs ? pkgs,  # Fallback to regular pkgs if not provided
   ...
 }: let
   hosts = import ../../hosts.nix;
@@ -165,9 +166,11 @@ in {
   # };
 
   # SABnzbd - Usenet downloader
+  # SABnzbd - Usenet downloader (pinned to v4.3.3 for stability)
   fleet.media.sabnzbd = {
     enable = true;
     domain = "sabnzbd.sn0wstorm.com";
+    package = pinnedPkgs.sabnzbd;  # Use pinned version 4.3.3
   };
 
   # Navidrome - Music streaming server
