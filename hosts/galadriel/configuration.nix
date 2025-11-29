@@ -36,29 +36,10 @@ in {
   # CLOUDFLARE DYNAMIC DNS SERVICE
   # ============================================================================
 
-  systemd.services.cloudflare-ddns = {
-    description = "Cloudflare Dynamic DNS Updater";
-    after = ["network.target"];
-    wants = ["network.target"];
-
-    serviceConfig = {
-      Type = "oneshot";
-      LoadCredential = "CLOUDFLARE_APITOKEN_FILE:/run/secrets/cloudflare_api_token";
-      DynamicUser = true;
-      ExecStart = "${pkgs.cloudflare-dyndns}/bin/cloudflare-dyndns --api-token-file %d/CLOUDFLARE_APITOKEN_FILE sn0wstorm.com";
-      RemainAfterExit = false;
-    };
-  };
-
-  systemd.timers.cloudflare-ddns = {
-    description = "Timer for Cloudflare Dynamic DNS updates";
-    wantedBy = ["timers.target"];
-
-    timerConfig = {
-      OnBootSec = "1min";
-      OnUnitActiveSec = "5min";
-      Persistent = true;
-    };
+  services.cloudflare-dyndns = {
+    enable = true;
+    apiTokenFile = "/run/secrets/cloudflare_api_token";
+    domains = [ "sn0wstorm.com" ]; 
   };
 
   fleet.monitoring.prometheus = {
