@@ -110,7 +110,7 @@ in {
 
   networking = {
     useDHCP = false;
-    interfaces.enps18 = {
+    interfaces.ens18 = {
       useDHCP = false;
       ipv4.addresses = [{
         address = hosts.galadriel.ip;
