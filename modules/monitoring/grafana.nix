@@ -33,6 +33,12 @@ in {
       description = "Domain name for Grafana";
     };
 
+    bypassAuth = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Bypass Authelia authentication (uses Grafana's built-in auth)";
+    };
+
     # Homepage dashboard integration
     homepage = {
       enable = mkOption {
@@ -103,6 +109,7 @@ in {
         "fleet.reverse-proxy.extra-config" = ''
           client_max_body_size 100M;
         '';
+        "fleet.authelia.bypass" = if cfg.bypassAuth then "true" else "false";
       };
     };
 

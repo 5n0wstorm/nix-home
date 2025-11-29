@@ -83,6 +83,41 @@ secrets/
 - `cloudflare_api_token`: Cloudflare API token for DDNS
 - `cloudflare_zone_id`: Cloudflare zone ID for DNS management
 
+### Authelia Secrets
+- `authelia_jwt_secret`: JWT secret for Authelia (min 64 random characters)
+- `authelia_storage_key`: Storage encryption key (min 64 random characters)
+- `authelia_users`: Users database file in YAML format
+
+#### Generate Authelia Secrets
+```bash
+# Generate JWT secret (64 chars)
+openssl rand -base64 64 | tr -d '\n'
+
+# Generate storage key (64 chars)
+openssl rand -base64 64 | tr -d '\n'
+```
+
+#### Authelia Users File Format
+The `authelia_users` secret should contain a YAML-formatted users database:
+
+```yaml
+users:
+  admin:
+    displayname: "Admin User"
+    # Generate password hash: docker run authelia/authelia:latest authelia crypto hash generate argon2
+    password: "$argon2id$v=19$m=65536,t=3,p=4$..."
+    email: admin@example.com
+    groups:
+      - admins
+      - users
+  user1:
+    displayname: "Regular User"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$..."
+    email: user1@example.com
+    groups:
+      - users
+```
+
 ## 🛠️ Commands
 
 ```bash

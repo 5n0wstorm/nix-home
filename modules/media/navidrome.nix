@@ -38,6 +38,12 @@ in {
       description = "Open firewall ports for Navidrome";
     };
 
+    bypassAuth = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Bypass Authelia authentication (Navidrome has built-in auth)";
+    };
+
     # Homepage dashboard integration
     homepage = {
       enable = mkOption {
@@ -104,6 +110,7 @@ in {
         "fleet.reverse-proxy.enable" = "true";
         "fleet.reverse-proxy.domain" = cfg.domain;
         "fleet.reverse-proxy.ssl" = "true";
+        "fleet.authelia.bypass" = if cfg.bypassAuth then "true" else "false";
       };
     };
 

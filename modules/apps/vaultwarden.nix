@@ -133,6 +133,8 @@ in {
         "fleet.reverse-proxy.extra-config" = ''
           client_max_body_size 525M;
         '';
+        # Vaultwarden handles its own authentication
+        "fleet.authelia.bypass" = "true";
       };
     };
 

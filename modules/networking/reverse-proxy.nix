@@ -6,6 +6,7 @@
 with lib; let
   cfg = config.fleet.networking.reverseProxy;
   acmeCfg = config.fleet.security.acme;
+  authCfg = config.fleet.security.authelia;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -32,6 +33,15 @@ in {
       description = "Enable TLS/SSL using the fleet ACME wildcard certificate";
     };
 
+    enableAuthelia = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Enable Authelia authentication for all proxied services.
+        Services can opt-out using the "fleet.authelia.bypass" label.
+      '';
+    };
+
     # Service registry for pluggable services
     serviceRegistry = mkOption {
       type = types.attrsOf (types.submodule {
@@ -52,6 +62,7 @@ in {
               "fleet.reverse-proxy.ssl" = "true";
               "fleet.reverse-proxy.websockets" = "false";
               "fleet.reverse-proxy.extra-config" = "client_max_body_size 100M;";
+              "fleet.authelia.bypass" = "true";
             };
           };
         };
@@ -86,6 +97,12 @@ in {
             description = "Enable SSL for this route";
           };
 
+          bypassAuth = mkOption {
+            type = types.bool;
+            default = false;
+            description = "Bypass Authelia authentication for this route";
+          };
+
           extraConfig = mkOption {
             type = types.lines;
             default = "";
@@ -117,6 +134,47 @@ in {
     # Check if ACME is properly configured for TLS
     useAcmeTLS = cfg.enableTLS && acmeCfg.enable;
 
+    # Check if Authelia protection is active
+    useAuthelia = cfg.enableAuthelia && authCfg.enable;
+
+    # Authelia nginx snippets for forward auth
+    autheliaAuthSnippet = ''
+      # Authelia forward authentication
+      auth_request /authelia;
+      auth_request_set $target_url $scheme://$http_host$request_uri;
+      auth_request_set $user $upstream_http_remote_user;
+      auth_request_set $groups $upstream_http_remote_groups;
+      auth_request_set $name $upstream_http_remote_name;
+      auth_request_set $email $upstream_http_remote_email;
+
+      # Pass authentication info to backend
+      proxy_set_header Remote-User $user;
+      proxy_set_header Remote-Groups $groups;
+      proxy_set_header Remote-Name $name;
+      proxy_set_header Remote-Email $email;
+
+      # Error handling - redirect to Authelia on 401
+      error_page 401 =302 https://${authCfg.domain}/?rd=$target_url;
+    '';
+
+    # Authelia location blocks for each virtual host
+    autheliaLocations = {
+      "/authelia" = {
+        proxyPass = "http://127.0.0.1:${toString authCfg.port}/api/authz/forward-auth";
+        extraConfig = ''
+          internal;
+          proxy_pass_request_body off;
+          proxy_set_header Content-Length "";
+          proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+          proxy_set_header X-Original-Method $request_method;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-Host $http_host;
+          proxy_set_header X-Forwarded-Uri $request_uri;
+        '';
+      };
+    };
+
     # Helper function to create a virtual host configuration
     mkVirtualHost = _name: hostConfig: {
       # Use wildcard certificate from ACME module
@@ -124,16 +182,23 @@ in {
       sslCertificateKey = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.keyPath;
       forceSSL = useAcmeTLS && hostConfig.ssl;
 
-      locations."/" = {
-        proxyPass = "http://${hostConfig.target}:${toString hostConfig.port}";
-        proxyWebsockets = true;
-        extraConfig = ''
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          proxy_set_header X-Forwarded-Proto $scheme;
-          ${hostConfig.extraConfig}
-        '';
-      };
+      # Add Authelia location if enabled and not bypassed
+      locations = mkMerge [
+        (mkIf (useAuthelia && !hostConfig.bypassAuth) autheliaLocations)
+        {
+          "/" = {
+            proxyPass = "http://${hostConfig.target}:${toString hostConfig.port}";
+            proxyWebsockets = true;
+            extraConfig = ''
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              ${optionalString (useAuthelia && !hostConfig.bypassAuth) autheliaAuthSnippet}
+              ${hostConfig.extraConfig}
+            '';
+          };
+        }
+      ];
     };
 
     # Helper function to extract domain from service config (used for keying)
@@ -149,20 +214,28 @@ in {
       port = labels."fleet.reverse-proxy.port" or serviceConfig.port or 80;
       extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
       enableSSL = (labels."fleet.reverse-proxy.ssl" or "true") != "false";
+      bypassAuth = (labels."fleet.authelia.bypass" or "false") == "true";
     in {
       # Use wildcard certificate from ACME module
       sslCertificate = mkIf (useAcmeTLS && enableSSL) acmeCfg.certPath;
       sslCertificateKey = mkIf (useAcmeTLS && enableSSL) acmeCfg.keyPath;
       forceSSL = useAcmeTLS && enableSSL;
 
-      locations."/" = {
-        proxyPass = "http://${target}:${toString port}";
-        proxyWebsockets = (labels."fleet.reverse-proxy.websockets" or "false") == "true";
-        extraConfig = ''
-          ${extraConfig}
-          ${labels."fleet.reverse-proxy.nginx-extra-config" or ""}
-        '';
-      };
+      # Add Authelia location if enabled and not bypassed
+      locations = mkMerge [
+        (mkIf (useAuthelia && !bypassAuth) autheliaLocations)
+        {
+          "/" = {
+            proxyPass = "http://${target}:${toString port}";
+            proxyWebsockets = (labels."fleet.reverse-proxy.websockets" or "false") == "true";
+            extraConfig = ''
+              ${optionalString (useAuthelia && !bypassAuth) autheliaAuthSnippet}
+              ${extraConfig}
+              ${labels."fleet.reverse-proxy.nginx-extra-config" or ""}
+            '';
+          };
+        }
+      ];
     };
 
     enabledServices =
@@ -190,6 +263,13 @@ in {
           message = ''
             fleet.networking.reverseProxy.enableTLS requires fleet.security.acme.enable.
             Please configure the ACME module with your wildcard certificate settings.
+          '';
+        }
+        {
+          assertion = cfg.enableAuthelia -> authCfg.enable;
+          message = ''
+            fleet.networking.reverseProxy.enableAuthelia requires fleet.security.authelia.enable.
+            Please configure the Authelia module first.
           '';
         }
       ];

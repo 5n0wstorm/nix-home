@@ -14,6 +14,7 @@ in {
     ./hardware-configuration.nix
     # Security
     ../../modules/security/acme.nix
+    ../../modules/security/authelia.nix
     # Networking
     ../../modules/networking/reverse-proxy.nix
     # Monitoring
@@ -234,12 +235,63 @@ in {
   };
 
   # ============================================================================
+  # AUTHELIA (Single Sign-On & MFA)
+  # ============================================================================
+  #
+  # Authelia provides authentication for all services behind the reverse proxy.
+  # By default, ALL domains require authentication. Services can opt-out using
+  # the bypassAuth option or by adding their domain to bypassDomains.
+  #
+
+  fleet.security.authelia = {
+    enable = true;
+    domain = "auth.sn0wstorm.com";
+    
+    # Default policy: require authentication for everything
+    defaultPolicy = "one_factor";
+    
+    # Domains that bypass authentication (services with their own auth)
+    bypassDomains = [
+      "bitwarden.sn0wstorm.com"  # Vaultwarden handles its own auth
+      "jellyfin.sn0wstorm.com"   # Jellyfin has built-in auth
+      "navidrome.sn0wstorm.com"  # Navidrome has built-in auth
+    ];
+    
+    # Paths that bypass authentication on all domains
+    bypassPaths = [
+      "/api/**"           # API endpoints (often have their own auth)
+      "/.well-known/**"   # Discovery endpoints
+    ];
+    
+    # High-security domains requiring 2FA
+    twoFactorDomains = [
+      "grafana.sn0wstorm.com"
+      "prometheus.sn0wstorm.com"
+    ];
+    
+    # Secrets (managed by sops-nix)
+    secrets = {
+      jwtSecretFile = "/run/secrets/authelia_jwt_secret";
+      storageEncryptionKeyFile = "/run/secrets/authelia_storage_key";
+    };
+    
+    # Users file for authentication (file-based auth)
+    usersFile = "/run/secrets/authelia_users";
+    
+    # Session settings
+    sessionDomain = "sn0wstorm.com";
+    sessionExpiration = "12h";
+    sessionInactivity = "45m";
+  };
+
+  # ============================================================================
   # REVERSE PROXY (Pluggable - services register themselves automatically)
   # ============================================================================
 
   fleet.networking.reverseProxy = {
     enable = true;
     enableTLS = true;
+    enableAuthelia = true;  # Enable Authelia protection for all services
   };
 
   # ============================================================================
@@ -271,6 +323,23 @@ in {
       };
       "git_user_name" = {};
       "git_user_email" = {};
+      
+      # Authelia secrets
+      "authelia_jwt_secret" = {
+        owner = "authelia-main";
+        group = "authelia-main";
+        mode = "0400";
+      };
+      "authelia_storage_key" = {
+        owner = "authelia-main";
+        group = "authelia-main";
+        mode = "0400";
+      };
+      "authelia_users" = {
+        owner = "authelia-main";
+        group = "authelia-main";
+        mode = "0400";
+      };
     };
   };
 
