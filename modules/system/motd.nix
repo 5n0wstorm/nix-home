@@ -212,8 +212,8 @@ in {
     # Install the MOTD script
     environment.systemPackages = [motdScript];
 
-    # Disable the default NixOS MOTD
-    users.motd = null;
+    # Disable the default NixOS MOTD (empty string disables it)
+    users.motd = "";
 
     # Configure PAM to show MOTD on login
     security.pam.services.login.showMotd = false;
