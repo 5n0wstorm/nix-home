@@ -293,8 +293,6 @@ in {
       services = glancesWidgets ++ allServices;
 
       bookmarks = cfg.bookmarks;
-
-      
     };
 
     # --------------------------------------------------------------------------

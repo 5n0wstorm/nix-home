@@ -122,13 +122,14 @@ with lib; let
     printf "$BLUE$BOLD  ━━━ Network ━━━$RESET\n"
     echo ""
     ${concatStringsSep "\n" (map (iface: ''
-      if ip link show ${iface} &>/dev/null; then
-        IPV4=$(ip -4 addr show ${iface} 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
-        if [ -n "$IPV4" ]; then
-          printf "$TEAL  %-20s$RESET %s\n" "  ${iface}" "$IPV4"
+        if ip link show ${iface} &>/dev/null; then
+          IPV4=$(ip -4 addr show ${iface} 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+          if [ -n "$IPV4" ]; then
+            printf "$TEAL  %-20s$RESET %s\n" "  ${iface}" "$IPV4"
+          fi
         fi
-      fi
-    '') cfg.networkInterfaces)}
+      '')
+      cfg.networkInterfaces)}
     # Auto-detect primary interface if no specific ones configured
     ${optionalString (cfg.networkInterfaces == []) ''
       NETDEV=$(ip -o route get 8.8.8.8 2>/dev/null | cut -f 5 -d " ")
@@ -229,4 +230,3 @@ in {
     '';
   };
 }
-

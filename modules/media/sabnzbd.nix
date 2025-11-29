@@ -21,7 +21,7 @@ in {
       defaultText = literalExpression "pkgs.sabnzbd";
       description = ''
         SABnzbd package to use. Override this to pin to a specific version.
-        
+
         To use an older version, pin nixpkgs in your flake.nix:
         ```nix
         sabnzbd-pinned = import (builtins.fetchTarball {
@@ -168,4 +168,3 @@ in {
     networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [cfg.port];
   };
 }
-

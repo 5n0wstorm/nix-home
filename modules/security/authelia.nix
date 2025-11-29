@@ -139,12 +139,12 @@ in {
       description = ''
         Path to Authelia users_database.yml file.
         Required if LDAP is not enabled.
-        
+
         Example users file format:
         users:
           admin:
             displayname: "Admin User"
-            password: "$argon2id$..." 
+            password: "$argon2id$..."
             email: admin@example.com
             groups:
               - admins
@@ -370,22 +370,25 @@ in {
           rules =
             # Bypass rules for specific domains
             (map (domain: {
-              domain = domain;
-              policy = "bypass";
-            }) cfg.bypassDomains)
+                domain = domain;
+                policy = "bypass";
+              })
+              cfg.bypassDomains)
             ++
             # Bypass rules for specific paths on all domains
             (map (path: {
-              domain = "*.${acmeCfg.domain}";
-              resources = [path];
-              policy = "bypass";
-            }) cfg.bypassPaths)
+                domain = "*.${acmeCfg.domain}";
+                resources = [path];
+                policy = "bypass";
+              })
+              cfg.bypassPaths)
             ++
             # Two-factor rules for high-security domains
             (map (domain: {
-              domain = domain;
-              policy = "two_factor";
-            }) cfg.twoFactorDomains)
+                domain = domain;
+                policy = "two_factor";
+              })
+              cfg.twoFactorDomains)
             ++
             # Always bypass the auth portal itself
             [
@@ -458,4 +461,3 @@ in {
     networking.firewall.allowedTCPPorts = [cfg.port];
   };
 }
-

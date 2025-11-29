@@ -117,7 +117,10 @@ in {
         "fleet.reverse-proxy.domain" = cfg.domain;
         "fleet.reverse-proxy.ssl" = "true";
         "fleet.reverse-proxy.websockets" = "true";
-        "fleet.authelia.bypass" = if cfg.bypassAuth then "true" else "false";
+        "fleet.authelia.bypass" =
+          if cfg.bypassAuth
+          then "true"
+          else "false";
       };
     };
 
@@ -138,4 +141,3 @@ in {
     networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [cfg.port];
   };
 }
-

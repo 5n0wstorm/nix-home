@@ -1,7 +1,7 @@
 {
   config,
   pkgs,
-  pinnedPkgs ? pkgs,  # Fallback to regular pkgs if not provided
+  pinnedPkgs ? pkgs, # Fallback to regular pkgs if not provided
   ...
 }: let
   hosts = import ../../hosts.nix;
@@ -170,7 +170,7 @@ in {
   fleet.media.sabnzbd = {
     enable = true;
     domain = "sabnzbd.sn0wstorm.com";
-    package = pinnedPkgs.sabnzbd;  # Use pinned version 4.5.3
+    package = pinnedPkgs.sabnzbd; # Use pinned version 4.5.3
   };
 
   # Navidrome - Music streaming server
@@ -249,38 +249,38 @@ in {
   fleet.security.authelia = {
     enable = true;
     domain = "auth.sn0wstorm.com";
-    
+
     # Default policy: require authentication for everything
     defaultPolicy = "one_factor";
-    
+
     # Domains that bypass authentication (services with their own auth)
     bypassDomains = [
-      "bitwarden.sn0wstorm.com"  # Vaultwarden handles its own auth
-      "jellyfin.sn0wstorm.com"   # Jellyfin has built-in auth
-      "navidrome.sn0wstorm.com"  # Navidrome has built-in auth
+      "bitwarden.sn0wstorm.com" # Vaultwarden handles its own auth
+      "jellyfin.sn0wstorm.com" # Jellyfin has built-in auth
+      "navidrome.sn0wstorm.com" # Navidrome has built-in auth
     ];
-    
+
     # Paths that bypass authentication on all domains
     bypassPaths = [
-      "/api/**"           # API endpoints (often have their own auth)
-      "/.well-known/**"   # Discovery endpoints
+      "/api/**" # API endpoints (often have their own auth)
+      "/.well-known/**" # Discovery endpoints
     ];
-    
+
     # High-security domains requiring 2FA
     twoFactorDomains = [
       "grafana.sn0wstorm.com"
       "prometheus.sn0wstorm.com"
     ];
-    
+
     # Secrets (managed by sops-nix)
     secrets = {
       jwtSecretFile = "/run/secrets/authelia_jwt_secret";
       storageEncryptionKeyFile = "/run/secrets/authelia_storage_key";
     };
-    
+
     # Users file for authentication (file-based auth)
     usersFile = "/run/secrets/authelia_users";
-    
+
     # Session settings
     sessionDomain = "sn0wstorm.com";
     sessionExpiration = "12h";
@@ -294,7 +294,7 @@ in {
   fleet.networking.reverseProxy = {
     enable = true;
     enableTLS = true;
-    enableAuthelia = true;  # Enable Authelia protection for all services
+    enableAuthelia = true; # Enable Authelia protection for all services
   };
 
   # ============================================================================
@@ -326,7 +326,7 @@ in {
       };
       "git_user_name" = {};
       "git_user_email" = {};
-      
+
       # Authelia secrets
       "authelia_jwt_secret" = {
         owner = "authelia-main";

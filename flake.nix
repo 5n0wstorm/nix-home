@@ -36,7 +36,7 @@
     # Pinned packages for specific versions
     pinnedPkgs = import nixpkgs-sabnzbd {
       system = "x86_64-linux";
-      config.allowUnfree = true;  # Required for unrar dependency
+      config.allowUnfree = true; # Required for unrar dependency
     };
     # For scaling up your homelab, you'd likely want automated host generation:
     # mkHost = name: hostConfig: {
