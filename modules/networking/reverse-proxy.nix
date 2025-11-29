@@ -3,7 +3,10 @@
   lib,
   ...
 }:
-with lib; {
+with lib; let
+  cfg = config.fleet.networking.reverseProxy;
+  acmeCfg = config.fleet.security.acme;
+in {
   # ============================================================================
   # MODULE OPTIONS
   # ============================================================================
@@ -26,25 +29,7 @@ with lib; {
     enableTLS = mkOption {
       type = types.bool;
       default = false;
-      description = "Enable TLS/SSL for all routes";
-    };
-
-    enableACME = mkOption {
-      type = types.bool;
-      default = false;
-      description = "Enable ACME/Let's Encrypt certificates with DNS challenge";
-    };
-
-    acmeEmail = mkOption {
-      type = types.str;
-      default = "";
-      description = "Email address for ACME certificate registration";
-    };
-
-    cloudflareCredentialsFile = mkOption {
-      type = types.nullOr types.path;
-      default = null;
-      description = "Path to Cloudflare credentials file for DNS challenge";
+      description = "Enable TLS/SSL using the fleet ACME wildcard certificate";
     };
 
     # Service registry for pluggable services
@@ -63,9 +48,8 @@ with lib; {
             description = "Labels for configuring reverse proxy behavior";
             example = {
               "fleet.reverse-proxy.enable" = "true";
-              "fleet.reverse-proxy.domain" = "myapp.local";
+              "fleet.reverse-proxy.domain" = "myapp.example.com";
               "fleet.reverse-proxy.ssl" = "true";
-              "fleet.reverse-proxy.ssl-type" = "acme"; # Let's Encrypt ACME
               "fleet.reverse-proxy.websockets" = "false";
               "fleet.reverse-proxy.extra-config" = "client_max_body_size 100M;";
             };
@@ -96,6 +80,12 @@ with lib; {
             description = "Description of this route";
           };
 
+          ssl = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Enable SSL for this route";
+          };
+
           extraConfig = mkOption {
             type = types.lines;
             default = "";
@@ -110,7 +100,7 @@ with lib; {
       default = {};
       description = "Hostname to backend mapping";
       example = {
-        "jenkins.fleet.local" = {
+        "jenkins.example.com" = {
           target = "192.168.122.55";
           port = 8888;
           description = "Jenkins CI/CD";
@@ -124,13 +114,16 @@ with lib; {
   # ============================================================================
 
   config = let
-    cfg = config.fleet.networking.reverseProxy;
+    # Check if ACME is properly configured for TLS
+    useAcmeTLS = cfg.enableTLS && acmeCfg.enable;
 
     # Helper function to create a virtual host configuration
     mkVirtualHost = name: hostConfig: {
-      enableACME = cfg.enableACME;
-      acmeRoot = mkIf cfg.enableACME null;  # Use DNS validation
-      forceSSL = cfg.enableTLS;
+      # Use wildcard certificate from ACME module
+      sslCertificate = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.certPath;
+      sslCertificateKey = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.keyPath;
+      forceSSL = useAcmeTLS && hostConfig.ssl;
+      addSSL = useAcmeTLS && hostConfig.ssl;
 
       locations."/" = {
         proxyPass = "http://${hostConfig.target}:${toString hostConfig.port}";
@@ -147,15 +140,17 @@ with lib; {
     # Helper function to create virtual host from service registry entry
     mkServiceVirtualHost = serviceName: serviceConfig: let
       labels = serviceConfig.labels or {};
-      domain = labels."fleet.reverse-proxy.domain" or "${serviceName}.sn0wstorm.com";
+      domain = labels."fleet.reverse-proxy.domain" or "${serviceName}.${acmeCfg.domain}";
       target = labels."fleet.reverse-proxy.target" or "127.0.0.1";
       port = labels."fleet.reverse-proxy.port" or serviceConfig.port or 80;
       extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
       enableSSL = labels."fleet.reverse-proxy.ssl" != "false";
     in {
-      enableACME = cfg.enableACME;
-      acmeRoot = mkIf cfg.enableACME null;  # Use DNS validation
-      forceSSL = cfg.enableTLS && enableSSL;
+      # Use wildcard certificate from ACME module
+      sslCertificate = mkIf (useAcmeTLS && enableSSL) acmeCfg.certPath;
+      sslCertificateKey = mkIf (useAcmeTLS && enableSSL) acmeCfg.keyPath;
+      forceSSL = useAcmeTLS && enableSSL;
+      addSSL = useAcmeTLS && enableSSL;
 
       locations."/" = {
         proxyPass = "http://${target}:${toString port}";
@@ -171,6 +166,20 @@ with lib; {
     };
   in
     mkIf cfg.enable {
+      # --------------------------------------------------------------------------
+      # ASSERTIONS
+      # --------------------------------------------------------------------------
+
+      assertions = [
+        {
+          assertion = cfg.enableTLS -> acmeCfg.enable;
+          message = ''
+            fleet.networking.reverseProxy.enableTLS requires fleet.security.acme.enable.
+            Please configure the ACME module with your wildcard certificate settings.
+          '';
+        }
+      ];
+
       # --------------------------------------------------------------------------
       # NGINX SERVICE
       # --------------------------------------------------------------------------
@@ -194,8 +203,6 @@ with lib; {
               )
               cfg.serviceRegistry));
       };
-
-      # --------------------------------------------------------------------------
 
       # --------------------------------------------------------------------------
       # FIREWALL CONFIGURATION

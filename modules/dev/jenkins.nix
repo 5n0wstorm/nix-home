@@ -38,7 +38,6 @@ in {
         "fleet.reverse-proxy.enable" = "true";
         "fleet.reverse-proxy.domain" = "jenkins.sn0wstorm.com";
         "fleet.reverse-proxy.ssl" = "true";
-        "fleet.reverse-proxy.ssl-type" = "acme";
         "fleet.reverse-proxy.websockets" = "true";
         "fleet.reverse-proxy.extra-config" = ''
           client_max_body_size 500M;

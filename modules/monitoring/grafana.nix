@@ -45,7 +45,6 @@ in {
         "fleet.reverse-proxy.enable" = "true";
         "fleet.reverse-proxy.domain" = "grafana.sn0wstorm.com";
         "fleet.reverse-proxy.ssl" = "true";
-        "fleet.reverse-proxy.ssl-type" = "acme";
         "fleet.reverse-proxy.websockets" = "false";
         "fleet.reverse-proxy.extra-config" = ''
           client_max_body_size 100M;
