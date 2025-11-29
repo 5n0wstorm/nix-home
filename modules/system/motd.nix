@@ -215,9 +215,9 @@ in {
     # Disable the default NixOS MOTD (empty string disables it)
     users.motd = "";
 
-    # Configure PAM to show MOTD on login
-    security.pam.services.login.showMotd = false;
-    security.pam.services.sshd.showMotd = false;
+    # Configure PAM to not show the default MOTD (we use our own via profile.local)
+    security.pam.services.login.showMotd = mkForce false;
+    security.pam.services.sshd.showMotd = mkForce false;
 
     # Use our custom MOTD via profile
     environment.etc."profile.local".text = ''
