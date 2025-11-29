@@ -291,8 +291,6 @@ with lib;
     # --------------------------------------------------------------------------
     # ACME CERTIFICATE MANAGEMENT
     # --------------------------------------------------------------------------
-
-    systemd.services.acme-cert-backup = mkIf cfg.enableACME {
       description = "Backup ACME certificates to SOPS-managed location";
       wantedBy = ["multi-user.target"];
       after = ["acme-finished.target"];
