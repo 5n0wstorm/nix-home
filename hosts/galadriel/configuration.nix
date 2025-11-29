@@ -83,6 +83,14 @@ in {
     # cloudflareCredentialsFile will auto-generate from SOPS secrets
   };
 
+  security.acme.certs."sn0wstorm.com" = {
+    domain = "*.sn0wstorm.com";
+    dnsProvider = "cloudflare";
+    credentialsFile = "/etc/cloudflare-credentials.ini";
+    group = "nginx";
+    email = "dominik@example.com";
+  };
+
   # ============================================================================
   # SECRETS MANAGEMENT (SOPS-NIX)
   # ============================================================================
