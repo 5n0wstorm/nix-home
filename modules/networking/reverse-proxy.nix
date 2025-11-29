@@ -127,6 +127,57 @@ with lib;
   config = let
     cfg = config.fleet.networking.reverseProxy;
 
+    # Helper function to create a virtual host configuration
+    mkVirtualHost = name: hostConfig: {
+      enableACME = cfg.enableACME;
+      forceSSL = cfg.enableTLS;
+
+      sslCertificate = mkIf (!cfg.enableACME && cfg.enableTLS) "/var/lib/fleet-ca/certs/${name}/cert.pem";
+      sslCertificateKey = mkIf (!cfg.enableACME && cfg.enableTLS) "/var/lib/fleet-ca/certs/${name}/key.pem";
+
+      locations."/" = {
+        proxyPass = "http://${hostConfig.target}:${toString hostConfig.port}";
+        proxyWebsockets = true;
+        extraConfig = ''
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          ${hostConfig.extraConfig}
+        '';
+      };
+    };
+
+    # Helper function to create virtual host from service registry entry
+    mkServiceVirtualHost = serviceName: serviceConfig: let
+      labels = serviceConfig.labels or {};
+      domain = labels."fleet.reverse-proxy.domain" or "${serviceName}.local";
+      target = labels."fleet.reverse-proxy.target" or "127.0.0.1";
+      port = labels."fleet.reverse-proxy.port" or serviceConfig.port or 80;
+      extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
+      enableSSL = labels."fleet.reverse-proxy.ssl" != "false";
+      sslType = labels."fleet.reverse-proxy.ssl-type" or "acme";  # "acme" or "selfsigned"
+      useACME = cfg.enableACME && enableSSL && sslType == "acme";
+      useSelfSigned = cfg.enableTLS && enableSSL && sslType == "selfsigned";
+    in {
+      enableACME = useACME;
+      forceSSL = (cfg.enableTLS && enableSSL) || useACME;
+
+      sslCertificate = mkIf useSelfSigned "/var/lib/fleet-ca/certs/${domain}/cert.pem";
+      sslCertificateKey = mkIf useSelfSigned "/var/lib/fleet-ca/certs/${domain}/key.pem";
+
+      locations."/" = {
+        proxyPass = "http://${target}:${toString port}";
+        proxyWebsockets = labels."fleet.reverse-proxy.websockets" == "true";
+        extraConfig = ''
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          ${extraConfig}
+          ${labels."fleet.reverse-proxy.nginx-extra-config" or ""}
+        '';
+      };
+    };
+
   in mkIf cfg.enable {
 
     # --------------------------------------------------------------------------
