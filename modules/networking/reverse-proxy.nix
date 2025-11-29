@@ -127,12 +127,7 @@ with lib;
   config = let
     cfg = config.fleet.networking.reverseProxy;
 
-    # Service registry - modules can add themselves here
-    serviceRegistry = cfg.serviceRegistry or {};
-
   in mkIf cfg.enable {
-    # Combine manual routes with service registry
-    fleet.networking.reverseProxy.serviceRegistry = {};
 
     # --------------------------------------------------------------------------
     # NGINX SERVICE
@@ -152,7 +147,7 @@ with lib;
         (mapAttrs mkServiceVirtualHost
           (filterAttrs (serviceName: serviceConfig:
             (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true"
-          ) serviceRegistry));
+          ) cfg.serviceRegistry));
     };
 
     # --------------------------------------------------------------------------
@@ -174,7 +169,7 @@ with lib;
 
       # Pre-populate certificates from SOPS if they exist
       certs = let
-        serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") serviceRegistry);
+        serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
       in mkMerge (map (domain: {
         "${domain}" = {
           # If certificate exists in SOPS, use it; otherwise generate new one
@@ -220,7 +215,7 @@ with lib;
 
       script = let
         certBackupDir = "/var/lib/fleet-acme-certs";
-        serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") serviceRegistry);
+        serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
       in ''
         set -euo pipefail
 
@@ -330,7 +325,7 @@ with lib;
 
       script = let
         acmeDir = "/var/lib/acme";
-        serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") serviceRegistry);
+        serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
       in ''
         set -euo pipefail
 
