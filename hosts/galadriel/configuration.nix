@@ -35,7 +35,7 @@ in {
   services.cfdyndns = {
     enable = true;
     apiTokenFile = "/run/secrets/cloudflare_api_token";
-    records = [ "sn0wstorm.com" ];
+    records = ["sn0wstorm.com"];
   };
 
   fleet.monitoring.prometheus = {
