@@ -83,6 +83,8 @@ in {
     # cloudflareCredentialsFile will auto-generate from SOPS secrets
   };
 
+  security.acme.acceptTerms = true;
+
   security.acme.certs."sn0wstorm.com" = {
     domain = "*.sn0wstorm.com";
     dnsProvider = "cloudflare";
