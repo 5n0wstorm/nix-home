@@ -128,9 +128,10 @@ in {
 
     # SOPS secrets
     secrets = {
-      # Cloudflare DDNS secrets
       "cloudflare_api_token" = {};
       "cloudflare_zone_id" = {};
+      "git_user_name" = {};
+      "git_user_email" = {};
     };
   };
 
@@ -163,6 +164,17 @@ in {
   };
 
   networking.firewall.allowedTCPPorts = [];
+
+  # ============================================================================
+  # GIT CONFIGURATION
+  # ============================================================================
+
+  # Git configuration with fallback identity
+  programs.git = {
+    enable = true;
+    userName = "$(cat /run/secrets/git_user_name)";
+    userEmail = "$(cat /run/secrets/git_user_email)";
+  };
 
   # ============================================================================
   # BOOTLOADER
