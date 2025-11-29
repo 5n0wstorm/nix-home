@@ -170,11 +170,11 @@ in {
   # ============================================================================
 
   # Git configuration with fallback identity
-  programs.git.enable = true
-  programs.git.config = {
-    userName = "$(cat /run/secrets/git_user_name)";
-    userEmail = "$(cat /run/secrets/git_user_email)";
-  };
+  programs.git.enable = true;
+
+  # Git identity from secrets:
+  git config --global user.name "$(cat /run/secrets/git_user_name)"
+  git config --global user.email "$(cat /run/secrets/git_user_email)"
 
   # ============================================================================
   # BOOTLOADER
