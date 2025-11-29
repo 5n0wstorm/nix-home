@@ -4,20 +4,7 @@
   pkgs,
   ...
 }:
-with lib; let
-  cfg = config.fleet.security.selfSignedCA;
-
-  # Get domains from service registry that use self-signed certificates
-  serviceRegistry = config.fleet.networking.reverseProxy.serviceRegistry or {};
-  serviceDomains = mapAttrsToList (serviceName: serviceConfig:
-    serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local"
-  ) (filterAttrs (serviceName: serviceConfig:
-    (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" &&
-    (serviceConfig.labels."fleet.reverse-proxy.ssl" or "true") != "false" &&
-    (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "selfsigned"
-  ) serviceRegistry);
-
-  allDomains = cfg.domains ++ serviceDomains;
+with lib;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -50,7 +37,21 @@ in {
   # MODULE IMPLEMENTATION
   # ============================================================================
 
-  config = mkIf cfg.enable {
+  config = let
+    cfg = config.fleet.security.selfSignedCA;
+
+    # Get domains from service registry that use self-signed certificates
+    serviceRegistry = config.fleet.networking.reverseProxy.serviceRegistry or {};
+    serviceDomains = mapAttrsToList (serviceName: serviceConfig:
+      serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local"
+    ) (filterAttrs (serviceName: serviceConfig:
+      (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" &&
+      (serviceConfig.labels."fleet.reverse-proxy.ssl" or "true") != "false" &&
+      (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "selfsigned"
+    ) serviceRegistry);
+
+    allDomains = cfg.domains ++ serviceDomains;
+  in mkIf cfg.enable {
     # --------------------------------------------------------------------------
     # CA AND CERTIFICATE GENERATION
     # --------------------------------------------------------------------------

@@ -3,11 +3,7 @@
   lib,
   ...
 }:
-with lib; let
-  cfg = config.fleet.networking.reverseProxy;
-
-  # Service registry - modules can add themselves here
-  serviceRegistry = config.fleet.networking.reverseProxy.serviceRegistry or {};
+with lib;
 
   # Helper function to create a virtual host configuration
   mkVirtualHost = name: hostConfig: {
@@ -189,7 +185,13 @@ in {
   # MODULE IMPLEMENTATION
   # ============================================================================
 
-  config = mkIf cfg.enable {
+  config = let
+    cfg = config.fleet.networking.reverseProxy;
+
+    # Service registry - modules can add themselves here
+    serviceRegistry = cfg.serviceRegistry or {};
+
+  in mkIf cfg.enable {
     # Combine manual routes with service registry
     fleet.networking.reverseProxy.serviceRegistry = {};
 
