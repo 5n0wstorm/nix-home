@@ -98,7 +98,7 @@ in {
     # Fetch the popular Node Exporter Full dashboard
     environment.etc."grafana/dashboards/node-exporter.json".source = pkgs.fetchurl {
       url = "https://raw.githubusercontent.com/rfmoz/grafana-dashboards/master/prometheus/node-exporter-full.json";
-      sha256 = "sha256-fqNEHu0nD7WSBAB7PSfYoMXBnRaS05eByqqLXS5PgIQ=";
+      sha256 = "sha256-lOpPVIW4Rih8/5zWnjC3K0kKgK5Jc1vQgCgj4CVkYP4=";
     };
 
     # Create directory for dashboards and copy our dashboard
