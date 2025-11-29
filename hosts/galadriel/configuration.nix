@@ -112,10 +112,12 @@ in {
     useDHCP = false;
     interfaces.ens18 = {
       useDHCP = false;
-      ipv4.addresses = [{
-        address = hosts.galadriel.ip;
-        prefixLength = 24;
-      }];
+      ipv4.addresses = [
+        {
+          address = hosts.galadriel.ip;
+          prefixLength = 24;
+        }
+      ];
     };
     defaultGateway = "192.168.2.1";
     nameservers = ["8.8.8.8" "1.1.1.1"];

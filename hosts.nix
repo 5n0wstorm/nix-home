@@ -22,7 +22,7 @@
   sam = {
     ip = "192.168.2.12";
     user = "dominik";
-    tags = [ ];
+    tags = [];
   };
 
   elrond = {
