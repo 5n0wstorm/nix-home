@@ -166,11 +166,11 @@ in {
   # };
 
   # SABnzbd - Usenet downloader
-  # SABnzbd - Usenet downloader (pinned to v4.3.3 for stability)
+  # SABnzbd - Usenet downloader (pinned to v4.5.3)
   fleet.media.sabnzbd = {
     enable = true;
     domain = "sabnzbd.sn0wstorm.com";
-    package = pinnedPkgs.sabnzbd;  # Use pinned version 4.3.3
+    package = pinnedPkgs.sabnzbd;  # Use pinned version 4.5.3
   };
 
   # Navidrome - Music streaming server
