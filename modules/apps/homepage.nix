@@ -211,55 +211,54 @@ in {
         concatLists (map mkCategorySection categories);
 
       # Glances widgets
-      glancesWidgets =
-        optional cfg.enableGlances {
-          Glances = [
-            {
-              Info = {
-                widget = {
-                  type = "glances";
-                  url = "http://localhost:${toString cfg.glancesPort}";
-                  metric = "info";
-                  chart = false;
-                  version = 4;
-                };
+      glancesWidgets = optional cfg.enableGlances {
+        Glances = [
+          {
+            Info = {
+              widget = {
+                type = "glances";
+                url = "http://localhost:${toString cfg.glancesPort}";
+                metric = "info";
+                chart = false;
+                version = 4;
               };
-            }
-            {
-              CPU = {
-                widget = {
-                  type = "glances";
-                  url = "http://localhost:${toString cfg.glancesPort}";
-                  metric = "cpu";
-                  chart = true;
-                  version = 4;
-                };
+            };
+          }
+          {
+            CPU = {
+              widget = {
+                type = "glances";
+                url = "http://localhost:${toString cfg.glancesPort}";
+                metric = "cpu";
+                chart = true;
+                version = 4;
               };
-            }
-            {
-              Memory = {
-                widget = {
-                  type = "glances";
-                  url = "http://localhost:${toString cfg.glancesPort}";
-                  metric = "memory";
-                  chart = true;
-                  version = 4;
-                };
+            };
+          }
+          {
+            Memory = {
+              widget = {
+                type = "glances";
+                url = "http://localhost:${toString cfg.glancesPort}";
+                metric = "memory";
+                chart = true;
+                version = 4;
               };
-            }
-            {
-              Network = {
-                widget = {
-                  type = "glances";
-                  url = "http://localhost:${toString cfg.glancesPort}";
-                  metric = "network:eth0";
-                  chart = false;
-                  version = 4;
-                };
+            };
+          }
+          {
+            Network = {
+              widget = {
+                type = "glances";
+                url = "http://localhost:${toString cfg.glancesPort}";
+                metric = "network:eth0";
+                chart = false;
+                version = 4;
               };
-            }
-          ];
-        };
+            };
+          }
+        ];
+      };
     in {
       enable = true;
       listenPort = cfg.port;
@@ -385,4 +384,3 @@ in {
     networking.firewall.allowedTCPPorts = [cfg.port] ++ optional cfg.enableGlances cfg.glancesPort;
   };
 }
-

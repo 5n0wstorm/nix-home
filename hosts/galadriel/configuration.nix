@@ -41,13 +41,28 @@ in {
     bookmarks = [
       {
         Developer = [
-          {GitHub = {abbr = "GH"; href = "https://github.com/";};}
-          {NixOS = {abbr = "NIX"; href = "https://nixos.org/";};}
+          {
+            GitHub = {
+              abbr = "GH";
+              href = "https://github.com/";
+            };
+          }
+          {
+            NixOS = {
+              abbr = "NIX";
+              href = "https://nixos.org/";
+            };
+          }
         ];
       }
       {
         Cloud = [
-          {Cloudflare = {abbr = "CF"; href = "https://dash.cloudflare.com/";};}
+          {
+            Cloudflare = {
+              abbr = "CF";
+              href = "https://dash.cloudflare.com/";
+            };
+          }
         ];
       }
     ];

@@ -170,15 +170,18 @@ in {
       };
     };
 
-    enabledServices = filterAttrs (
-      _serviceName: serviceConfig:
-        (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true"
-    ) cfg.serviceRegistry;
+    enabledServices =
+      filterAttrs (
+        _serviceName: serviceConfig:
+          (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true"
+      )
+      cfg.serviceRegistry;
     serviceVirtualHosts = listToAttrs (
       mapAttrsToList (serviceName: serviceConfig: {
         name = getServiceDomain serviceName serviceConfig;
         value = mkServiceVirtualHostConfig serviceName serviceConfig;
-      }) enabledServices
+      })
+      enabledServices
     );
   in
     mkIf cfg.enable {
