@@ -39,7 +39,7 @@ in {
   services.cloudflare-dyndns = {
     enable = true;
     apiTokenFile = "/run/secrets/cloudflare_api_token";
-    domains = [ "sn0wstorm.com" ]; 
+    domains = ["sn0wstorm.com"];
   };
 
   fleet.monitoring.prometheus = {
