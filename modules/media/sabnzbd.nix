@@ -14,16 +14,30 @@ in {
   options.fleet.media.sabnzbd = {
     enable = mkEnableOption "SABnzbd usenet downloader";
 
+    # Note: SABnzbd port is configured in its own config file at /var/lib/sabnzbd/sabnzbd.ini
+    # Default is 8080. This option is for reverse proxy and homepage integration.
     port = mkOption {
       type = types.port;
-      default = 8085;
-      description = "Port for SABnzbd web interface";
+      default = 8080;
+      description = "Port for SABnzbd web interface (must match sabnzbd.ini config)";
     };
 
     domain = mkOption {
       type = types.str;
       default = "sabnzbd.local";
       description = "Domain name for SABnzbd";
+    };
+
+    user = mkOption {
+      type = types.str;
+      default = "sabnzbd";
+      description = "User to run SABnzbd as";
+    };
+
+    group = mkOption {
+      type = types.str;
+      default = "sabnzbd";
+      description = "Group to run SABnzbd as";
     };
 
     openFirewall = mkOption {
@@ -107,6 +121,8 @@ in {
 
     services.sabnzbd = {
       enable = true;
+      user = cfg.user;
+      group = cfg.group;
       openFirewall = cfg.openFirewall;
     };
 
