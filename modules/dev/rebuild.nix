@@ -184,13 +184,13 @@ with lib;
         # Autoformat nix files
         ${pkgs.alejandra}/bin/alejandra --quiet hosts/ modules/ flake.nix hosts.nix 2>/dev/null || true
 
-        # Rebuild system
-        sudo nixos-rebuild switch --flake ".#$HOSTNAME" --show-trace
+        # Rebuild system using nh (enhanced nix helper with diff and tree view)
+        nh os switch ".#$HOSTNAME"
 
         echo "NixOS Rebuild Completed!"
 
         # Get current generation info
-        current=$(sudo nixos-rebuild list-generations --json | ${pkgs.jq}/bin/jq -r '.[] | select(.current == true) | .generation')
+        current=$(nixos-rebuild list-generations --json | ${pkgs.jq}/bin/jq -r '.[] | select(.current == true) | .generation')
 
         # Commit changes
         git add hosts/ modules/ flake.nix flake.lock hosts.nix

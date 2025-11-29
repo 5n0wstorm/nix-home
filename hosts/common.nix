@@ -20,11 +20,31 @@
       ];
       auto-optimise-store = true;
       trusted-users = ["@wheel"];
+
+      # Resource limits to prevent OOM during builds
+      max-jobs = 4; # Max parallel derivation builds (default: auto = all cores)
+      cores = 2; # Cores per build job (default: 0 = all cores)
     };
-    gc = {
-      automatic = true;
+  };
+
+  # Systemd resource limits for nix-daemon to prevent OOM
+  systemd.services.nix-daemon.serviceConfig = {
+    MemoryMax = "75%"; # Hard limit: kill if exceeded
+    MemoryHigh = "50%"; # Soft limit: throttle at this point
+    OOMScoreAdjust = 500; # Make nix-daemon more likely to be OOM-killed vs system services
+  };
+
+  # ============================================================================
+  # NH - Enhanced Nix CLI Helper
+  # ============================================================================
+
+  programs.nh = {
+    enable = true;
+    flake = "/home/dominik/nix-home"; # Default flake path for nh commands
+    clean = {
+      enable = true;
       dates = "weekly";
-      options = "--delete-older-than 30d";
+      extraArgs = "--keep 5 --keep-since 7d";
     };
   };
 
