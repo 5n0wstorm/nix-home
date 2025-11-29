@@ -386,46 +386,7 @@ with lib;
     }) serviceDomains)));
 
     # --------------------------------------------------------------------------
-    # ACME CERTIFICATE MANAGEMENT
-    # --------------------------------------------------------------------------
-      description = "Backup ACME certificates to SOPS-managed location";
-      wantedBy = ["multi-user.target"];
-      after = ["acme-finished.target"];
 
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        User = "root";
-      };
-
-      script = let
-        certBackupDir = "/var/lib/fleet-acme-certs";
-        serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
-      in ''
-        set -euo pipefail
-
-        # Create backup directory if it doesn't exist
-        mkdir -p "${certBackupDir}"
-
-        # Function to backup certificates for a domain
-        backup_cert() {
-          local domain="$1"
-          local acme_dir="/var/lib/acme/$domain"
-          local backup_dir="${certBackupDir}/$domain"
-
-          if [[ -d "$acme_dir" && -f "$acme_dir/fullchain.pem" && -f "$acme_dir/key.pem" ]]; then
-            echo "Backing up certificates for $domain..."
-            mkdir -p "$backup_dir"
-            cp "$acme_dir/fullchain.pem" "$backup_dir/"
-            cp "$acme_dir/key.pem" "$backup_dir/"
-            chmod 600 "$backup_dir"/*.pem
-          fi
-        }
-
-        # Backup certificates for all service domains that use ACME
-        ${concatMapStringsSep "\n" (domain: "backup_cert \"${domain}\"") serviceDomains}
-      '';
-    };
 
     # --------------------------------------------------------------------------
     # CERTIFICATE ENCRYPTION HELPER SCRIPT
