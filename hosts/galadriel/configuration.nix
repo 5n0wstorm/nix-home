@@ -15,7 +15,6 @@ in {
     ../../modules/monitoring/prometheus.nix
     ../../modules/monitoring/grafana.nix
     ../../modules/dev/jenkins.nix
-    ../../modules/apps/cloudflare-ddns.nix
     ../../modules/networking/reverse-proxy.nix
     ../../modules/security/self-signed-ca.nix
   ];
@@ -33,13 +32,10 @@ in {
 
   fleet.dev.jenkins.enable = true;
 
-  fleet.apps.cloudflare-ddns = {
+  services.cfdyndns = {
     enable = true;
     apiTokenFile = "/run/secrets/cloudflare_api_token";
-    zoneIdFile = "/run/secrets/cloudflare_zone_id";
-    recordName = "sn0wstorm.com";
-    recordType = "A";
-    interval = "5min";
+    records = [ "sn0wstorm.com" ];
   };
 
   fleet.monitoring.prometheus = {
@@ -129,7 +125,6 @@ in {
     # SOPS secrets
     secrets = {
       "cloudflare_api_token" = {};
-      "cloudflare_zone_id" = {};
       "git_user_name" = {};
       "git_user_email" = {};
     };
