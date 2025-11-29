@@ -186,6 +186,9 @@ in {
       name = "$(cat /run/secrets/git_user_name)";
       email = "$(cat /run/secrets/git_user_email)";
     };
+    safe = {
+      directory = "/home/dominik/nix-home";
+    };
   };
 
   # ============================================================================
