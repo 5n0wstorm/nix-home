@@ -312,12 +312,12 @@ with lib;
         if [[ $# -eq 0 ]]; then
           echo "Usage: $0 <domain> [domain2] ..."
           echo "Available domains with certificates:"
-          find "$CERT_BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
+          find "''${CERT_BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \;
           exit 1
         fi
 
         for domain in "$@"; do
-          cert_dir="$CERT_BACKUP_DIR/$domain"
+          cert_dir="''${CERT_BACKUP_DIR}/''${domain}"
           if [[ ! -d "$cert_dir" ]]; then
             echo "Error: Certificate directory not found: $cert_dir"
             echo "Run 'fleet-cert-backup' service first or wait for ACME to generate certificates"
@@ -328,25 +328,25 @@ with lib;
 
           # Encrypt fullchain.pem
           if [[ -f "$cert_dir/fullchain.pem" ]]; then
-            fullchain_key="${domain}_acme_fullchain"
-            echo "Encrypting fullchain.pem as $fullchain_key"
+            fullchain_key="''${domain}_acme_fullchain"
+            echo "Encrypting fullchain.pem as ''${fullchain_key}"
             sops --encrypt --input-type binary "$cert_dir/fullchain.pem" > "$cert_dir/fullchain.pem.enc"
             mv "$cert_dir/fullchain.pem.enc" "$SOPS_CONFIG.tmp"
             # Note: You need to manually merge this into your main SOPS file
             echo "Certificate encrypted. Run: sops edit $SOPS_CONFIG"
-            echo "Add the encrypted content as: ${fullchain_key}: |"
+            echo "Add the encrypted content as: ''${fullchain_key}: |"
             cat "$SOPS_CONFIG.tmp"
             rm "$SOPS_CONFIG.tmp"
           fi
 
           # Encrypt key.pem
           if [[ -f "$cert_dir/key.pem" ]]; then
-            key_key="${domain}_acme_key"
-            echo "Encrypting key.pem as $key_key"
+            key_key="''${domain}_acme_key"
+            echo "Encrypting key.pem as ''${key_key}"
             sops --encrypt --input-type binary "$cert_dir/key.pem" > "$cert_dir/key.pem.enc"
             mv "$cert_dir/key.pem.enc" "$SOPS_CONFIG.tmp"
             echo "Private key encrypted. Run: sops edit $SOPS_CONFIG"
-            echo "Add the encrypted content as: ${key_key}: |"
+            echo "Add the encrypted content as: ''${key_key}: |"
             cat "$SOPS_CONFIG.tmp"
             rm "$SOPS_CONFIG.tmp"
           fi
@@ -386,31 +386,31 @@ with lib;
           local domain_dir="${acmeDir}/$domain"
 
           # Check if encrypted certificates exist in SOPS
-          local fullchain_key="${domain}_acme_fullchain"
-          local key_key="${domain}_acme_key"
+          local fullchain_key="''${domain}_acme_fullchain"
+          local key_key="''${domain}_acme_key"
 
           local has_fullchain=false
           local has_key=false
 
           # Check if the secrets exist (this is a bit hacky but works)
-          if [[ -f "/run/secrets/${fullchain_key}" ]]; then
+          if [[ -f "/run/secrets/''${fullchain_key}" ]]; then
             has_fullchain=true
           fi
-          if [[ -f "/run/secrets/${key_key}" ]]; then
+          if [[ -f "/run/secrets/''${key_key}" ]]; then
             has_key=true
           fi
 
           if [[ "$has_fullchain" == "true" && "$has_key" == "true" ]]; then
-            echo "Restoring certificates for $domain from SOPS..."
+            echo "Restoring certificates for ''${domain} from SOPS..."
             mkdir -p "$domain_dir"
-            cp "/run/secrets/${fullchain_key}" "$domain_dir/fullchain.pem"
-            cp "/run/secrets/${key_key}" "$domain_dir/key.pem"
+            cp "/run/secrets/''${fullchain_key}" "$domain_dir/fullchain.pem"
+            cp "/run/secrets/''${key_key}" "$domain_dir/key.pem"
             chmod 600 "$domain_dir/key.pem"
             chmod 644 "$domain_dir/fullchain.pem"
             chown -R acme:acme "$domain_dir"
-            echo "Certificates restored for $domain"
+            echo "Certificates restored for ''${domain}"
           else
-            echo "No encrypted certificates found for $domain, will generate new ones"
+            echo "No encrypted certificates found for ''${domain}, will generate new ones"
           fi
         }
 
