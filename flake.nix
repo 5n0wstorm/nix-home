@@ -9,13 +9,13 @@
     nixos-wsl.url = "github:nix-community/NixOS-WSL";
     sops-nix.url = "github:Mic92/sops-nix";
 
-    # Pinned nixpkgs for SABnzbd 4.5.3 (Nov 2025)
+    # Pinned nixpkgs for SABnzbd version control
     # Change the commit hash to get a different version:
     # - 4.5.5: ee09932cedcef15aaf476f9343d1dea2cb77e261
     # - 4.5.3: 12c1f0253aa9a54fdf8ec8aecaafada64a111e24
     # - 4.4.0: 7e4a1594489d41bf8e16046b28e14a0e264c9baa
     # - 4.3.3: 5a48e3c2e435e95103d56590188cfed7b70e108c
-    nixpkgs-sabnzbd.url = "github:NixOS/nixpkgs/5a48e3c2e435e95103d56590188cfed7b70e108c";
+    nixpkgs-sabnzbd.url = "github:NixOS/nixpkgs/12c1f0253aa9a54fdf8ec8aecaafada64a111e24";
   };
 
   # ============================================================================
