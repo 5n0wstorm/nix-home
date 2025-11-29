@@ -12,13 +12,31 @@ in {
   imports = [
     ../common.nix
     ./hardware-configuration.nix
+    # Security
     ../../modules/security/acme.nix
+    # Networking
+    ../../modules/networking/reverse-proxy.nix
+    # Monitoring
     ../../modules/monitoring/prometheus.nix
     ../../modules/monitoring/grafana.nix
+    # Dev
     ../../modules/dev/jenkins.nix
-    ../../modules/networking/reverse-proxy.nix
+    # Apps
     ../../modules/apps/homepage.nix
     ../../modules/apps/vaultwarden.nix
+    # Media
+    ../../modules/media/jellyfin.nix
+    ../../modules/media/sonarr.nix
+    ../../modules/media/radarr.nix
+    ../../modules/media/lidarr.nix
+    ../../modules/media/readarr.nix
+    ../../modules/media/prowlarr.nix
+    ../../modules/media/bazarr.nix
+    ../../modules/media/overseerr.nix
+    ../../modules/media/qbittorrent.nix
+    ../../modules/media/transmission.nix
+    ../../modules/media/sabnzbd.nix
+    ../../modules/media/navidrome.nix
   ];
 
   # ============================================================================
@@ -77,6 +95,86 @@ in {
         ];
       }
     ];
+  };
+
+  # ============================================================================
+  # MEDIA SERVICES
+  # ============================================================================
+
+  # Jellyfin - Media streaming server
+  fleet.media.jellyfin = {
+    enable = true;
+    domain = "jellyfin.sn0wstorm.com";
+    mediaDir = "/media";
+  };
+
+  # Sonarr - TV series management
+  fleet.media.sonarr = {
+    enable = true;
+    domain = "sonarr.sn0wstorm.com";
+  };
+
+  # Radarr - Movie management
+  fleet.media.radarr = {
+    enable = true;
+    domain = "radarr.sn0wstorm.com";
+  };
+
+  # Lidarr - Music management
+  fleet.media.lidarr = {
+    enable = true;
+    domain = "lidarr.sn0wstorm.com";
+  };
+
+  # Readarr - Ebook management
+  fleet.media.readarr = {
+    enable = true;
+    domain = "readarr.sn0wstorm.com";
+  };
+
+  # Prowlarr - Indexer management
+  fleet.media.prowlarr = {
+    enable = true;
+    domain = "prowlarr.sn0wstorm.com";
+  };
+
+  # Bazarr - Subtitle management
+  fleet.media.bazarr = {
+    enable = true;
+    domain = "bazarr.sn0wstorm.com";
+  };
+
+  # Overseerr - Media request management
+  fleet.media.overseerr = {
+    enable = true;
+    domain = "overseerr.sn0wstorm.com";
+  };
+
+  # qBittorrent - Torrent client
+  fleet.media.qbittorrent = {
+    enable = true;
+    domain = "qbittorrent.sn0wstorm.com";
+    downloadDir = "/media/downloads";
+  };
+
+  # Transmission - Alternative torrent client (disabled, using qBittorrent)
+  # fleet.media.transmission = {
+  #   enable = true;
+  #   domain = "transmission.sn0wstorm.com";
+  #   downloadDir = "/media/downloads";
+  # };
+
+  # SABnzbd - Usenet downloader
+  fleet.media.sabnzbd = {
+    enable = true;
+    domain = "sabnzbd.sn0wstorm.com";
+  };
+
+  # Navidrome - Music streaming server
+  fleet.media.navidrome = {
+    enable = true;
+    domain = "navidrome.sn0wstorm.com";
+    musicFolder = "/media/music";
   };
 
   # ============================================================================
