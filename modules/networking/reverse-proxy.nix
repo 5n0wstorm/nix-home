@@ -123,7 +123,6 @@ in {
       sslCertificate = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.certPath;
       sslCertificateKey = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.keyPath;
       forceSSL = useAcmeTLS && hostConfig.ssl;
-      addSSL = useAcmeTLS && hostConfig.ssl;
 
       locations."/" = {
         proxyPass = "http://${hostConfig.target}:${toString hostConfig.port}";
@@ -150,7 +149,6 @@ in {
       sslCertificate = mkIf (useAcmeTLS && enableSSL) acmeCfg.certPath;
       sslCertificateKey = mkIf (useAcmeTLS && enableSSL) acmeCfg.keyPath;
       forceSSL = useAcmeTLS && enableSSL;
-      addSSL = useAcmeTLS && enableSSL;
 
       locations."/" = {
         proxyPass = "http://${target}:${toString port}";
