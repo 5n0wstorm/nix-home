@@ -101,7 +101,7 @@ sops --encrypt --in-place secrets/elrond.yaml --verbose
 ## 🚨 Troubleshooting
 
 ### "Failed to decrypt"
-- Check that your age key is in `/var/lib/sops-nix/key.txt`
+- Check that your age key is in `/home/dominik/.config/sops/age/keys.txt`
 - Verify the key matches the one in `.sops.yaml`
 
 ### "Permission denied" for SSH

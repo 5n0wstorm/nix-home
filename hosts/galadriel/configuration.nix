@@ -124,7 +124,7 @@ in {
     defaultSopsFile = ../../secrets/galadriel.yaml;
 
     # Age key for decryption (this should match your .sops.yaml)
-    age.keyFile = "/var/lib/sops-nix/key.txt";
+    age.keyFile = "/home/dominik/.config/sops/age/keys.txt";
 
     # SOPS secrets
     secrets = {
@@ -133,6 +133,17 @@ in {
       "cloudflare_zone_id" = {};
     };
   };
+
+  # --------------------------------------------------------------------------
+  # SOPS AGE KEY DIRECTORY
+  # --------------------------------------------------------------------------
+
+  # Ensure dominik's SOPS directory exists
+  systemd.tmpfiles.rules = [
+    "d /home/dominik/.config 0755 dominik users -"
+    "d /home/dominik/.config/sops 0755 dominik users -"
+    "d /home/dominik/.config/sops/age 0755 dominik users -"
+  ];
 
   # --------------------------------------------------------------------------
 

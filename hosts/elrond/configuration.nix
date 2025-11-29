@@ -42,7 +42,7 @@
     defaultSopsFile = ../../secrets/elrond.yaml;
 
     # Age key for decryption (this should match your .sops.yaml)
-    age.keyFile = "/var/lib/sops-nix/key.txt";
+    age.keyFile = "/home/dominik/.config/sops/age/keys.txt";
 
     # SSH key secrets
     secrets = {
@@ -77,9 +77,12 @@
     '';
   };
 
-  # Ensure SSH directory exists
+  # Ensure user directories exist
   systemd.tmpfiles.rules = [
     "d /home/dominik/.ssh 0700 dominik users"
+    "d /home/dominik/.config 0755 dominik users -"
+    "d /home/dominik/.config/sops 0755 dominik users -"
+    "d /home/dominik/.config/sops/age 0755 dominik users -"
   ];
 
   # ============================================================================
