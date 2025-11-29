@@ -26,7 +26,7 @@ keys:
 Edit the secrets file to add your SSH keys:
 ```bash
 # Edit the encrypted secrets file
-sops secrets/elrond.yaml
+sops secrets/secrets.yaml
 ```
 
 Replace the placeholder values with your actual SSH keys:
@@ -56,11 +56,18 @@ sudo nixos-rebuild switch --flake .#elrond
 rebuild  # Test the rebuild script with SSH key
 ```
 
+### 7. Configure Git Identity
+After rebuilding, set up your Git identity:
+```bash
+git config --global user.name "$(cat /run/secrets/git_user_name)"
+git config --global user.email "$(cat /run/secrets/git_user_email)"
+```
+
 ## 📁 File Structure
 
 ```
 secrets/
-├── elrond.yaml    # Encrypted secrets for elrond host
+├── secrets.yaml   # Unified encrypted secrets for all hosts
 └── ...
 
 .sops.yaml         # SOPS configuration
@@ -68,11 +75,13 @@ secrets/
 
 ## 🔧 Available Secrets
 
-### elrond.yaml
+### secrets.yaml (Unified)
 - `ssh_key`: SSH private key for git operations
 - `ssh_key_pub`: SSH public key
-- `git_user_name`: Git user name
-- `git_user_email`: Git user email
+- `git_user_name`: Git user name (available at /run/secrets/git_user_name)
+- `git_user_email`: Git user email (available at /run/secrets/git_user_email)
+- `cloudflare_api_token`: Cloudflare API token for DDNS
+- `cloudflare_zone_id`: Cloudflare zone ID for DNS management
 
 ## 🛠️ Commands
 
@@ -84,10 +93,10 @@ sops secrets/elrond.yaml
 sops --decrypt secrets/elrond.yaml
 
 # Encrypt file
-sops --encrypt --in-place secrets/elrond.yaml
+sops --encrypt --in-place secrets/secrets.yaml
 
 # Check encryption status
-sops --encrypt --in-place secrets/elrond.yaml --verbose
+sops --encrypt --in-place secrets/secrets.yaml --verbose
 ```
 
 ## 🔒 Security Notes

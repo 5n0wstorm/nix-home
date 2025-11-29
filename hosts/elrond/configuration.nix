@@ -39,12 +39,12 @@
   # SOPS configuration for encrypted secrets
   sops = {
     # Default secrets location
-    defaultSopsFile = ../../secrets/elrond.yaml;
+    defaultSopsFile = ../../secrets/secrets.yaml;
 
     # Age key for decryption (this should match your .sops.yaml)
     age.keyFile = "/home/dominik/.config/sops/age/keys.txt";
 
-    # SSH key secrets
+    # User secrets
     secrets = {
       "ssh_key" = {
         path = "/home/dominik/.ssh/id_ed25519";

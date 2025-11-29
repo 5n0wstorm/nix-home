@@ -121,7 +121,7 @@ in {
   # SOPS configuration for encrypted secrets
   sops = {
     # Default secrets location
-    defaultSopsFile = ../../secrets/galadriel.yaml;
+    defaultSopsFile = ../../secrets/secrets.yaml;
 
     # Age key for decryption (this should match your .sops.yaml)
     age.keyFile = "/home/dominik/.config/sops/age/keys.txt";
