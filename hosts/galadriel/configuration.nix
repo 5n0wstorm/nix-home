@@ -33,14 +33,14 @@ in {
 
   fleet.dev.jenkins.enable = true;
 
-  # fleet.apps.cloudflare-ddns = {
-  #   enable = true;
-  #   apiTokenFile = "/run/secrets/cloudflare_api_token";
-  #   zoneIdFile = "/run/secrets/cloudflare_zone_id";
-  #   recordName = "your-subdomain.example.com";
-  #   recordType = "A"; # or "AAAA" for IPv6
-  #   interval = "5min";
-  # };
+  fleet.apps.cloudflare-ddns = {
+    enable = true;
+    apiTokenFile = "/run/secrets/cloudflare_api_token";
+    zoneIdFile = "/run/secrets/cloudflare_zone_id";
+    recordName = "sn0wstorm.com";
+    recordType = "A";
+    interval = "5min";
+  };
 
   fleet.monitoring.prometheus = {
     enable = true;
