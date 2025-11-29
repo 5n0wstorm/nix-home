@@ -45,7 +45,11 @@ in {
       Type = "oneshot";
       LoadCredential = "CLOUDFLARE_APITOKEN_FILE:/run/secrets/cloudflare_api_token";
       DynamicUser = true;
-      ExecStart = "${pkgs.cloudflare-dynamic-dns}/bin/cloudflare-dynamic-dns --token $(${pkgs.systemd}/bin/systemd-creds cat CLOUDFLARE_APITOKEN_FILE) --domains sn0wstorm.com --ipcmd 'curl -fsSL https://api.ipify.org'";
+      ExecStart = "${pkgs.writeScript "cloudflare-ddns-wrapper" ''
+        #!${pkgs.bash}/bin/bash
+        TOKEN=$(${pkgs.systemd}/bin/systemd-creds cat CLOUDFLARE_APITOKEN_FILE)
+        exec ${pkgs.cloudflare-dynamic-dns}/bin/cloudflare-dynamic-dns --token "$TOKEN" --domains sn0wstorm.com --ipcmd 'curl -fsSL https://api.ipify.org'
+      ''}";
       RemainAfterExit = false;
     };
   };
