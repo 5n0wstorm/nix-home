@@ -174,8 +174,10 @@ in {
 
   # Git identity from secrets:
   programs.git.config = {
-    userName = "$(cat /run/secrets/git_user_name)";
-    userEmail = "$(cat /run/secrets/git_user_email)";
+    user = {
+      userName = "$(cat /run/secrets/git_user_name)";
+      userEmail = "$(cat /run/secrets/git_user_email)";
+    };
   };
 
   # ============================================================================
