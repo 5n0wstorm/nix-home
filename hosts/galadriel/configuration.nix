@@ -98,7 +98,6 @@ in {
     # SOPS secrets
     secrets = {
       "cloudflare_api_token" = {};
-      "cloudflare_credentials" = {};
       "ssh_key" = {
         path = "/home/dominik/.ssh/id_ed25519";
         owner = "dominik";
@@ -114,28 +113,6 @@ in {
       "git_user_name" = {};
       "git_user_email" = {};
     };
-  };
-
-  # --------------------------------------------------------------------------
-  # CLOUDFLARE ACME CREDENTIALS
-  # --------------------------------------------------------------------------
-
-  # Create Cloudflare credentials file for ACME
-  systemd.services.cloudflare-acme-credentials = {
-    description = "Create Cloudflare credentials for ACME DNS challenge";
-    wantedBy = ["multi-user.target"];
-    before = ["nginx.service"];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      User = "root";
-    };
-    script = ''
-      # Create credentials file from SOPS secret
-      echo "CLOUDFLARE_TOKEN=$(cat /run/secrets/cloudflare_api_token)" > /run/secrets/cloudflare_credentials
-      chmod 600 /run/secrets/cloudflare_credentials
-      chown root:root /run/secrets/cloudflare_credentials
-    '';
   };
 
   # --------------------------------------------------------------------------
