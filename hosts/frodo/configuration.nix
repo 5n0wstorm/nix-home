@@ -36,6 +36,19 @@ in {
   # NETWORKING & FIREWALL
   # ============================================================================
 
+  networking = {
+    useDHCP = false;
+    interfaces.enp1s0 = {
+      useDHCP = false;
+      ipv4.addresses = [{
+        address = hosts.frodo.ip;
+        prefixLength = 24;
+      }];
+    };
+    defaultGateway = "192.168.2.1";
+    nameservers = ["8.8.8.8" "1.1.1.1"];
+  };
+
   networking.firewall.allowedTCPPorts = [];
 
   # ============================================================================
