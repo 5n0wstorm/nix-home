@@ -145,6 +145,7 @@ in {
     services.vaultwarden = {
       enable = true;
       backupDir = cfg.backupDir;
+      environmentFile = mkIf (cfg.environmentFile != null) cfg.environmentFile;
 
       config = {
         DOMAIN = "https://${cfg.domain}";
