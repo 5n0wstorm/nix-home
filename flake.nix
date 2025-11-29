@@ -57,6 +57,13 @@
       ];
     };
 
+    nixosConfigurations.galadriel = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./hosts/galadriel/configuration.nix
+      ];
+    };
+
     # ==========================================================================
     # COLMENA HIVE - Fleet deployment configuration
     # ==========================================================================
