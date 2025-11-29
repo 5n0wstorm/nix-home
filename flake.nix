@@ -61,6 +61,7 @@
       system = "x86_64-linux";
       modules = [
         ./hosts/galadriel/configuration.nix
+        sops-nix.nixosModules.sops
       ];
     };
 

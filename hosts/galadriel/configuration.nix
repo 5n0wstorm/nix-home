@@ -15,6 +15,7 @@ in {
     ../../modules/monitoring/prometheus.nix
     ../../modules/monitoring/grafana.nix
     ../../modules/dev/jenkins.nix
+    ../../modules/apps/cloudflare-ddns.nix
     ../../modules/networking/reverse-proxy.nix
     ../../modules/security/self-signed-ca.nix
   ];
@@ -31,6 +32,15 @@ in {
   # ============================================================================
 
   fleet.dev.jenkins.enable = true;
+
+  # fleet.apps.cloudflare-ddns = {
+  #   enable = true;
+  #   apiTokenFile = "/run/secrets/cloudflare_api_token";
+  #   zoneIdFile = "/run/secrets/cloudflare_zone_id";
+  #   recordName = "your-subdomain.example.com";
+  #   recordType = "A"; # or "AAAA" for IPv6
+  #   interval = "5min";
+  # };
 
   fleet.monitoring.prometheus = {
     enable = true;
@@ -105,8 +115,26 @@ in {
   };
 
   # ============================================================================
-  # NETWORKING & FIREWALL
+  # SECRETS MANAGEMENT (SOPS-NIX)
   # ============================================================================
+
+  # SOPS configuration for encrypted secrets
+  sops = {
+    # Default secrets location
+    defaultSopsFile = ../../secrets/galadriel.yaml;
+
+    # Age key for decryption (this should match your .sops.yaml)
+    age.keyFile = "/var/lib/sops-nix/key.txt";
+
+    # SOPS secrets
+    secrets = {
+      # Cloudflare DDNS secrets
+      "cloudflare_api_token" = {};
+      "cloudflare_zone_id" = {};
+    };
+  };
+
+  # --------------------------------------------------------------------------
 
   networking = {
     useDHCP = false;
