@@ -118,7 +118,7 @@ in {
     useAcmeTLS = cfg.enableTLS && acmeCfg.enable;
 
     # Helper function to create a virtual host configuration
-    mkVirtualHost = name: hostConfig: {
+    mkVirtualHost = _name: hostConfig: {
       # Use wildcard certificate from ACME module
       sslCertificate = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.certPath;
       sslCertificateKey = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.keyPath;
@@ -136,14 +136,19 @@ in {
       };
     };
 
-    # Helper function to create virtual host from service registry entry
-    mkServiceVirtualHost = serviceName: serviceConfig: let
+    # Helper function to extract domain from service config (used for keying)
+    getServiceDomain = serviceName: serviceConfig: let
       labels = serviceConfig.labels or {};
-      domain = labels."fleet.reverse-proxy.domain" or "${serviceName}.${acmeCfg.domain}";
+    in
+      labels."fleet.reverse-proxy.domain" or "${serviceName}.${acmeCfg.domain}";
+
+    # Helper function to create virtual host config from service registry entry
+    mkServiceVirtualHostConfig = serviceName: serviceConfig: let
+      labels = serviceConfig.labels or {};
       target = labels."fleet.reverse-proxy.target" or "127.0.0.1";
       port = labels."fleet.reverse-proxy.port" or serviceConfig.port or 80;
       extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
-      enableSSL = labels."fleet.reverse-proxy.ssl" != "false";
+      enableSSL = (labels."fleet.reverse-proxy.ssl" or "true") != "false";
     in {
       # Use wildcard certificate from ACME module
       sslCertificate = mkIf (useAcmeTLS && enableSSL) acmeCfg.certPath;
@@ -154,14 +159,28 @@ in {
         proxyPass = "http://${target}:${toString port}";
         proxyWebsockets = (labels."fleet.reverse-proxy.websockets" or "false") == "true";
         extraConfig = ''
+          proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_http_version 1.1;
           ${extraConfig}
           ${labels."fleet.reverse-proxy.nginx-extra-config" or ""}
         '';
       };
     };
+
+    enabledServices = filterAttrs (
+      _serviceName: serviceConfig:
+        (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true"
+    ) cfg.serviceRegistry;
+    serviceVirtualHosts = listToAttrs (
+      mapAttrsToList (serviceName: serviceConfig: {
+        name = getServiceDomain serviceName serviceConfig;
+        value = mkServiceVirtualHostConfig serviceName serviceConfig;
+      }) enabledServices
+    );
   in
     mkIf cfg.enable {
       # --------------------------------------------------------------------------
@@ -192,14 +211,8 @@ in {
         recommendedTlsSettings = true;
 
         # Generate virtual hosts from manual routes and service registry
-        virtualHosts =
-          mapAttrs mkVirtualHost cfg.routes
-          // (mapAttrs mkServiceVirtualHost
-            (filterAttrs (
-                serviceName: serviceConfig:
-                  (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true"
-              )
-              cfg.serviceRegistry));
+        # Routes are already keyed by domain, service registry is converted above
+        virtualHosts = mapAttrs mkVirtualHost cfg.routes // serviceVirtualHosts;
       };
 
       # --------------------------------------------------------------------------
