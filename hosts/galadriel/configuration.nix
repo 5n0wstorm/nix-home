@@ -57,11 +57,11 @@ in {
   };
 
   # ============================================================================
-  # ACME WILDCARD CERTIFICATE (DNS-01 validation with RFC2136)
+  # ACME WILDCARD CERTIFICATE (DNS-01 validation with Cloudflare)
   # ============================================================================
   #
   # This configures a single wildcard certificate for *.sn0wstorm.com using
-  # RFC2136 (BIND dynamic DNS) for ACME DNS-01 challenge validation.
+  # Cloudflare DNS for ACME DNS-01 challenge validation.
   #
   # The certificate is shared by all services behind the reverse proxy.
   #
@@ -70,11 +70,23 @@ in {
     enable = true;
     domain = "sn0wstorm.com";
     email = "dominik@sn0wstorm.com";
-    dnsProvider = "rfc2136";
-    credentialsFile = "/var/lib/secrets/certs.secret";
-    dnsPropagationCheck = false; # Local DNS server, no propagation needed
-    enableRfc2136 = true;
-    rfc2136Zone = "sn0wstorm.com";
+    dnsProvider = "cloudflare";
+    credentialsFile = "/run/acme-cloudflare-credentials";
+  };
+
+  # Create ACME credentials file from existing Cloudflare token
+  systemd.services.acme-cloudflare-credentials = {
+    description = "Create ACME Cloudflare credentials file";
+    before = ["acme-sn0wstorm.com.service"];
+    requiredBy = ["acme-sn0wstorm.com.service"];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      echo "CLOUDFLARE_DNS_API_TOKEN=$(cat /run/secrets/cloudflare_api_token)" > /run/acme-cloudflare-credentials
+      chmod 400 /run/acme-cloudflare-credentials
+    '';
   };
 
   # ============================================================================
