@@ -56,111 +56,86 @@ in {
   };
 
   # ============================================================================
+  # DNS SERVER (BIND) WITH RFC2136 SUPPORT
+  # ============================================================================
+
+  services.bind = {
+    enable = true;
+    extraConfig = ''
+      include "/var/lib/secrets/dnskeys.conf";
+    '';
+    zones = [
+      rec {
+        name = "sn0wstorm.com";
+        file = "/var/db/bind/${name}";
+        master = true;
+        extraConfig = "allow-update { key rfc2136key.sn0wstorm.com.; };";
+      }
+    ];
+  };
+
+  # ============================================================================
+  # RFC2136 TSIG KEY GENERATION
+  # ============================================================================
+
+  systemd.services.dns-rfc2136-conf = {
+    requiredBy = [
+      "acme-sn0wstorm.com.service"
+      "bind.service"
+    ];
+    before = [
+      "acme-sn0wstorm.com.service"
+      "bind.service"
+    ];
+    unitConfig = {
+      ConditionPathExists = "!/var/lib/secrets/dnskeys.conf";
+    };
+    serviceConfig = {
+      Type = "oneshot";
+      UMask = 77;
+    };
+    path = [ pkgs.bind ];
+    script = ''
+      mkdir -p /var/lib/secrets
+      chmod 755 /var/lib/secrets
+      tsig-keygen rfc2136key.sn0wstorm.com > /var/lib/secrets/dnskeys.conf
+      chown named:root /var/lib/secrets/dnskeys.conf
+      chmod 400 /var/lib/secrets/dnskeys.conf
+
+      # extract secret value from the dnskeys.conf
+      while read x y; do if [ "$x" = "secret" ]; then secret="''${y:1:''${#y}-3}"; fi; done < /var/lib/secrets/dnskeys.conf
+
+      cat > /var/lib/secrets/certs.secret << EOF
+      RFC2136_NAMESERVER='127.0.0.1:53'
+      RFC2136_TSIG_ALGORITHM='hmac-sha256.'
+      RFC2136_TSIG_KEY='rfc2136key.sn0wstorm.com'
+      RFC2136_TSIG_SECRET='$secret'
+      EOF
+      chmod 400 /var/lib/secrets/certs.secret
+    '';
+  };
+
+  # ============================================================================
+  # ACME WITH DNS-01 VALIDATION
+  # ============================================================================
+
+  security.acme.acceptTerms = true;
+  security.acme.defaults.email = "dominik@example.com";
+  security.acme.defaults = {
+    dnsProvider = "rfc2136";
+    environmentFile = "/var/lib/secrets/certs.secret";
+    # We don't need to wait for propagation since this is a local DNS server
+    dnsPropagationCheck = false;
+  };
+
+  # ============================================================================
   # REVERSE PROXY (Pluggable - services register themselves automatically)
   # ============================================================================
 
-  # Temporarily disable SSL until certificates are generated
-  # fleet.networking.reverseProxy = {
-  #   enable = true;
-  #   enableTLS = true;
-  #   enableACME = true;
-  #   acmeEmail = "dominik@example.com";
-  # };
-
   fleet.networking.reverseProxy = {
     enable = true;
-    enableTLS = false;  # Disable SSL temporarily
-    enableACME = true;
-    acmeEmail = "dominik@example.com";
-  };
-
-  # Ensure services start in correct order
-  systemd.services.acme-sn0wstorm-com = {
-    wants = ["cloudflare-acme-credentials.service"];
-    after = ["cloudflare-acme-credentials.service"];
-  };
-
-  systemd.services.nginx = {
-    wants = ["acme-sn0wstorm-com.service"];
-    after = ["acme-sn0wstorm-com.service"];
-  };
-
-  # Service to enable SSL once certificates are ready
-  systemd.services.enable-ssl-after-acme = {
-    description = "Enable SSL in nginx after ACME certificates are generated";
-    wantedBy = ["multi-user.target"];
-    after = ["acme-sn0wstorm-com.service" "nginx.service"];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    script = ''
-      # Wait for certificate to exist
-      timeout=300  # 5 minutes
-      count=0
-      while [ ! -f /var/lib/acme/sn0wstorm.com/fullchain.pem ] && [ $count -lt $timeout ]; do
-        sleep 1
-        count=$((count + 1))
-      done
-
-      if [ -f /var/lib/acme/sn0wstorm.com/fullchain.pem ]; then
-        echo "ACME certificates found, you can now enable SSL by uncommenting the reverse proxy TLS config and running: nixos-rebuild switch"
-      else
-        echo "ACME certificates not found after timeout, check ACME service logs with: journalctl -u acme-sn0wstorm-com.service"
-      fi
-    '';
-  };
-
-  security.acme.acceptTerms = true;
-
-  security.acme.certs."sn0wstorm.com" = {
-    domain = "*.sn0wstorm.com";
-    dnsProvider = "cloudflare";
-    credentialsFile = "/etc/cloudflare-credentials.ini";
-    group = "nginx";
-    email = "dominik@example.com";
-  };
-
-  # ----------------------------------------------------------------------------
-  # CLOUDFLARE CREDENTIALS FOR ACME
-  # ----------------------------------------------------------------------------
-
-  # Generate Cloudflare credentials file for ACME from SOPS secret
-  systemd.services.cloudflare-acme-credentials = {
-    description = "Generate Cloudflare credentials for ACME";
-    wantedBy = ["multi-user.target"];
-    before = ["acme-sn0wstorm.com.service"];
-    serviceConfig = {
-      Type = "oneshot";
-      User = "root";
-    };
-    script = ''
-      mkdir -p /etc
-      cat > /etc/cloudflare-credentials.ini << EOF
-      CLOUDFLARE_DNS_API_TOKEN=$(cat /run/secrets/cloudflare_api_token)
-      EOF
-      chmod 600 /etc/cloudflare-credentials.ini
-    '';
-  };
-
-  # Create SSL enable flag based on certificate existence
-  systemd.services.ssl-status-check = {
-    description = "Check if SSL certificates exist and create status file";
-    wantedBy = ["multi-user.target"];
-    before = ["nginx.service"];
-    serviceConfig = {
-      Type = "oneshot";
-      User = "root";
-    };
-    script = ''
-      mkdir -p /var/lib/fleet-ssl-status
-      if [ -f /var/lib/acme/sn0wstorm.com/fullchain.pem ]; then
-        echo "true" > /var/lib/fleet-ssl-status/enable
-      else
-        echo "false" > /var/lib/fleet-ssl-status/enable
-      fi
-      chmod 644 /var/lib/fleet-ssl-status/enable
-    '';
+    enableTLS = true;   # Enable TLS since nginx will handle ACME
+    enableACME = true;  # Use nginx's built-in ACME with DNS validation
   };
 
   # ============================================================================

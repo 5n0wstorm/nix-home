@@ -129,10 +129,8 @@ with lib; {
     # Helper function to create a virtual host configuration
     mkVirtualHost = name: hostConfig: {
       enableACME = cfg.enableACME;
+      acmeRoot = mkIf cfg.enableACME null;  # Use DNS validation
       forceSSL = cfg.enableTLS;
-
-      sslCertificate = mkIf (!cfg.enableACME && cfg.enableTLS) "/var/lib/fleet-ca/certs/${name}/cert.pem";
-      sslCertificateKey = mkIf (!cfg.enableACME && cfg.enableTLS) "/var/lib/fleet-ca/certs/${name}/key.pem";
 
       locations."/" = {
         proxyPass = "http://${hostConfig.target}:${toString hostConfig.port}";
@@ -155,10 +153,9 @@ with lib; {
       extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
       enableSSL = labels."fleet.reverse-proxy.ssl" != "false";
     in {
-      # Use wildcard Let's Encrypt certificate for all services
-      sslCertificate = mkIf (cfg.enableTLS && enableSSL && cfg.enableACME) "/var/lib/acme/sn0wstorm.com/fullchain.pem";
-      sslCertificateKey = mkIf (cfg.enableTLS && enableSSL && cfg.enableACME) "/var/lib/acme/sn0wstorm.com/key.pem";
-      forceSSL = cfg.enableTLS && enableSSL && cfg.enableACME;
+      enableACME = cfg.enableACME;
+      acmeRoot = mkIf cfg.enableACME null;  # Use DNS validation
+      forceSSL = cfg.enableTLS && enableSSL;
 
       locations."/" = {
         proxyPass = "http://${target}:${toString port}";
