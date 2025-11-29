@@ -4,67 +4,6 @@
   ...
 }:
 with lib;
-
-  # Helper function to create a virtual host configuration
-  mkVirtualHost = name: hostConfig: {
-    enableACME = cfg.enableACME;
-    forceSSL = cfg.enableTLS;
-
-    sslCertificate = mkIf (!cfg.enableACME && cfg.enableTLS) "/var/lib/fleet-ca/certs/${name}/cert.pem";
-    sslCertificateKey = mkIf (!cfg.enableACME && cfg.enableTLS) "/var/lib/fleet-ca/certs/${name}/key.pem";
-
-    locations."/" = {
-      proxyPass = "http://${hostConfig.target}:${toString hostConfig.port}";
-      proxyWebsockets = true;
-      extraConfig = ''
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        ${hostConfig.extraConfig}
-      '';
-    };
-  };
-
-  # Helper function to create virtual host from service registry entry
-  mkServiceVirtualHost = serviceName: serviceConfig: let
-    labels = serviceConfig.labels or {};
-    domain = labels."fleet.reverse-proxy.domain" or "${serviceName}.local";
-    target = labels."fleet.reverse-proxy.target" or "127.0.0.1";
-    port = labels."fleet.reverse-proxy.port" or serviceConfig.port or 80;
-    extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
-    enableSSL = labels."fleet.reverse-proxy.ssl" != "false";
-    sslType = labels."fleet.reverse-proxy.ssl-type" or "acme";  # "acme" or "selfsigned"
-    useACME = cfg.enableACME && enableSSL && sslType == "acme";
-    useSelfSigned = cfg.enableTLS && enableSSL && sslType == "selfsigned";
-  in {
-    enableACME = useACME;
-    forceSSL = (cfg.enableTLS && enableSSL) || useACME;
-
-    sslCertificate = mkIf useSelfSigned "/var/lib/fleet-ca/certs/${domain}/cert.pem";
-    sslCertificateKey = mkIf useSelfSigned "/var/lib/fleet-ca/certs/${domain}/key.pem";
-
-    locations."/" = {
-      proxyPass = "http://${target}:${toString port}";
-      proxyWebsockets = labels."fleet.reverse-proxy.websockets" == "true";
-      extraConfig = ''
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        ${extraConfig}
-        ${labels."fleet.reverse-proxy.nginx-extra-config" or ""}
-      '';
-    };
-  };
-
-  # Combine manual routes with service registry
-  allRoutes = cfg.routes // serviceRegistry;
-
-  # Extract domains from service registry for SSL certificate generation
-  serviceDomains = mapAttrsToList (serviceName: serviceConfig:
-    serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local"
-  ) (filterAttrs (serviceName: serviceConfig:
-    (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true"
-  ) serviceRegistry);
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -254,7 +193,6 @@ in {
     # CLOUDFLARE CREDENTIALS FOR ACME DNS CHALLENGE
     # --------------------------------------------------------------------------
 
-    # Create Cloudflare credentials file from SOPS secrets if using default credentials file
     environment.etc."cloudflare-credentials.ini" = mkIf (cfg.enableACME && cfg.cloudflareCredentialsFile == null) {
       text = ''
         # Cloudflare API credentials for ACME DNS challenge
@@ -266,10 +204,9 @@ in {
     };
 
     # --------------------------------------------------------------------------
-    # ACME CERTIFICATE MANAGEMENT FOR REPRODUCIBLE BUILDS
+    # ACME CERTIFICATE MANAGEMENT
     # --------------------------------------------------------------------------
 
-    # Copy ACME certificates to SOPS-managed location after generation for reproducible builds
     systemd.services.acme-cert-backup = mkIf cfg.enableACME {
       description = "Backup ACME certificates to SOPS-managed location";
       wantedBy = ["multi-user.target"];
