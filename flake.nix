@@ -8,14 +8,6 @@
     colmena.url = "github:zhaofengli/colmena";
     nixos-wsl.url = "github:nix-community/NixOS-WSL";
     sops-nix.url = "github:Mic92/sops-nix";
-
-    # Pinned nixpkgs for SABnzbd version control
-    # Change the commit hash to get a different version:
-    # - 4.5.5: ee09932cedcef15aaf476f9343d1dea2cb77e261
-    # - 4.5.3: 12c1f0253aa9a54fdf8ec8aecaafada64a111e24
-    # - 4.4.0: 7e4a1594489d41bf8e16046b28e14a0e264c9baa
-    # - 4.3.3: 5a48e3c2e435e95103d56590188cfed7b70e108c
-    nixpkgs-sabnzbd.url = "github:NixOS/nixpkgs/12c1f0253aa9a54fdf8ec8aecaafada64a111e24";
   };
 
   # ============================================================================
@@ -24,7 +16,6 @@
 
   outputs = {
     nixpkgs,
-    nixpkgs-sabnzbd,
     colmena,
     nixos-wsl,
     sops-nix,
@@ -33,11 +24,6 @@
     # Import host definitions from single source of truth
     hosts = import ./hosts.nix;
 
-    # Pinned packages for specific versions
-    pinnedPkgs = import nixpkgs-sabnzbd {
-      system = "x86_64-linux";
-      config.allowUnfree = true; # Required for unrar dependency
-    };
     # For scaling up your homelab, you'd likely want automated host generation:
     # mkHost = name: hostConfig: {
     #   deployment = {
@@ -74,9 +60,6 @@
 
     nixosConfigurations.galadriel = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
-      specialArgs = {
-        inherit pinnedPkgs;
-      };
       modules = [
         ./hosts/galadriel/configuration.nix
         sops-nix.nixosModules.sops
@@ -103,14 +86,12 @@
       # HOST DEFINITIONS - Individual server configurations
       # ========================================================================
 
-      galadriel = {name, ...}: {
+      galadriel = {
         deployment = {
           targetHost = hosts.galadriel.ip;
           targetUser = hosts.galadriel.user;
           tags = hosts.galadriel.tags;
         };
-
-        _module.args.pinnedPkgs = pinnedPkgs;
 
         imports = [
           ./hosts/galadriel/configuration.nix

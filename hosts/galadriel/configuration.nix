@@ -1,7 +1,6 @@
 {
   config,
   pkgs,
-  pinnedPkgs ? pkgs, # Fallback to regular pkgs if not provided
   ...
 }: let
   hosts = import ../../hosts.nix;
@@ -161,7 +160,6 @@ in {
   fleet.media.sabnzbd = {
     enable = true;
     domain = "sabnzbd.sn0wstorm.com";
-    package = pinnedPkgs.sabnzbd;
   };
 
   # Navidrome - Music streaming server
