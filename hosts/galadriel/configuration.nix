@@ -158,19 +158,11 @@ in {
     downloadDir = "/media/downloads";
   };
 
-  # Transmission - Alternative torrent client (disabled, using qBittorrent)
-  # fleet.media.transmission = {
-  #   enable = true;
-  #   domain = "transmission.sn0wstorm.com";
-  #   downloadDir = "/media/downloads";
-  # };
 
-  # SABnzbd - Usenet downloader
-  # SABnzbd - Usenet downloader (pinned to v4.5.3)
   fleet.media.sabnzbd = {
     enable = true;
     domain = "sabnzbd.sn0wstorm.com";
-    package = pinnedPkgs.sabnzbd; # Use pinned version 4.5.3
+    package = pinnedPkgs.sabnzbd;
   };
 
   # Navidrome - Music streaming server
@@ -250,38 +242,31 @@ in {
     enable = true;
     domain = "auth.sn0wstorm.com";
 
-    # Default policy: require authentication for everything
     defaultPolicy = "one_factor";
 
-    # Domains that bypass authentication (services with their own auth)
     bypassDomains = [
-      "bitwarden.sn0wstorm.com" # Vaultwarden handles its own auth
-      "jellyfin.sn0wstorm.com" # Jellyfin has built-in auth
-      "navidrome.sn0wstorm.com" # Navidrome has built-in auth
+      "bitwarden.sn0wstorm.com"
+      "jellyfin.sn0wstorm.com"
+      "navidrome.sn0wstorm.com"
     ];
 
-    # Paths that bypass authentication on all domains
     bypassPaths = [
-      "/api/**" # API endpoints (often have their own auth)
-      "/.well-known/**" # Discovery endpoints
+      "/api/**"
+      "/.well-known/**"
     ];
 
-    # High-security domains requiring 2FA
     twoFactorDomains = [
       "grafana.sn0wstorm.com"
       "prometheus.sn0wstorm.com"
     ];
 
-    # Secrets (managed by sops-nix)
     secrets = {
       jwtSecretFile = "/run/secrets/authelia_jwt_secret";
       storageEncryptionKeyFile = "/run/secrets/authelia_storage_key";
     };
 
-    # Users file for authentication (file-based auth)
     usersFile = "/run/secrets/authelia_users";
 
-    # Session settings
     sessionDomain = "sn0wstorm.com";
     sessionExpiration = "12h";
     sessionInactivity = "45m";

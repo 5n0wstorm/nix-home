@@ -15,7 +15,7 @@
     # - 4.5.3: 12c1f0253aa9a54fdf8ec8aecaafada64a111e24
     # - 4.4.0: 7e4a1594489d41bf8e16046b28e14a0e264c9baa
     # - 4.3.3: 5a48e3c2e435e95103d56590188cfed7b70e108c
-    nixpkgs-sabnzbd.url = "github:NixOS/nixpkgs/7e4a1594489d41bf8e16046b28e14a0e264c9baa";
+    nixpkgs-sabnzbd.url = "github:NixOS/nixpkgs/5a48e3c2e435e95103d56590188cfed7b70e108c";
   };
 
   # ============================================================================
