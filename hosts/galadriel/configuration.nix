@@ -67,6 +67,17 @@ in {
     # cloudflareCredentialsFile will auto-generate from SOPS secrets
   };
 
+  # Ensure services start in correct order
+  systemd.services.acme-sn0wstorm-com = {
+    wants = ["cloudflare-acme-credentials.service"];
+    after = ["cloudflare-acme-credentials.service"];
+  };
+
+  systemd.services.nginx = {
+    wants = ["acme-sn0wstorm.com.service"];
+    after = ["acme-sn0wstorm.com.service"];
+  };
+
   security.acme.acceptTerms = true;
 
   security.acme.certs."sn0wstorm.com" = {
