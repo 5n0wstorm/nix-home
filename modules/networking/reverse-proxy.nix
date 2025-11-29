@@ -491,67 +491,6 @@ with lib;
       mode = "0755";
     };
 
-    # --------------------------------------------------------------------------
-    # CERTIFICATE RESTORATION FROM SOPS FOR REPRODUCIBLE BUILDS
-    # --------------------------------------------------------------------------
-
-    # Restore ACME certificates from SOPS secrets if they exist
-    systemd.services.acme-cert-restore = mkIf cfg.enableACME {
-      description = "Restore ACME certificates from SOPS secrets";
-      wantedBy = ["multi-user.target"];
-      before = ["nginx.service"];
-      after = ["sops-nix.service"];
-
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        User = "root";
-      };
-
-      script = let
-        acmeDir = "/var/lib/acme";
-        serviceDomains = mapAttrsToList (serviceName: serviceConfig: serviceConfig.labels."fleet.reverse-proxy.domain" or "${serviceName}.local") (filterAttrs (serviceName: serviceConfig: (serviceConfig.labels."fleet.reverse-proxy.enable" or "false") == "true" && (serviceConfig.labels."fleet.reverse-proxy.ssl-type" or "acme") == "acme") cfg.serviceRegistry);
-      in ''
-        set -euo pipefail
-
-        # Function to restore certificates for a domain
-        restore_cert() {
-          local domain="$1"
-          local domain_dir="${acmeDir}/$domain"
-
-          # Check if encrypted certificates exist in SOPS
-          local fullchain_key="''${domain}_acme_fullchain"
-          local key_key="''${domain}_acme_key"
-
-          local has_fullchain=false
-          local has_key=false
-
-          # Check if the secrets exist (this is a bit hacky but works)
-          if [[ -f "/run/secrets/''${fullchain_key}" ]]; then
-            has_fullchain=true
-          fi
-          if [[ -f "/run/secrets/''${key_key}" ]]; then
-            has_key=true
-          fi
-
-          if [[ "$has_fullchain" == "true" && "$has_key" == "true" ]]; then
-            echo "Restoring certificates for ''${domain} from SOPS..."
-            mkdir -p "$domain_dir"
-            cp "/run/secrets/''${fullchain_key}" "$domain_dir/fullchain.pem"
-            cp "/run/secrets/''${key_key}" "$domain_dir/key.pem"
-            chmod 600 "$domain_dir/key.pem"
-            chmod 644 "$domain_dir/fullchain.pem"
-            chown -R acme:acme "$domain_dir"
-            echo "Certificates restored for ''${domain}"
-          else
-            echo "No encrypted certificates found for ''${domain}, will generate new ones"
-          fi
-        }
-
-        # Restore certificates for all service domains that use ACME
-        ${concatMapStringsSep "\n" (domain: "restore_cert \"${domain}\"") serviceDomains}
-      '';
-    };
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
