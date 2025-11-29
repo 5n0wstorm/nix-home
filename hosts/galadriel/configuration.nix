@@ -60,17 +60,16 @@ in {
   # TLS CERTIFICATES
   # --------------------------------------------------------------------------
 
-  fleet.security.selfSignedCA = {
-    enable = true;
-    caName = "Fleet Internal CA";
-    # Only domains that use self-signed certificates (not ACME)
-    # Services using ACME will get Let's Encrypt certificates automatically
-    domains = [
-      "prometheus.local"
-      "git.local"
-      "rss.local"
-    ];
-  };
+  # Self-signed CA disabled - using ACME certificates for all services
+  # fleet.security.selfSignedCA = {
+  #   enable = true;
+  #   caName = "Fleet Internal CA";
+  #   domains = [
+  #     "prometheus.local"
+  #     "git.local"
+  #     "rss.local"
+  #   ];
+  # };
 
   # --------------------------------------------------------------------------
   # REVERSE PROXY (Pluggable - services register themselves automatically)

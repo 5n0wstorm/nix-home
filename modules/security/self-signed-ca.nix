@@ -112,7 +112,7 @@ with lib;
                         echo "Generating certificate for ${domain}..."
                         ${pkgs.openssl}/bin/openssl req -new -key "$DOMAIN_DIR/key.pem" \
                           -out "$DOMAIN_DIR/csr.pem" \
-                          -subj "/C=US/ST=Internal/L=Fleet/O=Fleet Services/CN=${domain}"
+                          -subj "/C=US/ST=Internal/L=Fleet/O=Fleet Services/CN=''${domain}"
 
                         # Sign the certificate with our CA
                         ${pkgs.openssl}/bin/openssl x509 -req -in "$DOMAIN_DIR/csr.pem" \
@@ -123,7 +123,7 @@ with lib;
             [v3_req]
             keyUsage = keyEncipherment, dataEncipherment
             extendedKeyUsage = serverAuth
-            subjectAltName = DNS:${domain}
+            subjectAltName = DNS:''${domain}
             EOF
                         )
 
