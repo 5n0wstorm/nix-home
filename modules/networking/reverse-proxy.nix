@@ -200,19 +200,6 @@ with lib; {
 
 
 
-              # Set global environment for ACME setup
-              "acme-setup".serviceConfig.Environment = [
-                "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
-              ];
-            }
-          ]
-          ++ (map (domain: {
-              "acme-${domain}".serviceConfig.Environment = [
-                "CLOUDFLARE_DNS_API_TOKEN=@${tokenPath}"
-              ];
-            })
-            serviceDomains)));
-
     # --------------------------------------------------------------------------
 
 
