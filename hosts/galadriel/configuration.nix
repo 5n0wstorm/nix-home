@@ -16,7 +16,7 @@ in {
     ../../modules/monitoring/grafana.nix
     ../../modules/dev/jenkins.nix
     ../../modules/networking/reverse-proxy.nix
-    ../../modules/security/self-signed-ca.nix
+    # ../../modules/security/self-signed-ca.nix  # Disabled - using ACME only
   ];
 
   # ============================================================================
