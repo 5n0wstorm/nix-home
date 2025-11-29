@@ -51,11 +51,11 @@ with lib;
       # Script to interactively set up age key for sops-nix
       set -e
 
-      KEY_FILE="/var/lib/sops-nix/key.txt"
+      KEY_FILE="/home/dominik/.config/sops/age/keys.txt"
 
       if [ -f "$KEY_FILE" ]; then
         echo "Age key already exists at $KEY_FILE"
-        echo "Remove it first if you want to replace it: sudo rm $KEY_FILE"
+        echo "Remove it first if you want to replace it: rm $KEY_FILE"
         exit 0
       fi
 
@@ -69,7 +69,7 @@ with lib;
       echo ""
 
       # Create directory if it doesn't exist
-      sudo mkdir -p /var/lib/sops-nix
+      mkdir -p /home/dominik/.config/sops/age
 
       # Read age key interactively
       echo -n "Enter your age private key: "
@@ -90,10 +90,9 @@ with lib;
           echo "$AGE_COMMENT"
         fi
         echo "$AGE_KEY"
-      } | sudo tee "$KEY_FILE" > /dev/null
+      } > "$KEY_FILE"
 
-      sudo chmod 600 "$KEY_FILE"
-      sudo chown root:root "$KEY_FILE"
+      chmod 600 "$KEY_FILE"
 
       echo ""
       echo "✅ Age key saved successfully to $KEY_FILE"
@@ -200,12 +199,15 @@ with lib;
         echo "Changes committed successfully!"
 
       # Check if age key exists for sops-nix
-      if [ ! -f "/var/lib/sops-nix/key.txt" ]; then
-          echo "⚠️  Age key not found at /var/lib/sops-nix/key.txt"
+      if [ ! -f "/home/dominik/.config/sops/age/keys.txt" ]; then
+          echo "⚠️  Age key not found at /home/dominik/.config/sops/age/keys.txt"
           echo "This is required for decrypting secrets with sops-nix."
           echo ""
           echo "Run this command first to set up your age key:"
           echo "  setup-age-key"
+          echo ""
+          echo "Or manually copy your age key to:"
+          echo "  ~/.config/sops/age/keys.txt"
           echo ""
           echo "Then run rebuild again."
           exit 1

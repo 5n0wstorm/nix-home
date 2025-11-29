@@ -44,11 +44,10 @@ sops --encrypt --in-place secrets/elrond.yaml
 For elrond (WSL), the age key needs to be available for decryption:
 
 ```bash
-# After rebuilding, copy your age key to the system
-sudo mkdir -p /var/lib/sops-nix
-sudo cp ~/.config/sops/age/keys.txt /var/lib/sops-nix/key.txt
-sudo chown root:root /var/lib/sops-nix/key.txt
-sudo chmod 600 /var/lib/sops-nix/key.txt
+# Ensure your age key is in the correct location
+mkdir -p ~/.config/sops/age
+# Your age key should be at ~/.config/sops/age/keys.txt
+chmod 600 ~/.config/sops/age/keys.txt
 ```
 
 ### 6. Rebuild and Test
@@ -101,7 +100,7 @@ sops --encrypt --in-place secrets/elrond.yaml --verbose
 ## 🚨 Troubleshooting
 
 ### "Failed to decrypt"
-- Check that your age key is in `/home/dominik/.config/sops/age/keys.txt`
+- Check that your age key is in `~/.config/sops/age/keys.txt` (or `/home/dominik/.config/sops/age/keys.txt`)
 - Verify the key matches the one in `.sops.yaml`
 
 ### "Permission denied" for SSH
