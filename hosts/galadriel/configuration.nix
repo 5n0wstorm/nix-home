@@ -77,6 +77,28 @@ in {
     email = "dominik@example.com";
   };
 
+  # ----------------------------------------------------------------------------
+  # CLOUDFLARE CREDENTIALS FOR ACME
+  # ----------------------------------------------------------------------------
+
+  # Generate Cloudflare credentials file for ACME from SOPS secret
+  systemd.services.cloudflare-acme-credentials = {
+    description = "Generate Cloudflare credentials for ACME";
+    wantedBy = ["multi-user.target"];
+    before = ["acme-sn0wstorm.com.service"];
+    serviceConfig = {
+      Type = "oneshot";
+      User = "root";
+    };
+    script = ''
+      mkdir -p /etc
+      cat > /etc/cloudflare-credentials.ini << EOF
+      CLOUDFLARE_DNS_API_TOKEN=$(cat /run/secrets/cloudflare_api_token)
+      EOF
+      chmod 600 /etc/cloudflare-credentials.ini
+    '';
+  };
+
   # ============================================================================
   # SECRETS MANAGEMENT (SOPS-NIX)
   # ============================================================================
