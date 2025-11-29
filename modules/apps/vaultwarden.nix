@@ -179,4 +179,3 @@ in {
     networking.firewall.allowedTCPPorts = [cfg.port] ++ optional cfg.websocketEnabled cfg.websocketPort;
   };
 }
-
