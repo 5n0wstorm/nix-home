@@ -184,12 +184,11 @@ in {
       after = ["sops-nix.service"];
       wantedBy = ["multi-user.target"];
 
+      path = [pkgs.coreutils];
+
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        # Use RuntimeDirectory for proper /run handling
-        RuntimeDirectory = "gluetun";
-        RuntimeDirectoryMode = "0700";
       };
 
       script = ''
@@ -197,12 +196,12 @@ in {
         USERNAME=$(cat ${cfg.pia.usernameFile} | tr -d '[:space:]')
         PASSWORD=$(cat ${cfg.pia.passwordFile} | tr -d '[:space:]')
 
-        # Create environment file for Gluetun (RuntimeDirectory creates /run/gluetun)
-        echo "OPENVPN_USER=$USERNAME" > /run/gluetun/credentials.env
-        echo "OPENVPN_PASSWORD=$PASSWORD" >> /run/gluetun/credentials.env
+        # Create environment file for Gluetun in persistent directory
+        echo "OPENVPN_USER=$USERNAME" > /var/lib/gluetun/credentials.env
+        echo "OPENVPN_PASSWORD=$PASSWORD" >> /var/lib/gluetun/credentials.env
 
-        chmod 400 /run/gluetun/credentials.env
-        echo "Gluetun credentials prepared at /run/gluetun/credentials.env"
+        chmod 400 /var/lib/gluetun/credentials.env
+        echo "Gluetun credentials prepared at /var/lib/gluetun/credentials.env"
       '';
     };
 
@@ -259,7 +258,7 @@ in {
       };
 
       # Credentials from generated environment file
-      environmentFiles = ["/run/gluetun/credentials.env"];
+      environmentFiles = ["/var/lib/gluetun/credentials.env"];
 
       volumes = [
         "/var/lib/gluetun:/gluetun"
