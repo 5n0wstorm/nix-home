@@ -363,6 +363,7 @@ in {
     # Domains that bypass authentication entirely (have their own auth)
     bypassDomains = [
       # Services with their own authentication
+      "qbittorrent.sn0wstorm.com"
       "bitwarden.sn0wstorm.com"
       "jellyfin.sn0wstorm.com"
       "navidrome.sn0wstorm.com"
