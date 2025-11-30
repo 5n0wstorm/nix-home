@@ -167,7 +167,7 @@ in {
           proxy_pass_request_body off;
           proxy_set_header Content-Length "";
           proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
-          proxy_set_header X-Forwarded-Method $request_method;
+          proxy_set_header X-Original-Method $request_method;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto $scheme;
           proxy_set_header X-Forwarded-Host $http_host;
