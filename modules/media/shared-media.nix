@@ -36,7 +36,7 @@ in {
     # --------------------------------------------------------------------------
 
     directories = {
-      # Torrent download directories (per category)
+      # Torrent download directories
       torrents = {
         root = mkOption {
           type = types.str;
@@ -44,28 +44,16 @@ in {
           description = "Subdirectory for torrent downloads (relative to baseDir)";
         };
 
-        books = mkOption {
+        incomplete = mkOption {
           type = types.str;
-          default = "books";
-          description = "Subdirectory for book torrents";
+          default = "incomplete";
+          description = "Subdirectory for incomplete torrent downloads";
         };
 
-        movies = mkOption {
+        complete = mkOption {
           type = types.str;
-          default = "movies";
-          description = "Subdirectory for movie torrents";
-        };
-
-        music = mkOption {
-          type = types.str;
-          default = "music";
-          description = "Subdirectory for music torrents";
-        };
-
-        tv = mkOption {
-          type = types.str;
-          default = "tv";
-          description = "Subdirectory for TV torrents";
+          default = "complete";
+          description = "Subdirectory for complete torrent downloads";
         };
       };
 
@@ -162,32 +150,18 @@ in {
           description = "Full path to torrents directory";
         };
 
-        books = mkOption {
+        incomplete = mkOption {
           type = types.str;
-          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.books}";
+          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.incomplete}";
           readOnly = true;
-          description = "Full path to book torrents directory";
+          description = "Full path to incomplete torrents directory";
         };
 
-        movies = mkOption {
+        complete = mkOption {
           type = types.str;
-          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.movies}";
+          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.complete}";
           readOnly = true;
-          description = "Full path to movie torrents directory";
-        };
-
-        music = mkOption {
-          type = types.str;
-          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.music}";
-          readOnly = true;
-          description = "Full path to music torrents directory";
-        };
-
-        tv = mkOption {
-          type = types.str;
-          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.tv}";
-          readOnly = true;
-          description = "Full path to TV torrents directory";
+          description = "Full path to complete torrents directory";
         };
       };
 
@@ -335,14 +309,12 @@ in {
 
     # --------------------------------------------------------------------------
     # DIRECTORY STRUCTURE
-    # Creates the TRaSH-guide recommended folder structure:
+    # Creates the folder structure:
     #
     # baseDir/
     # ├── torrents/
-    # │   ├── books/
-    # │   ├── movies/
-    # │   ├── music/
-    # │   └── tv/
+    # │   ├── incomplete/
+    # │   └── complete/
     # ├── usenet/
     # │   ├── incomplete/
     # │   └── complete/
@@ -361,12 +333,10 @@ in {
       # Base directory
       "d ${cfg.baseDir} 0775 root ${cfg.group} -"
 
-      # Torrent directories (per category)
+      # Torrent directories (incomplete/complete)
       "d ${cfg.paths.torrents.root} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.torrents.books} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.torrents.movies} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.torrents.music} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.torrents.tv} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.torrents.incomplete} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.torrents.complete} 0775 root ${cfg.group} -"
 
       # Usenet directories
       "d ${cfg.paths.usenet.root} 0775 root ${cfg.group} -"
@@ -407,10 +377,8 @@ in {
 
         # Torrent directories
         chmod g+s ${cfg.paths.torrents.root}
-        chmod g+s ${cfg.paths.torrents.books}
-        chmod g+s ${cfg.paths.torrents.movies}
-        chmod g+s ${cfg.paths.torrents.music}
-        chmod g+s ${cfg.paths.torrents.tv}
+        chmod g+s ${cfg.paths.torrents.incomplete}
+        chmod g+s ${cfg.paths.torrents.complete}
 
         # Usenet directories
         chmod g+s ${cfg.paths.usenet.root}
@@ -432,10 +400,8 @@ in {
         chmod 2775 ${cfg.baseDir}
 
         chmod 2775 ${cfg.paths.torrents.root}
-        chmod 2775 ${cfg.paths.torrents.books}
-        chmod 2775 ${cfg.paths.torrents.movies}
-        chmod 2775 ${cfg.paths.torrents.music}
-        chmod 2775 ${cfg.paths.torrents.tv}
+        chmod 2775 ${cfg.paths.torrents.incomplete}
+        chmod 2775 ${cfg.paths.torrents.complete}
 
         chmod 2775 ${cfg.paths.usenet.root}
         chmod 2775 ${cfg.paths.usenet.incomplete}
