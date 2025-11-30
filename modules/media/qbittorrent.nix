@@ -78,6 +78,20 @@ in {
         default = true;
         description = "Automatically update qBittorrent listening port from VPN port forwarding";
       };
+
+      # Credentials for qBittorrent API (needed for auto port update)
+      apiUsername = mkOption {
+        type = types.str;
+        default = "admin";
+        description = "qBittorrent Web UI username for API access";
+      };
+
+      apiPasswordFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Path to file containing qBittorrent Web UI password for API access";
+        example = "/run/secrets/qbittorrent/password";
+      };
     };
 
     # Homepage dashboard integration
@@ -263,7 +277,7 @@ in {
     # Automatically configures qBittorrent to use the VPN's forwarded port
     # --------------------------------------------------------------------------
 
-    systemd.services.qbittorrent-port-update = mkIf (cfg.vpn.enable && cfg.vpn.autoUpdatePort) {
+    systemd.services.qbittorrent-port-update = mkIf (cfg.vpn.enable && cfg.vpn.autoUpdatePort && cfg.vpn.apiPasswordFile != null) {
       description = "Update qBittorrent listening port from VPN port forwarding";
       after = ["podman-qbittorrent.service" "vpn-port-monitor.service"];
       requires = ["podman-qbittorrent.service"];
@@ -279,30 +293,79 @@ in {
 
       script = ''
         # Wait for qBittorrent to be ready
-        sleep 60
+        sleep 90
 
-        # qBittorrent Web API credentials (default: admin/adminadmin on first run)
-        # User should change these in the qBittorrent web UI
         QB_HOST="http://localhost:${toString vpnCfg.ports.webui}"
-        COOKIE_FILE="/tmp/qb_cookie"
+        QB_USER="${cfg.vpn.apiUsername}"
+        QB_PASS_FILE="${cfg.vpn.apiPasswordFile}"
+        COOKIE_FILE="/tmp/qb_cookie_$$"
+        LAST_PORT=""
+
+        cleanup() {
+          rm -f "$COOKIE_FILE"
+        }
+        trap cleanup EXIT
+
+        # Function to authenticate with qBittorrent
+        qb_login() {
+          if [ ! -f "$QB_PASS_FILE" ]; then
+            echo "ERROR: Password file not found: $QB_PASS_FILE"
+            return 1
+          fi
+          QB_PASS=$(cat "$QB_PASS_FILE" | tr -d '[:space:]')
+
+          RESPONSE=$(curl -s -c "$COOKIE_FILE" -X POST "$QB_HOST/api/v2/auth/login" \
+            -d "username=$QB_USER&password=$QB_PASS" 2>/dev/null)
+
+          if [ "$RESPONSE" = "Ok." ]; then
+            echo "Successfully authenticated with qBittorrent"
+            return 0
+          else
+            echo "Failed to authenticate with qBittorrent: $RESPONSE"
+            return 1
+          fi
+        }
+
+        # Function to get current listening port
+        qb_get_port() {
+          curl -s -b "$COOKIE_FILE" "$QB_HOST/api/v2/app/preferences" 2>/dev/null | jq -r '.listen_port // empty'
+        }
+
+        # Function to set listening port
+        qb_set_port() {
+          local port=$1
+          RESPONSE=$(curl -s -b "$COOKIE_FILE" -X POST "$QB_HOST/api/v2/app/setPreferences" \
+            -d "json={\"listen_port\":$port}" 2>/dev/null)
+          return $?
+        }
 
         while true; do
           # Get the forwarded port from gluetun control server
-          FORWARDED_PORT=$(curl -s http://localhost:${toString vpnCfg.ports.control}/v1/openvpn/portforwarded 2>/dev/null | jq -r '.port // empty')
+          FORWARDED_PORT=$(curl -s "http://localhost:${toString vpnCfg.ports.control}/v1/openvpn/portforwarded" 2>/dev/null | jq -r '.port // empty')
 
           if [ -n "$FORWARDED_PORT" ] && [ "$FORWARDED_PORT" != "0" ] && [ "$FORWARDED_PORT" != "null" ]; then
             echo "VPN forwarded port: $FORWARDED_PORT"
 
-            # Try to get current qBittorrent port
-            # Note: This requires authentication - user needs to set up API access
-            CURRENT_PORT=$(curl -s "$QB_HOST/api/v2/app/preferences" 2>/dev/null | jq -r '.listen_port // empty')
+            # Only update if port changed
+            if [ "$FORWARDED_PORT" != "$LAST_PORT" ]; then
+              # Authenticate with qBittorrent
+              if qb_login; then
+                CURRENT_PORT=$(qb_get_port)
+                echo "Current qBittorrent listening port: $CURRENT_PORT"
 
-            if [ "$CURRENT_PORT" != "$FORWARDED_PORT" ]; then
-              echo "Updating qBittorrent listening port from $CURRENT_PORT to $FORWARDED_PORT"
-              # Update port via API (requires valid session)
-              # curl -s -X POST "$QB_HOST/api/v2/app/setPreferences" \
-              #   -d "json={\"listen_port\":$FORWARDED_PORT}"
-              echo "Port update would be applied here (requires auth setup)"
+                if [ "$CURRENT_PORT" != "$FORWARDED_PORT" ]; then
+                  echo "Updating qBittorrent listening port from $CURRENT_PORT to $FORWARDED_PORT"
+                  if qb_set_port "$FORWARDED_PORT"; then
+                    echo "Successfully updated qBittorrent port to $FORWARDED_PORT"
+                    LAST_PORT="$FORWARDED_PORT"
+                  else
+                    echo "Failed to update qBittorrent port"
+                  fi
+                else
+                  echo "Port already set correctly"
+                  LAST_PORT="$FORWARDED_PORT"
+                fi
+              fi
             fi
           else
             echo "Waiting for VPN port forwarding..."

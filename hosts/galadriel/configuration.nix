@@ -204,6 +204,9 @@ in {
     vpn = {
       enable = true;
       autoUpdatePort = true;
+      # API credentials for automatic port forwarding updates
+      apiUsername = "admin";
+      apiPasswordFile = "/run/secrets/qbittorrent/password";
     };
   };
 
@@ -503,6 +506,13 @@ in {
         mode = "0400";
       };
       "pia-vpn/password" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+
+      # qBittorrent API password for VPN port forwarding auto-update
+      "qbittorrent/password" = {
         owner = "root";
         group = "root";
         mode = "0400";
