@@ -478,7 +478,9 @@ in {
           display_name = "Fleet Auth";
           timeout = "60s";
           attestation_conveyance_preference = "indirect";
-          user_verification = "preferred";
+          selection_criteria = {
+            user_verification = "preferred";
+          };
         };
 
         # NTP configuration
