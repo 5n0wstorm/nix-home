@@ -6,6 +6,7 @@
 }:
 with lib; let
   cfg = config.fleet.media.sabnzbd;
+  sharedCfg = config.fleet.media.shared;
   homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================

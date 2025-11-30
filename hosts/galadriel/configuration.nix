@@ -129,7 +129,7 @@ in {
   fleet.media.jellyfin = {
     enable = true;
     domain = "jellyfin.sn0wstorm.com";
-    mediaDir = config.fleet.media.shared.baseDir;
+    # Uses default: sharedCfg.paths.media.root (/data/media)
   };
 
   # Sonarr - TV series management

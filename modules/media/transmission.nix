@@ -5,6 +5,7 @@
 }:
 with lib; let
   cfg = config.fleet.media.transmission;
+  sharedCfg = config.fleet.media.shared;
   homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
@@ -34,8 +35,11 @@ in {
 
     downloadDir = mkOption {
       type = types.str;
-      default = "/media/downloads";
-      description = "Download directory for Transmission";
+      default =
+        if sharedCfg.enable
+        then sharedCfg.paths.torrents.root
+        else "/data/torrents";
+      description = "Download directory for Transmission (defaults to shared torrents path)";
     };
 
     openFirewall = mkOption {

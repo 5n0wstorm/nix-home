@@ -5,6 +5,7 @@
 }:
 with lib; let
   cfg = config.fleet.media.navidrome;
+  sharedCfg = config.fleet.media.shared;
   homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
@@ -28,8 +29,11 @@ in {
 
     musicFolder = mkOption {
       type = types.str;
-      default = "/media/music";
-      description = "Music library folder";
+      default =
+        if sharedCfg.enable
+        then sharedCfg.paths.media.music
+        else "/data/media/music";
+      description = "Music library folder (defaults to shared media music path)";
     };
 
     openFirewall = mkOption {

@@ -43,8 +43,11 @@ in {
 
     downloadDir = mkOption {
       type = types.str;
-      default = "/media/downloads";
-      description = "Download directory for qBittorrent";
+      default =
+        if sharedCfg.enable
+        then sharedCfg.paths.torrents.root
+        else "/data/torrents";
+      description = "Download directory for qBittorrent (defaults to shared torrents path)";
     };
 
     user = mkOption {

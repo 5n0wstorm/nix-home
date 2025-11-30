@@ -15,8 +15,8 @@ in {
 
     baseDir = mkOption {
       type = types.str;
-      default = "/media";
-      description = "Base directory for all media";
+      default = "/data";
+      description = "Base directory for all media (recommended: /data)";
     };
 
     group = mkOption {
@@ -31,86 +31,256 @@ in {
       description = "GID for the media group";
     };
 
+    # --------------------------------------------------------------------------
+    # DIRECTORY SUBDIRECTORY NAMES
+    # --------------------------------------------------------------------------
+
     directories = {
-      downloads = mkOption {
-        type = types.str;
-        default = "downloads";
-        description = "Subdirectory for downloads (relative to baseDir)";
+      # Torrent download directories (per category)
+      torrents = {
+        root = mkOption {
+          type = types.str;
+          default = "torrents";
+          description = "Subdirectory for torrent downloads (relative to baseDir)";
+        };
+
+        books = mkOption {
+          type = types.str;
+          default = "books";
+          description = "Subdirectory for book torrents";
+        };
+
+        movies = mkOption {
+          type = types.str;
+          default = "movies";
+          description = "Subdirectory for movie torrents";
+        };
+
+        music = mkOption {
+          type = types.str;
+          default = "music";
+          description = "Subdirectory for music torrents";
+        };
+
+        tv = mkOption {
+          type = types.str;
+          default = "tv";
+          description = "Subdirectory for TV torrents";
+        };
       };
 
-      tv = mkOption {
-        type = types.str;
-        default = "tv";
-        description = "Subdirectory for TV shows (relative to baseDir)";
+      # Usenet download directories
+      usenet = {
+        root = mkOption {
+          type = types.str;
+          default = "usenet";
+          description = "Subdirectory for usenet downloads (relative to baseDir)";
+        };
+
+        incomplete = mkOption {
+          type = types.str;
+          default = "incomplete";
+          description = "Subdirectory for incomplete usenet downloads";
+        };
+
+        complete = mkOption {
+          type = types.str;
+          default = "complete";
+          description = "Subdirectory for complete usenet downloads";
+        };
+
+        books = mkOption {
+          type = types.str;
+          default = "books";
+          description = "Subdirectory for completed book downloads";
+        };
+
+        movies = mkOption {
+          type = types.str;
+          default = "movies";
+          description = "Subdirectory for completed movie downloads";
+        };
+
+        music = mkOption {
+          type = types.str;
+          default = "music";
+          description = "Subdirectory for completed music downloads";
+        };
+
+        tv = mkOption {
+          type = types.str;
+          default = "tv";
+          description = "Subdirectory for completed TV downloads";
+        };
       };
 
-      movies = mkOption {
-        type = types.str;
-        default = "movies";
-        description = "Subdirectory for movies (relative to baseDir)";
-      };
+      # Final media library directories
+      media = {
+        root = mkOption {
+          type = types.str;
+          default = "media";
+          description = "Subdirectory for final media library (relative to baseDir)";
+        };
 
-      music = mkOption {
-        type = types.str;
-        default = "music";
-        description = "Subdirectory for music (relative to baseDir)";
-      };
+        books = mkOption {
+          type = types.str;
+          default = "books";
+          description = "Subdirectory for books library";
+        };
 
-      books = mkOption {
-        type = types.str;
-        default = "books";
-        description = "Subdirectory for books/ebooks (relative to baseDir)";
-      };
+        movies = mkOption {
+          type = types.str;
+          default = "movies";
+          description = "Subdirectory for movies library";
+        };
 
-      audiobooks = mkOption {
-        type = types.str;
-        default = "audiobooks";
-        description = "Subdirectory for audiobooks (relative to baseDir)";
+        music = mkOption {
+          type = types.str;
+          default = "music";
+          description = "Subdirectory for music library";
+        };
+
+        tv = mkOption {
+          type = types.str;
+          default = "tv";
+          description = "Subdirectory for TV library";
+        };
       };
     };
 
-    # Computed full paths (read-only)
+    # --------------------------------------------------------------------------
+    # COMPUTED FULL PATHS (read-only)
+    # --------------------------------------------------------------------------
+
     paths = {
-      downloads = mkOption {
-        type = types.str;
-        default = "${cfg.baseDir}/${cfg.directories.downloads}";
-        readOnly = true;
-        description = "Full path to downloads directory";
+      # Torrent paths
+      torrents = {
+        root = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.torrents.root}";
+          readOnly = true;
+          description = "Full path to torrents directory";
+        };
+
+        books = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.books}";
+          readOnly = true;
+          description = "Full path to book torrents directory";
+        };
+
+        movies = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.movies}";
+          readOnly = true;
+          description = "Full path to movie torrents directory";
+        };
+
+        music = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.music}";
+          readOnly = true;
+          description = "Full path to music torrents directory";
+        };
+
+        tv = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.torrents.root}/${cfg.directories.torrents.tv}";
+          readOnly = true;
+          description = "Full path to TV torrents directory";
+        };
       };
 
-      tv = mkOption {
-        type = types.str;
-        default = "${cfg.baseDir}/${cfg.directories.tv}";
-        readOnly = true;
-        description = "Full path to TV directory";
+      # Usenet paths
+      usenet = {
+        root = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.usenet.root}";
+          readOnly = true;
+          description = "Full path to usenet directory";
+        };
+
+        incomplete = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.usenet.root}/${cfg.directories.usenet.incomplete}";
+          readOnly = true;
+          description = "Full path to incomplete usenet directory";
+        };
+
+        complete = {
+          root = mkOption {
+            type = types.str;
+            default = "${cfg.baseDir}/${cfg.directories.usenet.root}/${cfg.directories.usenet.complete}";
+            readOnly = true;
+            description = "Full path to complete usenet directory";
+          };
+
+          books = mkOption {
+            type = types.str;
+            default = "${cfg.baseDir}/${cfg.directories.usenet.root}/${cfg.directories.usenet.complete}/${cfg.directories.usenet.books}";
+            readOnly = true;
+            description = "Full path to completed book downloads";
+          };
+
+          movies = mkOption {
+            type = types.str;
+            default = "${cfg.baseDir}/${cfg.directories.usenet.root}/${cfg.directories.usenet.complete}/${cfg.directories.usenet.movies}";
+            readOnly = true;
+            description = "Full path to completed movie downloads";
+          };
+
+          music = mkOption {
+            type = types.str;
+            default = "${cfg.baseDir}/${cfg.directories.usenet.root}/${cfg.directories.usenet.complete}/${cfg.directories.usenet.music}";
+            readOnly = true;
+            description = "Full path to completed music downloads";
+          };
+
+          tv = mkOption {
+            type = types.str;
+            default = "${cfg.baseDir}/${cfg.directories.usenet.root}/${cfg.directories.usenet.complete}/${cfg.directories.usenet.tv}";
+            readOnly = true;
+            description = "Full path to completed TV downloads";
+          };
+        };
       };
 
-      movies = mkOption {
-        type = types.str;
-        default = "${cfg.baseDir}/${cfg.directories.movies}";
-        readOnly = true;
-        description = "Full path to movies directory";
-      };
+      # Media library paths
+      media = {
+        root = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.media.root}";
+          readOnly = true;
+          description = "Full path to media library directory";
+        };
 
-      music = mkOption {
-        type = types.str;
-        default = "${cfg.baseDir}/${cfg.directories.music}";
-        readOnly = true;
-        description = "Full path to music directory";
-      };
+        books = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.media.root}/${cfg.directories.media.books}";
+          readOnly = true;
+          description = "Full path to books library";
+        };
 
-      books = mkOption {
-        type = types.str;
-        default = "${cfg.baseDir}/${cfg.directories.books}";
-        readOnly = true;
-        description = "Full path to books directory";
-      };
+        movies = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.media.root}/${cfg.directories.media.movies}";
+          readOnly = true;
+          description = "Full path to movies library";
+        };
 
-      audiobooks = mkOption {
-        type = types.str;
-        default = "${cfg.baseDir}/${cfg.directories.audiobooks}";
-        readOnly = true;
-        description = "Full path to audiobooks directory";
+        music = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.media.root}/${cfg.directories.media.music}";
+          readOnly = true;
+          description = "Full path to music library";
+        };
+
+        tv = mkOption {
+          type = types.str;
+          default = "${cfg.baseDir}/${cfg.directories.media.root}/${cfg.directories.media.tv}";
+          readOnly = true;
+          description = "Full path to TV library";
+        };
       };
     };
   };
@@ -132,7 +302,7 @@ in {
 
     # --------------------------------------------------------------------------
     # SYSTEMD SUPPLEMENTARY GROUPS
-    # Add media group as supplementary so services can access /media/*
+    # Add media group as supplementary so services can access media directories
     # but keep their own data directories (/var/lib/*) with original ownership
     # --------------------------------------------------------------------------
 
@@ -165,25 +335,54 @@ in {
 
     # --------------------------------------------------------------------------
     # DIRECTORY STRUCTURE
+    # Creates the TRaSH-guide recommended folder structure:
+    #
+    # baseDir/
+    # ├── torrents/
+    # │   ├── books/
+    # │   ├── movies/
+    # │   ├── music/
+    # │   └── tv/
+    # ├── usenet/
+    # │   ├── incomplete/
+    # │   └── complete/
+    # │       ├── books/
+    # │       ├── movies/
+    # │       ├── music/
+    # │       └── tv/
+    # └── media/
+    #     ├── books/
+    #     ├── movies/
+    #     ├── music/
+    #     └── tv/
     # --------------------------------------------------------------------------
 
     systemd.tmpfiles.rules = [
-      # Base media directory
+      # Base directory
       "d ${cfg.baseDir} 0775 root ${cfg.group} -"
 
-      # Downloads directory with subdirectories for different types
-      "d ${cfg.paths.downloads} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.downloads}/complete 0775 root ${cfg.group} -"
-      "d ${cfg.paths.downloads}/incomplete 0775 root ${cfg.group} -"
-      "d ${cfg.paths.downloads}/torrents 0775 root ${cfg.group} -"
-      "d ${cfg.paths.downloads}/usenet 0775 root ${cfg.group} -"
+      # Torrent directories (per category)
+      "d ${cfg.paths.torrents.root} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.torrents.books} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.torrents.movies} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.torrents.music} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.torrents.tv} 0775 root ${cfg.group} -"
+
+      # Usenet directories
+      "d ${cfg.paths.usenet.root} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.usenet.incomplete} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.usenet.complete.root} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.usenet.complete.books} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.usenet.complete.movies} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.usenet.complete.music} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.usenet.complete.tv} 0775 root ${cfg.group} -"
 
       # Media library directories
-      "d ${cfg.paths.tv} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.movies} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.music} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.books} 0775 root ${cfg.group} -"
-      "d ${cfg.paths.audiobooks} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.media.root} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.media.books} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.media.movies} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.media.music} 0775 root ${cfg.group} -"
+      "d ${cfg.paths.media.tv} 0775 root ${cfg.group} -"
     ];
 
     # --------------------------------------------------------------------------
@@ -203,30 +402,54 @@ in {
 
       script = ''
         # Set group sticky bit so new files inherit the media group
+        # Base directory
         chmod g+s ${cfg.baseDir}
-        chmod g+s ${cfg.paths.downloads}
-        chmod g+s ${cfg.paths.downloads}/complete
-        chmod g+s ${cfg.paths.downloads}/incomplete
-        chmod g+s ${cfg.paths.downloads}/torrents
-        chmod g+s ${cfg.paths.downloads}/usenet
-        chmod g+s ${cfg.paths.tv}
-        chmod g+s ${cfg.paths.movies}
-        chmod g+s ${cfg.paths.music}
-        chmod g+s ${cfg.paths.books}
-        chmod g+s ${cfg.paths.audiobooks}
 
-        # Ensure group write permissions
+        # Torrent directories
+        chmod g+s ${cfg.paths.torrents.root}
+        chmod g+s ${cfg.paths.torrents.books}
+        chmod g+s ${cfg.paths.torrents.movies}
+        chmod g+s ${cfg.paths.torrents.music}
+        chmod g+s ${cfg.paths.torrents.tv}
+
+        # Usenet directories
+        chmod g+s ${cfg.paths.usenet.root}
+        chmod g+s ${cfg.paths.usenet.incomplete}
+        chmod g+s ${cfg.paths.usenet.complete.root}
+        chmod g+s ${cfg.paths.usenet.complete.books}
+        chmod g+s ${cfg.paths.usenet.complete.movies}
+        chmod g+s ${cfg.paths.usenet.complete.music}
+        chmod g+s ${cfg.paths.usenet.complete.tv}
+
+        # Media library directories
+        chmod g+s ${cfg.paths.media.root}
+        chmod g+s ${cfg.paths.media.books}
+        chmod g+s ${cfg.paths.media.movies}
+        chmod g+s ${cfg.paths.media.music}
+        chmod g+s ${cfg.paths.media.tv}
+
+        # Ensure group write permissions (2775 = sticky + rwxrwxr-x)
         chmod 2775 ${cfg.baseDir}
-        chmod 2775 ${cfg.paths.downloads}
-        chmod 2775 ${cfg.paths.downloads}/complete
-        chmod 2775 ${cfg.paths.downloads}/incomplete
-        chmod 2775 ${cfg.paths.downloads}/torrents
-        chmod 2775 ${cfg.paths.downloads}/usenet
-        chmod 2775 ${cfg.paths.tv}
-        chmod 2775 ${cfg.paths.movies}
-        chmod 2775 ${cfg.paths.music}
-        chmod 2775 ${cfg.paths.books}
-        chmod 2775 ${cfg.paths.audiobooks}
+
+        chmod 2775 ${cfg.paths.torrents.root}
+        chmod 2775 ${cfg.paths.torrents.books}
+        chmod 2775 ${cfg.paths.torrents.movies}
+        chmod 2775 ${cfg.paths.torrents.music}
+        chmod 2775 ${cfg.paths.torrents.tv}
+
+        chmod 2775 ${cfg.paths.usenet.root}
+        chmod 2775 ${cfg.paths.usenet.incomplete}
+        chmod 2775 ${cfg.paths.usenet.complete.root}
+        chmod 2775 ${cfg.paths.usenet.complete.books}
+        chmod 2775 ${cfg.paths.usenet.complete.movies}
+        chmod 2775 ${cfg.paths.usenet.complete.music}
+        chmod 2775 ${cfg.paths.usenet.complete.tv}
+
+        chmod 2775 ${cfg.paths.media.root}
+        chmod 2775 ${cfg.paths.media.books}
+        chmod 2775 ${cfg.paths.media.movies}
+        chmod 2775 ${cfg.paths.media.music}
+        chmod 2775 ${cfg.paths.media.tv}
       '';
     };
   };

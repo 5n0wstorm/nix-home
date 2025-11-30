@@ -5,6 +5,7 @@
 }:
 with lib; let
   cfg = config.fleet.media.jellyfin;
+  sharedCfg = config.fleet.media.shared;
   homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
@@ -34,8 +35,11 @@ in {
 
     mediaDir = mkOption {
       type = types.str;
-      default = "/media";
-      description = "Media directory for Jellyfin";
+      default =
+        if sharedCfg.enable
+        then sharedCfg.paths.media.root
+        else "/data/media";
+      description = "Media directory for Jellyfin (defaults to shared media library root)";
     };
 
     openFirewall = mkOption {
