@@ -158,9 +158,10 @@ in {
     '';
 
     # Authelia location blocks for each virtual host
+    # Uses auth-request endpoint which returns 401 (not 302) for nginx compatibility
     autheliaLocations = {
       "/authelia" = {
-        proxyPass = "http://127.0.0.1:${toString authCfg.port}/api/authz/forward-auth";
+        proxyPass = "http://127.0.0.1:${toString authCfg.port}/api/authz/auth-request";
         extraConfig = ''
           internal;
           proxy_pass_request_body off;

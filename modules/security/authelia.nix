@@ -454,8 +454,13 @@ in {
           address = "tcp://127.0.0.1:${toString cfg.port}";
           endpoints = {
             authz = {
+              # ForwardAuth returns 302 redirects (for Traefik/Caddy)
               forward-auth = {
                 implementation = "ForwardAuth";
+              };
+              # AuthRequest returns 401 status codes (for nginx auth_request)
+              auth-request = {
+                implementation = "AuthRequest";
               };
             };
           };
