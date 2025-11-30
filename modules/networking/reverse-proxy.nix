@@ -164,10 +164,10 @@ in {
     '';
 
     # Authelia location block for each virtual host
-    # Using /api/verify (legacy endpoint) which handles rd parameter more reliably
+    # Based on official Authelia nginx documentation
     autheliaLocations = {
       "/internal/authelia/authz" = {
-        proxyPass = "http://127.0.0.1:${toString authCfg.port}/api/verify";
+        proxyPass = "http://127.0.0.1:${toString authCfg.port}/api/authz/auth-request";
         extraConfig = ''
           ## Essential Proxy Configuration
           internal;
