@@ -294,12 +294,14 @@ in {
     # SOPS secrets
     secrets = {
       "cloudflare_api_token" = {};
+
       "ssh_key" = {
         path = "/home/dominik/.ssh/id_ed25519";
         owner = "dominik";
         group = "users";
         mode = "0600";
       };
+
       "ssh_key_pub" = {
         path = "/home/dominik/.ssh/id_ed25519.pub";
         owner = "dominik";
@@ -313,17 +315,24 @@ in {
         mode = "0400";
       };
 
-      # Authelia secrets
+      "vynux_smb_credentials" = {
+        owner = "dominik";
+        group = "users";
+        mode = "0400";
+      };
+
       "authelia_jwt_secret" = {
         owner = "authelia-main";
         group = "authelia-main";
         mode = "0400";
       };
+
       "authelia_storage_key" = {
         owner = "authelia-main";
         group = "authelia-main";
         mode = "0400";
       };
+
       "authelia_users" = {
         owner = "authelia-main";
         group = "authelia-main";
@@ -362,6 +371,28 @@ in {
   };
 
   networking.firewall.allowedTCPPorts = [];
+
+  # ============================================================================
+  # SMB/CIFS MOUNTS
+  # ============================================================================
+
+  # Required for mounting CIFS/SMB shares
+  environment.systemPackages = [pkgs.cifs-utils];
+
+  fileSystems."/mnt/nas" = {
+    device = "//192.168.2.2/dataPool0";
+    fsType = "cifs";
+    options = [
+      "x-systemd.automount"
+      "noauto"
+      "x-systemd.idle-timeout=60"
+      "x-systemd.device-timeout=5s"
+      "x-systemd.mount-timeout=5s"
+      "credentials=/run/secrets/vynux_smb_credentials"
+      "uid=1000"
+      "gid=100"
+    ];
+  };
 
   # ============================================================================
   # GIT CONFIGURATION
