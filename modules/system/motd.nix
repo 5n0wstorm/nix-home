@@ -180,8 +180,8 @@ with lib; let
         fi
 
         HEALTH=$($SMART_CMD -H "$drive" | grep -i "overall-health" | awk '{print $NF}')
-          TEMP=$($SMART_CMD -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
-          MODEL=$($SMART_CMD -i "$drive" | grep -E "(Device Model|Model Number|Model)" | head -1 | cut -d: -f2- | sed 's/^[[:space:]]*//' | xargs)
+        TEMP=$($SMART_CMD -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
+        MODEL=$($SMART_CMD -i "$drive" | grep -E "(Device Model|Model Number|Model)" | head -1 | cut -d: -f2- | sed 's/^[[:space:]]*//' | xargs)
 
           # Get SSD wearout information
           WEAROUT=""
