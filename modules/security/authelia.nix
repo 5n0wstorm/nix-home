@@ -509,9 +509,7 @@ in {
           cookies = [
             {
               domain = cfg.sessionDomain;
-              authelia_url = "https://${cfg.domain}";
-              # Use 'lax' for better security while still allowing redirects
-              # The cookie domain covers all subdomains (*.sn0wstorm.com)
+
               same_site = "lax";
               default_redirection_url =
                 if cfg.defaultRedirectionUrl != null
