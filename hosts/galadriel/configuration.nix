@@ -162,7 +162,7 @@ in {
 
     pia = {
       # Regions that support port forwarding
-      serverRegions = ["cz" "fi"];
+      serverRegions = ["Czech Republic" "FI Helsinki"];
       portForwarding = true;
       usernameFile = "/run/secrets/pia-vpn/username";
       passwordFile = "/run/secrets/pia-vpn/password";
