@@ -130,7 +130,7 @@ in {
 
     # --------------------------------------------------------------------------
     # SERVICE GROUP CONFIGURATION
-    # Set the media group for each service that supports it
+    # Set the media group for services that support it directly
     # --------------------------------------------------------------------------
 
     services.sonarr.group = mkIf config.services.sonarr.enable cfg.group;
@@ -140,6 +140,14 @@ in {
     services.bazarr.group = mkIf config.services.bazarr.enable cfg.group;
     services.jellyfin.group = mkIf config.services.jellyfin.enable cfg.group;
     services.sabnzbd.group = mkIf config.services.sabnzbd.enable cfg.group;
+
+    # --------------------------------------------------------------------------
+    # SYSTEMD SUPPLEMENTARY GROUPS
+    # For services that use DynamicUser or don't have a group option
+    # --------------------------------------------------------------------------
+
+    systemd.services.prowlarr.serviceConfig.SupplementaryGroups = mkIf config.services.prowlarr.enable [cfg.group];
+    systemd.services.transmission.serviceConfig.SupplementaryGroups = mkIf config.services.transmission.enable [cfg.group];
 
     # --------------------------------------------------------------------------
     # DIRECTORY STRUCTURE
