@@ -162,16 +162,43 @@ with lib; let
           TEMP=$(smartctl -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
           MODEL=$(smartctl -i "$drive" | grep "Device Model" | cut -d: -f2 | xargs)
 
-          if [ "$HEALTH" = "PASSED" ]; then
-            printf "$GREEN  ● $RESET%-45s $GREEN[OK]$RESET" "$drive ($MODEL)"
-          elif [ "$HEALTH" = "FAILED" ]; then
-            printf "$RED  ● $RESET%-45s $RED[FAILED]$RESET" "$drive ($MODEL)"
+          # Get SSD wearout information
+          WEAROUT=""
+          # Check for Percentage Used Endurance Indicator (ID 233)
+          USED_ENDURANCE=$(smartctl -A "$drive" | grep -E "^233" | awk '{print $4}' | sed 's/^0*//')
+          if [ -n "$USED_ENDURANCE" ] && [ "$USED_ENDURANCE" != "0" ]; then
+            WEAROUT="$USED_ENDURANCE% used"
           else
-            printf "$YELLOW  ● $RESET%-45s $YELLOW[UNKNOWN]$RESET" "$drive ($MODEL)"
+            # Check for Media Wearout Indicator (ID 177)
+            MEDIA_WEAR=$(smartctl -A "$drive" | grep -E "^177" | awk '{print $4}' | sed 's/^0*//')
+            if [ -n "$MEDIA_WEAR" ] && [ "$MEDIA_WEAR" != "0" ]; then
+              WEAROUT="$MEDIA_WEAR raw"
+            fi
           fi
 
+          if [ "$HEALTH" = "PASSED" ]; then
+            printf "$GREEN  ● $RESET%-35s $GREEN[OK]$RESET" "$drive ($MODEL)"
+          elif [ "$HEALTH" = "FAILED" ]; then
+            printf "$RED  ● $RESET%-35s $RED[FAILED]$RESET" "$drive ($MODEL)"
+          else
+            printf "$YELLOW  ● $RESET%-35s $YELLOW[UNKNOWN]$RESET" "$drive ($MODEL)"
+          fi
+
+          # Show wearout and temperature info
+          INFO=""
+          if [ -n "$WEAROUT" ]; then
+            INFO="$WEAROUT"
+          fi
           if [ -n "$TEMP" ] && [ "$TEMP" != "-" ]; then
-            printf " %s°C\n" "$TEMP"
+            if [ -n "$INFO" ]; then
+              INFO="$INFO, $TEMP°C"
+            else
+              INFO="$TEMP°C"
+            fi
+          fi
+
+          if [ -n "$INFO" ]; then
+            printf " (%s)\n" "$INFO"
           else
             printf "\n"
           fi

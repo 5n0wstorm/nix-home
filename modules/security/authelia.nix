@@ -525,6 +525,7 @@ in {
               address = "tcp://${cfg.database.host}:${toString cfg.database.port}";
               database = cfg.database.database;
               username = cfg.database.username;
+              password = "";
             };
           }
           else {
@@ -655,7 +656,8 @@ in {
       description = "Prepare Authelia secrets environment file";
       before = ["authelia-main.service"];
       requiredBy = ["authelia-main.service"];
-      after = ["sops-nix.service"];
+      after = ["sops-nix.service" "mysql.service"];
+      wants = ["sops-nix.service" "mysql.service"];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
@@ -676,8 +678,10 @@ in {
         ${optionalString (cfg.database.passwordFile != null) ''
           if [ -f "${cfg.database.passwordFile}" ]; then
             echo "X_AUTHELIA_STORAGE_MYSQL_PASSWORD_FILE=${cfg.database.passwordFile}" >> ${envFile}
+            echo "Authelia database password file found: ${cfg.database.passwordFile}"
           else
-            echo "Warning: ${cfg.database.passwordFile} not found"
+            echo "Warning: Authelia database password file not found: ${cfg.database.passwordFile}"
+            ls -la /run/secrets/authelia/ || echo "Authelia secrets directory not found"
           fi
         ''}
         ${optionalString (cfg.smtp.enable && cfg.smtp.passwordFile != null) ''
