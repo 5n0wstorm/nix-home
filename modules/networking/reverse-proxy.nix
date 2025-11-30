@@ -140,10 +140,12 @@ in {
     # Authelia nginx snippets for forward auth
     # Based on official Authelia nginx documentation:
     # https://www.authelia.com/integration/proxies/nginx/
-    # Using Legacy Method for more reliable redirect handling
     autheliaAuthSnippet = ''
       ## Send a subrequest to Authelia to verify if the user is authenticated and has permission to access the resource.
       auth_request /internal/authelia/authz;
+
+      ## Modern Method: Set the $redirection_url to the Location header of the response to the Authz endpoint.
+      auth_request_set $redirection_url $upstream_http_location;
 
       ## Save the upstream response headers from Authelia to variables.
       auth_request_set $user $upstream_http_remote_user;
@@ -157,10 +159,8 @@ in {
       proxy_set_header Remote-Name $name;
       proxy_set_header Remote-Email $email;
 
-      ## Legacy Method: Set $target_url to the original requested URL and redirect with rd parameter.
-      ## This is more reliable as it doesn't depend on Authelia's session for the redirect URL.
-      set $target_url $scheme://$http_host$request_uri;
-      error_page 401 =302 https://${authCfg.domain}/?rd=$target_url;
+      ## Modern Method: When there is a 401 response code from the authz endpoint redirect to the $redirection_url.
+      error_page 401 =302 $redirection_url;
     '';
 
     # Authelia location block for each virtual host
