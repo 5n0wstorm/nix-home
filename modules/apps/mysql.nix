@@ -243,28 +243,38 @@ in {
 
     fleet.apps.mysql.connections = let
       # Combine databaseRequests with explicit databases
-      fromRequests = mapAttrs' (serviceName: req: nameValuePair serviceName {
-        host = cfg.bindAddress;
-        port = cfg.port;
-        database = req.database;
-        user = if req.user != "" then req.user else serviceName;
-        passwordFile = req.passwordFile;
-      }) cfg.databaseRequests;
+      fromRequests = mapAttrs' (serviceName: req:
+        nameValuePair serviceName {
+          host = cfg.bindAddress;
+          port = cfg.port;
+          database = req.database;
+          user =
+            if req.user != ""
+            then req.user
+            else serviceName;
+          passwordFile = req.passwordFile;
+        })
+      cfg.databaseRequests;
 
       fromDatabases = flatten (
         mapAttrsToList (dbName: dbCfg: [
-          mapAttrs' (userName: userCfg: nameValuePair "${dbName}-${userName}" {
-            host = cfg.bindAddress;
-            port = cfg.port;
-            database = dbCfg.name;
-            user = userName;
-            passwordFile = userCfg.passwordFile;
-          }) dbCfg.users
-        ]) cfg.databases
+          mapAttrs'
+          (userName: userCfg:
+            nameValuePair "${dbName}-${userName}" {
+              host = cfg.bindAddress;
+              port = cfg.port;
+              database = dbCfg.name;
+              user = userName;
+              passwordFile = userCfg.passwordFile;
+            })
+          dbCfg.users
+        ])
+        cfg.databases
       );
 
       allConnections = fromRequests // (listToAttrs fromDatabases);
-    in allConnections;
+    in
+      allConnections;
     # ----------------------------------------------------------------------------
     # ASSERTIONS
     # ----------------------------------------------------------------------------
@@ -291,19 +301,26 @@ in {
       # Combine databaseRequests with explicit databases for initial databases
       initialDatabases = let
         # Convert databaseRequests to database format
-        fromRequests = mapAttrs' (serviceName: req: nameValuePair req.database {
-          name = req.database;
-          schema = req.schema;
-        }) cfg.databaseRequests;
+        fromRequests = mapAttrs' (serviceName: req:
+          nameValuePair req.database {
+            name = req.database;
+            schema = req.schema;
+          })
+        cfg.databaseRequests;
 
         # Merge with explicit databases
-        allDatabases = fromRequests // (mapAttrs (name: dbCfg: {
-          inherit (dbCfg) name schema;
-        }) cfg.databases);
-      in mapAttrsToList (name: dbCfg: {
-        inherit (dbCfg) name;
-        inherit (dbCfg) schema;
-      }) allDatabases;
+        allDatabases =
+          fromRequests
+          // (mapAttrs (name: dbCfg: {
+              inherit (dbCfg) name schema;
+            })
+            cfg.databases);
+      in
+        mapAttrsToList (name: dbCfg: {
+          inherit (dbCfg) name;
+          inherit (dbCfg) schema;
+        })
+        allDatabases;
 
       inherit (cfg) settings;
     };
@@ -326,36 +343,45 @@ in {
       path = [cfg.package];
       script = let
         # Combine databaseRequests with explicit databases
-        fromRequests = mapAttrs' (serviceName: req: nameValuePair req.database {
-          name = req.database;
-          users = {
-            ${if req.user != "" then req.user else serviceName} = {
-              inherit (req) passwordFile permissions host;
+        fromRequests = mapAttrs' (serviceName: req:
+          nameValuePair req.database {
+            name = req.database;
+            users = {
+              ${
+                if req.user != ""
+                then req.user
+                else serviceName
+              } = {
+                inherit (req) passwordFile permissions host;
+              };
             };
-          };
-        }) cfg.databaseRequests;
+          })
+        cfg.databaseRequests;
 
         allDatabases = fromRequests // cfg.databases;
 
         userCommands = concatStringsSep "\n" (
           flatten (
-            mapAttrsToList (dbName: dbCfg:
-              mapAttrsToList (userName: userCfg: ''
-                # Setup user: ${userName} for database: ${dbCfg.name}
-                if [ -f "${userCfg.passwordFile}" ]; then
-                  PASSWORD=$(cat "${userCfg.passwordFile}")
-                  mysql -u root <<EOF
-                CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
-                ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
-                GRANT ${userCfg.permissions} ON ${dbCfg.name}.* TO '${userName}'@'${userCfg.host}';
-                FLUSH PRIVILEGES;
-                EOF
-                  echo "User ${userName}@${userCfg.host} configured for ${dbCfg.name}"
-                else
-                  echo "Warning: Password file ${userCfg.passwordFile} not found for ${userName}"
-                fi
-              '') dbCfg.users
-            ) allDatabases
+            mapAttrsToList (
+              dbName: dbCfg:
+                mapAttrsToList (userName: userCfg: ''
+                  # Setup user: ${userName} for database: ${dbCfg.name}
+                  if [ -f "${userCfg.passwordFile}" ]; then
+                    PASSWORD=$(cat "${userCfg.passwordFile}")
+                    mysql -u root <<EOF
+                  CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
+                  ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
+                  GRANT ${userCfg.permissions} ON ${dbCfg.name}.* TO '${userName}'@'${userCfg.host}';
+                  FLUSH PRIVILEGES;
+                  EOF
+                    echo "User ${userName}@${userCfg.host} configured for ${dbCfg.name}"
+                  else
+                    echo "Warning: Password file ${userCfg.passwordFile} not found for ${userName}"
+                  fi
+                '')
+                dbCfg.users
+            )
+            allDatabases
           )
         );
       in ''

@@ -606,15 +606,16 @@ in {
                 else {}
               )
               // {
-                tls = {
-                  skip_verify = cfg.smtp.tls.skipVerify;
-                  minimum_version = cfg.smtp.tls.minimumVersion;
-                }
-                // (
-                  if cfg.smtp.tls.serverName != ""
-                  then {server_name = cfg.smtp.tls.serverName;}
-                  else {}
-                );
+                tls =
+                  {
+                    skip_verify = cfg.smtp.tls.skipVerify;
+                    minimum_version = cfg.smtp.tls.minimumVersion;
+                  }
+                  // (
+                    if cfg.smtp.tls.serverName != ""
+                    then {server_name = cfg.smtp.tls.serverName;}
+                    else {}
+                  );
               };
           }
           else {
