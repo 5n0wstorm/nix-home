@@ -166,6 +166,11 @@ in {
     # --------------------------------------------------------------------------
     # FONT CONFIGURATION FOR SUBTITLE RENDERING
     # --------------------------------------------------------------------------
+    # FFmpeg/libass requires fonts and fontconfig for ASS/SSA subtitle rendering.
+    # Without proper configuration, subtitle burn-in will fail with exit code 254.
+
+    fonts.fontconfig.enable = true;
+
     fonts.packages = with pkgs; [
       noto-fonts
       noto-fonts-cjk-sans
@@ -174,9 +179,19 @@ in {
       dejavu_fonts
     ];
 
+    # Ensure Jellyfin's ffmpeg can find fonts via fontconfig
+    # HOME is needed for fontconfig cache, FONTCONFIG_PATH for font discovery
     systemd.services.jellyfin.environment = {
       FONTCONFIG_PATH = "/etc/fonts";
+      FONTCONFIG_FILE = "/etc/fonts/fonts.conf";
+      HOME = cfg.dataDir;
     };
+
+    # Create fontconfig cache directory for jellyfin user
+    systemd.tmpfiles.rules = [
+      "d ${cfg.dataDir}/.cache 0755 jellyfin jellyfin -"
+      "d ${cfg.dataDir}/.cache/fontconfig 0755 jellyfin jellyfin -"
+    ];
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
