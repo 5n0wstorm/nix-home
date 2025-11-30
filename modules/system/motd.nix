@@ -155,22 +155,33 @@ with lib; let
 
     # Get list of drives (excluding partitions)
     for drive in $(ls /dev/sd* /dev/nvme* 2>/dev/null | grep -E '(/dev/sd[a-z]$|/dev/nvme[0-9]+n[0-9]+$)'); do
+      # Debug: show what drives we're checking
+      # echo "Checking drive: $drive" >&2
       if [ -b "$drive" ]; then
-        # Get SMART health status
-        if smartctl -H "$drive" &>/dev/null; then
-          HEALTH=$(smartctl -H "$drive" | grep -i "overall-health" | awk '{print $NF}')
-          TEMP=$(smartctl -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
-          MODEL=$(smartctl -i "$drive" | grep "Device Model" | cut -d: -f2 | xargs)
+        # Get SMART health status - try different options for different drive types
+        SMART_CMD=""
+        if echo "$drive" | grep -q "^/dev/nvme"; then
+          # NVMe drives need special handling
+          SMART_CMD="smartctl -d nvme"
+        else
+          # SATA drives use default
+          SMART_CMD="smartctl"
+        fi
+
+        if $SMART_CMD -H "$drive" &>/dev/null; then
+          HEALTH=$($SMART_CMD -H "$drive" | grep -i "overall-health" | awk '{print $NF}')
+          TEMP=$($SMART_CMD -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
+          MODEL=$($SMART_CMD -i "$drive" | grep "Device Model\|Model Number" | head -1 | cut -d: -f2 | xargs)
 
           # Get SSD wearout information
           WEAROUT=""
           # Check for Percentage Used Endurance Indicator (ID 233)
-          USED_ENDURANCE=$(smartctl -A "$drive" | grep -E "^233" | awk '{print $4}' | sed 's/^0*//')
+          USED_ENDURANCE=$($SMART_CMD -A "$drive" | grep -E "^233" | awk '{print $4}' | sed 's/^0*//')
           if [ -n "$USED_ENDURANCE" ] && [ "$USED_ENDURANCE" != "0" ]; then
             WEAROUT="$USED_ENDURANCE% used"
           else
             # Check for Media Wearout Indicator (ID 177)
-            MEDIA_WEAR=$(smartctl -A "$drive" | grep -E "^177" | awk '{print $4}' | sed 's/^0*//')
+            MEDIA_WEAR=$($SMART_CMD -A "$drive" | grep -E "^177" | awk '{print $4}' | sed 's/^0*//')
             if [ -n "$MEDIA_WEAR" ] && [ "$MEDIA_WEAR" != "0" ]; then
               WEAROUT="$MEDIA_WEAR raw"
             fi
