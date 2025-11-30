@@ -136,6 +136,10 @@ in {
     enable = true;
     domain = "jellyfin.sn0wstorm.com";
     # Uses default: sharedCfg.paths.media.root (/data/media)
+    hardwareAcceleration = {
+      enable = true;
+      type = "amd"; # AMD VAAPI for hardware transcoding
+    };
   };
 
   # Sonarr - TV series management

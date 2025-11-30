@@ -55,6 +55,16 @@ in {
       description = "Bypass Authelia authentication (Jellyfin has built-in auth)";
     };
 
+    hardwareAcceleration = {
+      enable = mkEnableOption "AMD VAAPI hardware-accelerated transcoding";
+
+      type = mkOption {
+        type = types.enum ["amd" "intel" "nvidia"];
+        default = "amd";
+        description = "Type of GPU for hardware acceleration";
+      };
+    };
+
     # Homepage dashboard integration
     homepage = {
       enable = mkOption {
@@ -162,6 +172,46 @@ in {
       openFirewall = cfg.openFirewall;
       dataDir = cfg.dataDir;
     };
+
+    # --------------------------------------------------------------------------
+    # HARDWARE ACCELERATION (AMD VAAPI)
+    # --------------------------------------------------------------------------
+
+    hardware.graphics = mkIf cfg.hardwareAcceleration.enable {
+      enable = true;
+      enable32Bit = true;
+      extraPackages = with pkgs; (
+        if cfg.hardwareAcceleration.type == "amd"
+        then [
+          amdvlk
+          libva
+          libvdpau-va-gl
+          rocmPackages.clr
+          rocmPackages.clr.icd
+          vulkan-loader
+          vulkan-tools
+        ]
+        else if cfg.hardwareAcceleration.type == "intel"
+        then [
+          intel-media-driver
+          intel-vaapi-driver
+          libva
+          libvdpau-va-gl
+          vpl-gpu-rt
+        ]
+        else []
+      );
+    };
+
+    # Add jellyfin user to video and render groups for GPU access
+    users.groups.video.members = mkIf cfg.hardwareAcceleration.enable ["jellyfin"];
+    users.groups.render.members = mkIf cfg.hardwareAcceleration.enable ["jellyfin"];
+
+    # Debugging tools for hardware acceleration
+    environment.systemPackages = mkIf cfg.hardwareAcceleration.enable (with pkgs; [
+      libva-utils # vainfo for debugging VAAPI
+      vulkan-tools # vulkaninfo for debugging Vulkan
+    ]);
 
     # --------------------------------------------------------------------------
     # FONT CONFIGURATION FOR SUBTITLE RENDERING
