@@ -185,7 +185,7 @@ with lib;
         ${pkgs.alejandra}/bin/alejandra --quiet hosts/ modules/ flake.nix hosts.nix 2>/dev/null || true
 
         # Rebuild system using nh (enhanced nix helper with diff and tree view)
-        nh os switch ".#$HOSTNAME"
+        nh os switch . -H "$HOSTNAME"
 
         echo "NixOS Rebuild Completed!"
 
