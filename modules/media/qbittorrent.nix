@@ -229,7 +229,11 @@ in {
       environment = {
         # Use media group GID for proper permissions
         PUID = "2000";
-        PGID = toString (if sharedCfg.enable then sharedCfg.gid else 2000);
+        PGID = toString (
+          if sharedCfg.enable
+          then sharedCfg.gid
+          else 2000
+        );
         TZ = "America/New_York";
         WEBUI_PORT = "8080";
       };
@@ -237,7 +241,11 @@ in {
       volumes = [
         "${cfg.dataDir}:/config"
         # Mount full media directory for hardlinks/moves to work
-        "${if sharedCfg.enable then sharedCfg.baseDir else cfg.downloadDir}:/media"
+        "${
+          if sharedCfg.enable
+          then sharedCfg.baseDir
+          else cfg.downloadDir
+        }:/media"
       ];
 
       # Use gluetun's network namespace - ALL traffic goes through VPN

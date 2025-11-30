@@ -148,10 +148,10 @@ in {
     # For services that use DynamicUser or don't have a group option
     # --------------------------------------------------------------------------
 
-    systemd.services.prowlarr.serviceConfig.SupplementaryGroups = 
+    systemd.services.prowlarr.serviceConfig.SupplementaryGroups =
       mkIf (config.services.prowlarr.enable or false) [cfg.group];
-    
-    systemd.services.transmission.serviceConfig.SupplementaryGroups = 
+
+    systemd.services.transmission.serviceConfig.SupplementaryGroups =
       mkIf (config.services.transmission.enable or false) [cfg.group];
 
     # --------------------------------------------------------------------------
@@ -222,4 +222,3 @@ in {
     };
   };
 }
-
