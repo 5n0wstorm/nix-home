@@ -183,60 +183,60 @@ with lib; let
         TEMP=$($SMART_CMD -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
         MODEL=$($SMART_CMD -i "$drive" | grep -E "(Device Model|Model Number|Model)" | head -1 | cut -d: -f2- | sed 's/^[[:space:]]*//' | xargs)
 
-          # Get SSD wearout information
-          WEAROUT=""
-          # Try multiple common SSD wearout attributes
-          # Check for Percentage Used Endurance Indicator (ID 233 - Samsung, Intel)
-          USED_ENDURANCE=$($SMART_CMD -A "$drive" | grep -E "^233" | awk '{print $4}' | sed 's/^0*//')
-          if [ -n "$USED_ENDURANCE" ] && [ "$USED_ENDURANCE" != "0" ]; then
-            WEAROUT="$USED_ENDURANCE% used"
+        # Get SSD wearout information
+        WEAROUT=""
+        # Try multiple common SSD wearout attributes
+        # Check for Percentage Used Endurance Indicator (ID 233 - Samsung, Intel)
+        USED_ENDURANCE=$($SMART_CMD -A "$drive" | grep -E "^233" | awk '{print $4}' | sed 's/^0*//')
+        if [ -n "$USED_ENDURANCE" ] && [ "$USED_ENDURANCE" != "0" ]; then
+          WEAROUT="$USED_ENDURANCE% used"
+        else
+          # Check for Media Wearout Indicator (ID 177 - Samsung)
+          MEDIA_WEAR=$($SMART_CMD -A "$drive" | grep -E "^177" | awk '{print $4}' | sed 's/^0*//')
+          if [ -n "$MEDIA_WEAR" ] && [ "$MEDIA_WEAR" != "0" ]; then
+            WEAROUT="$MEDIA_WEAR raw"
           else
-            # Check for Media Wearout Indicator (ID 177 - Samsung)
-            MEDIA_WEAR=$($SMART_CMD -A "$drive" | grep -E "^177" | awk '{print $4}' | sed 's/^0*//')
-            if [ -n "$MEDIA_WEAR" ] && [ "$MEDIA_WEAR" != "0" ]; then
-              WEAROUT="$MEDIA_WEAR raw"
+            # Check for Percentage Used (ID 202 - WD, some others)
+            PERCENT_USED=$($SMART_CMD -A "$drive" | grep -E "^202" | awk '{print $4}' | sed 's/^0*//')
+            if [ -n "$PERCENT_USED" ] && [ "$PERCENT_USED" != "0" ]; then
+              WEAROUT="$PERCENT_USED% used"
             else
-              # Check for Percentage Used (ID 202 - WD, some others)
-              PERCENT_USED=$($SMART_CMD -A "$drive" | grep -E "^202" | awk '{print $4}' | sed 's/^0*//')
-              if [ -n "$PERCENT_USED" ] && [ "$PERCENT_USED" != "0" ]; then
-                WEAROUT="$PERCENT_USED% used"
-              else
-                # Check for SSD Life Left (ID 169)
-                LIFE_LEFT=$($SMART_CMD -A "$drive" | grep -E "^169" | awk '{print $4}' | sed 's/^0*//')
-                if [ -n "$LIFE_LEFT" ] && [ "$LIFE_LEFT" != "0" ]; then
-                  WEAROUT="$LIFE_LEFT% left"
-                fi
+              # Check for SSD Life Left (ID 169)
+              LIFE_LEFT=$($SMART_CMD -A "$drive" | grep -E "^169" | awk '{print $4}' | sed 's/^0*//')
+              if [ -n "$LIFE_LEFT" ] && [ "$LIFE_LEFT" != "0" ]; then
+                WEAROUT="$LIFE_LEFT% left"
               fi
             fi
           fi
+        fi
 
-          if [ "$HEALTH" = "PASSED" ]; then
-            printf "$GREEN  ● $RESET%-35s $GREEN[OK]$RESET" "$drive ($MODEL)"
-          elif [ "$HEALTH" = "FAILED" ]; then
-            printf "$RED  ● $RESET%-35s $RED[FAILED]$RESET" "$drive ($MODEL)"
-          else
-            printf "$YELLOW  ● $RESET%-35s $YELLOW[UNKNOWN]$RESET" "$drive ($MODEL)"
-          fi
+        if [ "$HEALTH" = "PASSED" ]; then
+          printf "$GREEN  ● $RESET%-35s $GREEN[OK]$RESET" "$drive ($MODEL)"
+        elif [ "$HEALTH" = "FAILED" ]; then
+          printf "$RED  ● $RESET%-35s $RED[FAILED]$RESET" "$drive ($MODEL)"
+        else
+          printf "$YELLOW  ● $RESET%-35s $YELLOW[UNKNOWN]$RESET" "$drive ($MODEL)"
+        fi
 
-          # Show wearout and temperature info
-          INFO=""
-          if [ -n "$WEAROUT" ]; then
-            INFO="$WEAROUT"
-          fi
-          if [ -n "$TEMP" ] && [ "$TEMP" != "-" ]; then
-            if [ -n "$INFO" ]; then
-              INFO="$INFO, $TEMP°C"
-            else
-              INFO="$TEMP°C"
-            fi
-          fi
-
+        # Show wearout and temperature info
+        INFO=""
+        if [ -n "$WEAROUT" ]; then
+          INFO="$WEAROUT"
+        fi
+        if [ -n "$TEMP" ] && [ "$TEMP" != "-" ]; then
           if [ -n "$INFO" ]; then
-            printf " (%s)\n" "$INFO"
+            INFO="$INFO, $TEMP°C"
           else
-            printf "\n"
+            INFO="$TEMP°C"
           fi
         fi
+
+        if [ -n "$INFO" ]; then
+          printf " (%s)\n" "$INFO"
+        else
+          printf "\n"
+        fi
+      fi
       fi
     done
     echo ""
