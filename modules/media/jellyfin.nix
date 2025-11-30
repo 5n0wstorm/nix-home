@@ -183,13 +183,12 @@ in {
       extraPackages = with pkgs; (
         if cfg.hardwareAcceleration.type == "amd"
         then [
-          amdvlk
+          # RADV (Mesa Vulkan) is enabled by default, no need for amdvlk
           libva
           libvdpau-va-gl
           rocmPackages.clr
           rocmPackages.clr.icd
           vulkan-loader
-          vulkan-tools
         ]
         else if cfg.hardwareAcceleration.type == "intel"
         then [
