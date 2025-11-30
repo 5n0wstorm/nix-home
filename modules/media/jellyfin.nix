@@ -183,12 +183,15 @@ in {
       extraPackages = with pkgs; (
         if cfg.hardwareAcceleration.type == "amd"
         then [
-          # RADV (Mesa Vulkan) is enabled by default, no need for amdvlk
+          # RADV (Mesa Vulkan) is enabled by default
           libva
           libvdpau-va-gl
           rocmPackages.clr
           rocmPackages.clr.icd
           vulkan-loader
+          # Required for Jellyfin's Vulkan-based subtitle overlay
+          libplacebo
+          shaderc
         ]
         else if cfg.hardwareAcceleration.type == "intel"
         then [
@@ -228,13 +231,17 @@ in {
       dejavu_fonts
     ];
 
-    # Ensure Jellyfin's ffmpeg can find fonts via fontconfig
+    # Ensure Jellyfin's ffmpeg can find fonts via fontconfig and Vulkan drivers
     # HOME is needed for fontconfig cache, FONTCONFIG_PATH for font discovery
     systemd.services.jellyfin.environment = {
       FONTCONFIG_PATH = "/etc/fonts";
       FONTCONFIG_FILE = "/etc/fonts/fonts.conf";
       HOME = cfg.dataDir;
-    };
+    } // (optionalAttrs cfg.hardwareAcceleration.enable {
+      # Vulkan ICD discovery for hardware subtitle overlay
+      VK_DRIVER_FILES = "/run/opengl-driver/share/vulkan/icd.d/radeon_icd.x86_64.json";
+      LIBVA_DRIVER_NAME = "radeonsi";
+    });
 
     # Create fontconfig cache directory for jellyfin user
     systemd.tmpfiles.rules = [
