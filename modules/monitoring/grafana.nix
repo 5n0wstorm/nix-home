@@ -107,7 +107,9 @@ in {
         "fleet.reverse-proxy.ssl" = "true";
         "fleet.reverse-proxy.websockets" = "false";
         "fleet.reverse-proxy.extra-config" = ''
-          client_max_body_size 100M;
+          request_body {
+            max_size 100MB
+          }
         '';
         "fleet.authelia.bypass" =
           if cfg.bypassAuth
