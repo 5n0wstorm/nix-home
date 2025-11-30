@@ -198,7 +198,7 @@ in {
     enable = true;
     domain = "qbittorrent.sn0wstorm.com";
     port = 9000;
-    downloadDir = config.fleet.media.shared.paths.downloads;
+    # Uses default: sharedCfg.paths.torrents.root (/data/torrents)
 
     # Route ALL torrent traffic through PIA VPN
     vpn = {
