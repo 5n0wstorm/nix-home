@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 with lib; let
@@ -108,6 +109,12 @@ in {
     services.prowlarr = {
       enable = true;
       openFirewall = cfg.openFirewall;
+      settings = {
+        auth = {
+          method = "External";
+          required = "DisabledForLocalAddresses";
+        };
+      };
     };
 
     # --------------------------------------------------------------------------

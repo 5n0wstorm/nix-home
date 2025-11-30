@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 with lib; let
@@ -110,6 +111,19 @@ in {
       openFirewall = cfg.openFirewall;
       listenPort = cfg.port;
     };
+
+    # --------------------------------------------------------------------------
+    # DISABLE BUILT-IN AUTH (handled by Authelia)
+    # --------------------------------------------------------------------------
+
+    systemd.services.bazarr.preStart = let
+      configFile = "/var/lib/bazarr/config/config.ini";
+    in ''
+      if [ -f "${configFile}" ]; then
+        # Disable Bazarr built-in authentication (set auth type to None)
+        ${pkgs.gnused}/bin/sed -i 's|^type = .*|type = None|g' "${configFile}"
+      fi
+    '';
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION

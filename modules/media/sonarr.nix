@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 with lib; let
@@ -116,6 +117,20 @@ in {
       openFirewall = cfg.openFirewall;
       dataDir = cfg.dataDir;
     };
+
+    # --------------------------------------------------------------------------
+    # DISABLE BUILT-IN AUTH (handled by Authelia)
+    # --------------------------------------------------------------------------
+
+    systemd.services.sonarr.preStart = let
+      configFile = "${cfg.dataDir}/config.xml";
+    in ''
+      if [ -f "${configFile}" ]; then
+        # Set authentication to External (handled by reverse proxy/Authelia)
+        ${pkgs.gnused}/bin/sed -i 's|<AuthenticationMethod>[^<]*</AuthenticationMethod>|<AuthenticationMethod>External</AuthenticationMethod>|g' "${configFile}"
+        ${pkgs.gnused}/bin/sed -i 's|<AuthenticationRequired>[^<]*</AuthenticationRequired>|<AuthenticationRequired>DisabledForLocalAddresses</AuthenticationRequired>|g' "${configFile}"
+      fi
+    '';
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
