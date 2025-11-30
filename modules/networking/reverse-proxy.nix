@@ -138,45 +138,67 @@ in {
     useAuthelia = cfg.enableAuthelia && authCfg.enable;
 
     # Authelia nginx snippets for forward auth
-    # Using AuthRequest endpoint - returns 401 on failure, we handle redirect
+    # Based on official Authelia nginx documentation:
+    # https://www.authelia.com/integration/proxies/nginx/
     autheliaAuthSnippet = ''
-      # Authelia forward authentication
-      auth_request /authelia;
+      ## Send a subrequest to Authelia to verify if the user is authenticated and has permission to access the resource.
+      auth_request /internal/authelia/authz;
+
+      ## Modern Method: Set the $redirection_url to the Location header of the response to the Authz endpoint.
+      auth_request_set $redirection_url $upstream_http_location;
+
+      ## Save the upstream response headers from Authelia to variables.
       auth_request_set $user $upstream_http_remote_user;
       auth_request_set $groups $upstream_http_remote_groups;
       auth_request_set $name $upstream_http_remote_name;
       auth_request_set $email $upstream_http_remote_email;
 
-      # Pass authentication info to backend
+      ## Inject the response headers from the variables into the request made to the backend.
       proxy_set_header Remote-User $user;
       proxy_set_header Remote-Groups $groups;
       proxy_set_header Remote-Name $name;
       proxy_set_header Remote-Email $email;
 
-      # Error handling - redirect to Authelia on 401
-      # Authelia will read X-Original-URL from its session/headers
-      error_page 401 =302 https://${authCfg.domain}/?rd=$scheme://$http_host$request_uri;
-
-      # Ensure the session cookie is forwarded properly
-      proxy_set_header Cookie $http_cookie;
+      ## Modern Method: When there is a 401 response code from the authz endpoint redirect to the $redirection_url.
+      error_page 401 =302 $redirection_url;
     '';
 
-    # Authelia location blocks for each virtual host
-    # Uses AuthRequest endpoint which returns 401 on auth failure
+    # Authelia location block for each virtual host
+    # Based on official Authelia nginx documentation
     autheliaLocations = {
-      "/authelia" = {
+      "/internal/authelia/authz" = {
         proxyPass = "http://127.0.0.1:${toString authCfg.port}/api/authz/auth-request";
         extraConfig = ''
+          ## Essential Proxy Configuration
           internal;
           proxy_pass_request_body off;
-          proxy_set_header Content-Length "";
-          proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+
+          ## Headers
+          ## The headers starting with X-* are required.
           proxy_set_header X-Original-Method $request_method;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+          proxy_set_header X-Forwarded-Method $request_method;
           proxy_set_header X-Forwarded-Proto $scheme;
           proxy_set_header X-Forwarded-Host $http_host;
-          proxy_set_header X-Forwarded-Uri $request_uri;
-          proxy_set_header Cookie $http_cookie;
+          proxy_set_header X-Forwarded-URI $request_uri;
+          proxy_set_header X-Forwarded-For $remote_addr;
+          proxy_set_header Content-Length "";
+          proxy_set_header Connection "";
+
+          ## Basic Proxy Configuration
+          proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+          proxy_redirect http:// $scheme://;
+          proxy_http_version 1.1;
+          proxy_cache_bypass $cookie_session;
+          proxy_no_cache $cookie_session;
+          proxy_buffers 4 32k;
+          client_body_buffer_size 128k;
+
+          ## Advanced Proxy Configuration
+          send_timeout 5m;
+          proxy_read_timeout 240;
+          proxy_send_timeout 240;
+          proxy_connect_timeout 240;
         '';
       };
     };
