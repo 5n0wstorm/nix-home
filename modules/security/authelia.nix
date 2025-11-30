@@ -508,18 +508,18 @@ in {
         session = {
           name = "authelia_session";
           cookies = [
-            {
+            ({
               domain = cfg.sessionDomain;
               authelia_url = "https://${cfg.domain}";
               same_site = "lax";
-              default_redirection_url =
-                if cfg.defaultRedirectionUrl != null
-                then cfg.defaultRedirectionUrl
-                else "https://${cfg.domain}";
               expiration = cfg.sessionExpiration;
               inactivity = cfg.sessionInactivity;
               remember_me = cfg.rememberMeDuration;
             }
+            # Only add default_redirection_url if explicitly set and different from authelia_url
+            // (lib.optionalAttrs (cfg.defaultRedirectionUrl != null) {
+              default_redirection_url = cfg.defaultRedirectionUrl;
+            }))
           ];
         };
 
