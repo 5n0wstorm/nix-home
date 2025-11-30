@@ -129,38 +129,17 @@ in {
     };
 
     # --------------------------------------------------------------------------
-    # ADD SERVICE USERS TO MEDIA GROUP
+    # SERVICE GROUP CONFIGURATION
+    # Set the media group for each service that supports it
     # --------------------------------------------------------------------------
 
-    # Sonarr
-    users.users.sonarr.extraGroups = mkIf config.services.sonarr.enable [cfg.group];
-
-    # Radarr
-    users.users.radarr.extraGroups = mkIf config.services.radarr.enable [cfg.group];
-
-    # Lidarr
-    users.users.lidarr.extraGroups = mkIf config.services.lidarr.enable [cfg.group];
-
-    # Readarr
-    users.users.readarr.extraGroups = mkIf config.services.readarr.enable [cfg.group];
-
-    # Prowlarr
-    users.users.prowlarr.extraGroups = mkIf config.services.prowlarr.enable [cfg.group];
-
-    # Bazarr
-    users.users.bazarr.extraGroups = mkIf config.services.bazarr.enable [cfg.group];
-
-    # Jellyfin
-    users.users.jellyfin.extraGroups = mkIf config.services.jellyfin.enable [cfg.group];
-
-    # qBittorrent (native service)
-    users.users.qbittorrent.extraGroups = mkIf (config.fleet.media.qbittorrent.enable && !config.fleet.media.qbittorrent.vpn.enable) [cfg.group];
-
-    # SABnzbd
-    users.users.sabnzbd.extraGroups = mkIf config.services.sabnzbd.enable [cfg.group];
-
-    # Transmission
-    users.users.transmission.extraGroups = mkIf config.services.transmission.enable [cfg.group];
+    services.sonarr.group = mkIf config.services.sonarr.enable cfg.group;
+    services.radarr.group = mkIf config.services.radarr.enable cfg.group;
+    services.lidarr.group = mkIf config.services.lidarr.enable cfg.group;
+    services.readarr.group = mkIf config.services.readarr.enable cfg.group;
+    services.bazarr.group = mkIf config.services.bazarr.enable cfg.group;
+    services.jellyfin.group = mkIf config.services.jellyfin.enable cfg.group;
+    services.sabnzbd.group = mkIf config.services.sabnzbd.enable cfg.group;
 
     # --------------------------------------------------------------------------
     # DIRECTORY STRUCTURE
