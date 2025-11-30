@@ -236,7 +236,10 @@ in {
         SERVER_REGIONS = concatStringsSep "," cfg.pia.serverRegions;
 
         # Port forwarding
-        VPN_PORT_FORWARDING = if cfg.pia.portForwarding then "on" else "off";
+        VPN_PORT_FORWARDING =
+          if cfg.pia.portForwarding
+          then "on"
+          else "off";
         VPN_PORT_FORWARDING_PROVIDER = "private internet access";
 
         # DNS
@@ -278,10 +281,10 @@ in {
       # Expose ports for services that will route through VPN
       # qBittorrent web UI and BitTorrent ports
       ports = [
-        "8080:8080"   # qBittorrent Web UI (internal container port)
-        "6881:6881"   # BitTorrent TCP
+        "8080:8080" # qBittorrent Web UI (internal container port)
+        "6881:6881" # BitTorrent TCP
         "6881:6881/udp" # BitTorrent UDP
-        "8000:8000"   # Gluetun control server (for monitoring)
+        "8000:8000" # Gluetun control server (for monitoring)
       ];
     };
 
@@ -340,4 +343,3 @@ in {
     };
   };
 }
-
