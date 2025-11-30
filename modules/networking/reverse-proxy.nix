@@ -155,6 +155,9 @@ in {
 
       # Error handling - redirect to Authelia on 401
       error_page 401 =302 https://${authCfg.domain}/?rd=$target_url;
+
+      # Ensure the session cookie is forwarded properly
+      proxy_set_header Cookie $http_cookie;
     '';
 
     # Authelia location blocks for each virtual host
@@ -172,6 +175,7 @@ in {
           proxy_set_header X-Forwarded-Proto $scheme;
           proxy_set_header X-Forwarded-Host $http_host;
           proxy_set_header X-Forwarded-Uri $request_uri;
+          proxy_set_header Cookie $http_cookie;
         '';
       };
     };
