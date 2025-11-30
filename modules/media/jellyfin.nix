@@ -90,6 +90,30 @@ in {
 
   config = mkIf cfg.enable {
     # --------------------------------------------------------------------------
+    # JELLYFIN OVERLAY FOR SKIP INTRO BUTTON
+    # --------------------------------------------------------------------------
+
+    nixpkgs.overlays = [
+      (_final: prev: {
+        jellyfin-web = prev.jellyfin-web.overrideAttrs (
+          _finalAttrs: _previousAttrs: {
+            installPhase = ''
+              runHook preInstall
+
+              # Add skip intro button script to the HTML head
+              sed -i "s#</head>#<script src=\"configurationpage?name=skip-intro-button.js\"></script></head>#" dist/index.html
+
+              mkdir -p $out/share
+              cp -a dist $out/share/jellyfin-web
+
+              runHook postInstall
+            '';
+          }
+        );
+      })
+    ];
+
+    # --------------------------------------------------------------------------
     # HOMEPAGE DASHBOARD REGISTRATION
     # --------------------------------------------------------------------------
 
