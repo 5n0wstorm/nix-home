@@ -306,8 +306,8 @@ in {
         group = "users";
         mode = "0644";
       };
-      "git_user_name" = {};
-      "git_user_email" = {};
+      
+      "git_identity"= {};
 
       # Authelia secrets
       "authelia_jwt_secret" = {
@@ -368,14 +368,13 @@ in {
 
   # Git identity from secrets:
   programs.git.config = {
-    user = {
-      name = "$(cat /run/secrets/git_user_name)";
-      email = "$(cat /run/secrets/git_user_email)";
-    };
-    safe = {
-      directory = "/home/dominik/nix-home";
-    };
+  include = {
+    path = "/run/secrets/git_identity";
   };
+  safe = {
+    directory = "/home/dominik/nix-home";
+  };
+};
 
   # ============================================================================
   # SSH CONFIGURATION
