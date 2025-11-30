@@ -128,6 +128,8 @@ in {
       gid = cfg.gid;
     };
 
+    users.users.dominik.extraGroups = [cfg.group];
+
     # --------------------------------------------------------------------------
     # SERVICE GROUP CONFIGURATION
     # Set the media group for services that support it directly
