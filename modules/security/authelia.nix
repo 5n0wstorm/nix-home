@@ -655,35 +655,61 @@ in {
       description = "Prepare Authelia secrets environment file";
       before = ["authelia-main.service"];
       requiredBy = ["authelia-main.service"];
+      after = ["sops-nix.service"];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        User = "authelia-main";
-        Group = "authelia-main";
+        # Run as root to create directory, then chown
       };
       script = let
         envFile = "/run/authelia-main/secrets.env";
       in ''
         mkdir -p /run/authelia-main
+        chown authelia-main:authelia-main /run/authelia-main
+        chmod 700 /run/authelia-main
+
         rm -f ${envFile}
         touch ${envFile}
         chmod 600 ${envFile}
+        chown authelia-main:authelia-main ${envFile}
 
         ${optionalString (cfg.database.hostFile != null) ''
-          echo "AUTHELIA__STORAGE__MYSQL__HOST=$(cat ${cfg.database.hostFile})" >> ${envFile}
+          if [ -f "${cfg.database.hostFile}" ]; then
+            echo "AUTHELIA__STORAGE__MYSQL__HOST=$(cat ${cfg.database.hostFile})" >> ${envFile}
+          else
+            echo "Warning: ${cfg.database.hostFile} not found"
+          fi
         ''}
         ${optionalString (cfg.database.databaseFile != null) ''
-          echo "AUTHELIA__STORAGE__MYSQL__DATABASE=$(cat ${cfg.database.databaseFile})" >> ${envFile}
+          if [ -f "${cfg.database.databaseFile}" ]; then
+            echo "AUTHELIA__STORAGE__MYSQL__DATABASE=$(cat ${cfg.database.databaseFile})" >> ${envFile}
+          else
+            echo "Warning: ${cfg.database.databaseFile} not found"
+          fi
         ''}
         ${optionalString (cfg.database.usernameFile != null) ''
-          echo "AUTHELIA__STORAGE__MYSQL__USERNAME=$(cat ${cfg.database.usernameFile})" >> ${envFile}
+          if [ -f "${cfg.database.usernameFile}" ]; then
+            echo "AUTHELIA__STORAGE__MYSQL__USERNAME=$(cat ${cfg.database.usernameFile})" >> ${envFile}
+          else
+            echo "Warning: ${cfg.database.usernameFile} not found"
+          fi
         ''}
         ${optionalString (cfg.database.passwordFile != null) ''
-          echo "AUTHELIA__STORAGE__MYSQL__PASSWORD=$(cat ${cfg.database.passwordFile})" >> ${envFile}
+          if [ -f "${cfg.database.passwordFile}" ]; then
+            echo "AUTHELIA__STORAGE__MYSQL__PASSWORD=$(cat ${cfg.database.passwordFile})" >> ${envFile}
+          else
+            echo "Warning: ${cfg.database.passwordFile} not found"
+          fi
         ''}
         ${optionalString (cfg.smtp.enable && cfg.smtp.passwordFile != null) ''
-          echo "AUTHELIA__NOTIFIER__SMTP__PASSWORD=$(cat ${cfg.smtp.passwordFile})" >> ${envFile}
+          if [ -f "${cfg.smtp.passwordFile}" ]; then
+            echo "AUTHELIA__NOTIFIER__SMTP__PASSWORD=$(cat ${cfg.smtp.passwordFile})" >> ${envFile}
+          else
+            echo "Warning: ${cfg.smtp.passwordFile} not found"
+          fi
         ''}
+
+        echo "Authelia secrets environment file created"
       '';
     };
 
