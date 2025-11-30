@@ -23,7 +23,6 @@
   }: let
     # Import host definitions from single source of truth
     hosts = import ./hosts.nix;
-
     # For scaling up your homelab, you'd likely want automated host generation:
     # mkHost = name: hostConfig: {
     #   deployment = {
