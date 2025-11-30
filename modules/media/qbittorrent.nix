@@ -264,6 +264,72 @@ in {
     };
 
     # --------------------------------------------------------------------------
+    # QBITTORRENT CONFIG SETUP SERVICE
+    # Pre-configures download paths and categories for arr stack integration
+    # --------------------------------------------------------------------------
+
+    systemd.services.qbittorrent-config = mkIf cfg.vpn.enable {
+      description = "Setup qBittorrent download paths and categories";
+      before = ["podman-qbittorrent.service"];
+      requiredBy = ["podman-qbittorrent.service"];
+      wantedBy = ["multi-user.target"];
+
+      path = [pkgs.coreutils pkgs.jq];
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = cfg.user;
+        Group = cfg.group;
+      };
+
+      script = ''
+        CONFIG_DIR="${cfg.dataDir}/qBittorrent"
+        mkdir -p "$CONFIG_DIR"
+
+        # Create categories.json for arr stack integration
+        # These paths are INSIDE the container where /data is mounted
+        cat > "$CONFIG_DIR/categories.json" << 'EOF'
+        {
+          "books": {
+            "save_path": "/data/torrents/books"
+          },
+          "movies": {
+            "save_path": "/data/torrents/movies"
+          },
+          "music": {
+            "save_path": "/data/torrents/music"
+          },
+          "tv": {
+            "save_path": "/data/torrents/tv"
+          }
+        }
+        EOF
+
+        # Only create qBittorrent.conf if it doesn't exist (preserve user settings)
+        if [ ! -f "$CONFIG_DIR/qBittorrent.conf" ]; then
+          cat > "$CONFIG_DIR/qBittorrent.conf" << 'EOF'
+        [BitTorrent]
+        Session\DefaultSavePath=/data/torrents
+        Session\TempPath=/data/torrents
+        Session\TempPathEnabled=false
+
+        [Preferences]
+        Downloads\SavePath=/data/torrents
+        Downloads\TempPath=/data/torrents
+        Downloads\TempPathEnabled=false
+        WebUI\Port=8080
+        EOF
+          echo "Created initial qBittorrent.conf"
+        else
+          echo "qBittorrent.conf already exists, skipping (preserving user settings)"
+        fi
+
+        echo "qBittorrent categories configured for arr stack"
+      '';
+    };
+
+    # --------------------------------------------------------------------------
     # QBITTORRENT CONTAINER (VPN MODE)
     # Routes all traffic through gluetun VPN container
     # --------------------------------------------------------------------------
@@ -290,14 +356,13 @@ in {
 
       volumes = [
         "${cfg.dataDir}:/config"
-        # Mount downloads directory to /downloads (qBittorrent default path)
-        "${cfg.downloadDir}:/downloads"
-        # Mount full media directory for hardlinks/moves to library folders
+        # Mount entire data directory for hardlinks to work
+        # qBittorrent saves to /data/torrents, Sonarr/Radarr hardlink to /data/media
         "${
           if sharedCfg.enable
           then sharedCfg.baseDir
-          else cfg.downloadDir
-        }:/media"
+          else "/data"
+        }:/data"
       ];
 
       # Use gluetun's network namespace - ALL traffic goes through VPN
