@@ -517,7 +517,6 @@ in {
           remember_me = cfg.rememberMeDuration;
         };
 
-        # Storage configuration
         storage =
           if cfg.database.enable
           then {
@@ -525,7 +524,6 @@ in {
               address = "tcp://${cfg.database.host}:${toString cfg.database.port}";
               database = cfg.database.database;
               username = cfg.database.username;
-              password = "";
             };
           }
           else {
