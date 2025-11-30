@@ -8,6 +8,8 @@
     colmena.url = "github:zhaofengli/colmena";
     nixos-wsl.url = "github:nix-community/NixOS-WSL";
     sops-nix.url = "github:Mic92/sops-nix";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   # ============================================================================
@@ -19,6 +21,7 @@
     colmena,
     nixos-wsl,
     sops-nix,
+    disko,
     ...
   }: let
     # Import host definitions from single source of truth
@@ -61,6 +64,8 @@
       system = "x86_64-linux";
       modules = [
         ./hosts/galadriel/configuration.nix
+        ./hosts/galadriel/disko.nix
+        disko.nixosModules.disko
         sops-nix.nixosModules.sops
       ];
     };
@@ -94,6 +99,8 @@
 
         imports = [
           ./hosts/galadriel/configuration.nix
+          ./hosts/galadriel/disko.nix
+          disko.nixosModules.disko
           sops-nix.nixosModules.sops
         ];
       };

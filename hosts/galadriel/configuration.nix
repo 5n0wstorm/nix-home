@@ -556,9 +556,10 @@ in {
 
   # ============================================================================
 
+  # Network interface - enp3s0f1 confirmed via `ip link` on Proxmox host
   networking = {
     useDHCP = false;
-    interfaces.ens18 = {
+    interfaces.enp3s0f1 = {
       useDHCP = false;
       ipv4.addresses = [
         {
@@ -629,12 +630,11 @@ in {
   };
 
   # ============================================================================
-  # BOOTLOADER
+  # BOOTLOADER (UEFI with systemd-boot)
   # ============================================================================
 
-  boot.loader.grub.enable = true;
-  boot.loader.grub.device = "/dev/sda";
-  boot.loader.grub.useOSProber = true;
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
 
   # ============================================================================
   # SYSTEM
