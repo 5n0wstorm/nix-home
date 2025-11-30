@@ -155,6 +155,7 @@ in {
   fleet.media.qbittorrent = {
     enable = true;
     domain = "qbittorrent.sn0wstorm.com";
+    port = 9000;
     downloadDir = "/media/downloads";
   };
 
