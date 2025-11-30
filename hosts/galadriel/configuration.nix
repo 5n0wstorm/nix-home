@@ -28,6 +28,7 @@ in {
     ../../modules/apps/mysql.nix
     ../../modules/apps/vaultwarden.nix
     # Media
+    ../../modules/media/shared-media.nix
     ../../modules/media/jellyfin.nix
     ../../modules/media/sonarr.nix
     ../../modules/media/radarr.nix
@@ -100,6 +101,27 @@ in {
   };
 
   # ============================================================================
+  # SHARED MEDIA DIRECTORY STRUCTURE
+  # ============================================================================
+
+  fleet.media.shared = {
+    enable = true;
+    baseDir = "/media";
+    # Directory structure:
+    # /media/
+    # ├── downloads/
+    # │   ├── complete/
+    # │   ├── incomplete/
+    # │   ├── torrents/
+    # │   └── usenet/
+    # ├── tv/
+    # ├── movies/
+    # ├── music/
+    # ├── books/
+    # └── audiobooks/
+  };
+
+  # ============================================================================
   # MEDIA SERVICES
   # ============================================================================
 
@@ -107,7 +129,7 @@ in {
   fleet.media.jellyfin = {
     enable = true;
     domain = "jellyfin.sn0wstorm.com";
-    mediaDir = "/media";
+    mediaDir = config.fleet.media.shared.baseDir;
   };
 
   # Sonarr - TV series management
@@ -176,7 +198,7 @@ in {
     enable = true;
     domain = "qbittorrent.sn0wstorm.com";
     port = 9000;
-    downloadDir = "/media/downloads";
+    downloadDir = config.fleet.media.shared.paths.downloads;
 
     # Route ALL torrent traffic through PIA VPN
     vpn = {
@@ -194,7 +216,7 @@ in {
   fleet.media.navidrome = {
     enable = true;
     domain = "navidrome.sn0wstorm.com";
-    musicFolder = "/media/music";
+    musicFolder = config.fleet.media.shared.paths.music;
   };
 
   # ============================================================================

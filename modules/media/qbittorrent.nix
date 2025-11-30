@@ -7,6 +7,7 @@
 with lib; let
   cfg = config.fleet.media.qbittorrent;
   vpnCfg = config.fleet.networking.vpnGateway;
+  sharedCfg = config.fleet.media.shared;
   homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
@@ -181,6 +182,8 @@ in {
       createHome = true;
       # Assign UID for container user mapping
       uid = 2000;
+      # Add to media group for shared directory access
+      extraGroups = mkIf sharedCfg.enable [sharedCfg.group];
     };
 
     users.groups.${cfg.group} = {
@@ -224,15 +227,17 @@ in {
       image = "lscr.io/linuxserver/qbittorrent:latest";
 
       environment = {
+        # Use media group GID for proper permissions
         PUID = "2000";
-        PGID = "2000";
+        PGID = toString (if sharedCfg.enable then sharedCfg.gid else 2000);
         TZ = "America/New_York";
         WEBUI_PORT = "8080";
       };
 
       volumes = [
         "${cfg.dataDir}:/config"
-        "${cfg.downloadDir}:/downloads"
+        # Mount full media directory for hardlinks/moves to work
+        "${if sharedCfg.enable then sharedCfg.baseDir else cfg.downloadDir}:/media"
       ];
 
       # Use gluetun's network namespace - ALL traffic goes through VPN
