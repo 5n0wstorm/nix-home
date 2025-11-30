@@ -559,7 +559,7 @@ in {
   # Network interface
   networking = {
     useDHCP = false;
-    interfaces.enp3s0f1 = {
+    interfaces.eno1 = {
       useDHCP = false;
       ipv4.addresses = [
         {
