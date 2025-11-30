@@ -142,18 +142,10 @@ in {
           dnsProvider = cfg.dnsProvider;
           environmentFile = cfg.credentialsFile;
           dnsPropagationCheck = cfg.dnsPropagationCheck;
-          group = "nginx";
+          group = "caddy";
         };
       };
 
-      # Ensure nginx can read certificates
-      users.users.nginx = {
-        isSystemUser = true;
-        group = "nginx";
-        extraGroups = ["acme"];
-      };
-
-      users.groups.nginx = {};
       users.groups.acme = {};
     }
 
@@ -220,11 +212,11 @@ in {
     })
 
     # --------------------------------------------------------------------------
-    # NGINX DEPENDENCIES
+    # CADDY DEPENDENCIES
     # --------------------------------------------------------------------------
     {
-      # Ensure nginx waits for certificates
-      systemd.services.nginx = {
+      # Ensure Caddy waits for certificates
+      systemd.services.caddy = {
         wants = ["acme-finished-${cfg.domain}.target"];
         after = ["acme-finished-${cfg.domain}.target"];
       };

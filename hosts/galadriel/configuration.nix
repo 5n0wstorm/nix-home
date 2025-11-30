@@ -16,7 +16,7 @@ in {
     ../../modules/security/acme.nix
     ../../modules/security/authelia.nix
     # Networking
-    ../../modules/networking/reverse-proxy.nix
+    ../../modules/networking/caddy-proxy.nix
     # Monitoring
     ../../modules/monitoring/prometheus.nix
     ../../modules/monitoring/grafana.nix
