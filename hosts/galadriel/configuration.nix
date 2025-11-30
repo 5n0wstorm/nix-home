@@ -306,7 +306,7 @@ in {
         group = "users";
         mode = "0644";
       };
-      
+
       "git_identity" = {
         owner = "dominik";
         group = "users";
@@ -372,13 +372,13 @@ in {
 
   # Git identity from secrets:
   programs.git.config = {
-  include = {
-    path = "/run/secrets/git_identity";
+    include = {
+      path = "/run/secrets/git_identity";
+    };
+    safe = {
+      directory = "/home/dominik/nix-home";
+    };
   };
-  safe = {
-    directory = "/home/dominik/nix-home";
-  };
-};
 
   # ============================================================================
   # SSH CONFIGURATION
