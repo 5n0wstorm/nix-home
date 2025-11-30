@@ -149,6 +149,37 @@ with lib; let
     printf "$TEAL  %-20s$RESET %s\n" "  Processes" "$PROCS"
     echo ""
 
+    # SMART Drive Information
+    printf "$BLUE$BOLD  ━━━ SMART Status ━━━$RESET\n"
+    echo ""
+
+    # Get list of drives (excluding partitions)
+    for drive in $(ls /dev/sd* /dev/nvme* 2>/dev/null | grep -E '(/dev/sd[a-z]$|/dev/nvme[0-9]+n[0-9]+$)'); do
+      if [ -b "$drive" ]; then
+        # Get SMART health status
+        if smartctl -H "$drive" &>/dev/null; then
+          HEALTH=$(smartctl -H "$drive" | grep -i "overall-health" | awk '{print $NF}')
+          TEMP=$(smartctl -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
+          MODEL=$(smartctl -i "$drive" | grep "Device Model" | cut -d: -f2 | xargs)
+
+          if [ "$HEALTH" = "PASSED" ]; then
+            printf "$GREEN  ● $RESET%-45s $GREEN[OK]$RESET" "$drive ($MODEL)"
+          elif [ "$HEALTH" = "FAILED" ]; then
+            printf "$RED  ● $RESET%-45s $RED[FAILED]$RESET" "$drive ($MODEL)"
+          else
+            printf "$YELLOW  ● $RESET%-45s $YELLOW[UNKNOWN]$RESET" "$drive ($MODEL)"
+          fi
+
+          if [ -n "$TEMP" ] && [ "$TEMP" != "-" ]; then
+            printf " %s°C\n" "$TEMP"
+          else
+            printf "\n"
+          fi
+        fi
+      fi
+    done
+    echo ""
+
     ${optionalString (fleetServices != []) ''
       # Service Status
       printf "$BLUE$BOLD  ━━━ Fleet Services ━━━$RESET\n"
@@ -210,8 +241,8 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
-    # Install the MOTD script
-    environment.systemPackages = [motdScript];
+    # Install the MOTD script and required tools
+    environment.systemPackages = [motdScript] ++ [pkgs.smartmontools];
 
     # Disable the default NixOS MOTD (empty string disables it)
     users.motd = "";
