@@ -467,7 +467,7 @@ in {
         };
 
         log = {
-          level = "debug";
+          level = "info";
           format = "text";
         };
 
