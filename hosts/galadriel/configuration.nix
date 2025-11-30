@@ -556,10 +556,10 @@ in {
 
   # ============================================================================
 
-  # Network interface - enp3s0f1 confirmed via `ip link` on Proxmox host
+  # Network interface
   networking = {
     useDHCP = false;
-    interfaces.enp3s0f1 = {
+    interfaces.nic0 = {
       useDHCP = false;
       ipv4.addresses = [
         {
