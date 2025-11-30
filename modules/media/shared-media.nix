@@ -133,21 +133,24 @@ in {
     # Set the media group for services that support it directly
     # --------------------------------------------------------------------------
 
-    services.sonarr.group = mkIf config.services.sonarr.enable cfg.group;
-    services.radarr.group = mkIf config.services.radarr.enable cfg.group;
-    services.lidarr.group = mkIf config.services.lidarr.enable cfg.group;
-    services.readarr.group = mkIf config.services.readarr.enable cfg.group;
-    services.bazarr.group = mkIf config.services.bazarr.enable cfg.group;
-    services.jellyfin.group = mkIf config.services.jellyfin.enable cfg.group;
-    services.sabnzbd.group = mkIf config.services.sabnzbd.enable cfg.group;
+    services.sonarr.group = mkIf (config.services.sonarr.enable or false) cfg.group;
+    services.radarr.group = mkIf (config.services.radarr.enable or false) cfg.group;
+    services.lidarr.group = mkIf (config.services.lidarr.enable or false) cfg.group;
+    services.readarr.group = mkIf (config.services.readarr.enable or false) cfg.group;
+    services.bazarr.group = mkIf (config.services.bazarr.enable or false) cfg.group;
+    services.jellyfin.group = mkIf (config.services.jellyfin.enable or false) cfg.group;
+    services.sabnzbd.group = mkIf (config.services.sabnzbd.enable or false) cfg.group;
 
     # --------------------------------------------------------------------------
     # SYSTEMD SUPPLEMENTARY GROUPS
     # For services that use DynamicUser or don't have a group option
     # --------------------------------------------------------------------------
 
-    systemd.services.prowlarr.serviceConfig.SupplementaryGroups = mkIf config.services.prowlarr.enable [cfg.group];
-    systemd.services.transmission.serviceConfig.SupplementaryGroups = mkIf config.services.transmission.enable [cfg.group];
+    systemd.services.prowlarr.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.prowlarr.enable or false) [cfg.group];
+    
+    systemd.services.transmission.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.transmission.enable or false) [cfg.group];
 
     # --------------------------------------------------------------------------
     # DIRECTORY STRUCTURE
