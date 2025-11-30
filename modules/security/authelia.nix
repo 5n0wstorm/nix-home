@@ -457,17 +457,19 @@ in {
               # ForwardAuth returns 302 redirects (for Traefik/Caddy)
               forward-auth = {
                 implementation = "ForwardAuth";
+                authelia_url = "https://${cfg.domain}";
               };
               # AuthRequest returns 401 status codes (for nginx auth_request)
               auth-request = {
                 implementation = "AuthRequest";
+                authelia_url = "https://${cfg.domain}";
               };
             };
           };
         };
 
         log = {
-          level = "info";
+          level = "debug";
           format = "text";
         };
 
