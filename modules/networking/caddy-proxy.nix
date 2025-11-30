@@ -156,7 +156,7 @@ in {
       ${domain} {
         ${optionalString useAcmeTLS ''
         tls ${acmeCfg.certPath} ${acmeCfg.keyPath}
-        ''}
+      ''}
         ${optionalString needsAuth autheliaSnippet}
         reverse_proxy ${upstream}
         ${routeConfig.extraConfig}
@@ -177,7 +177,7 @@ in {
       ${domain} {
         ${optionalString useAcmeTLS ''
         tls ${acmeCfg.certPath} ${acmeCfg.keyPath}
-        ''}
+      ''}
         ${optionalString needsAuth autheliaSnippet}
         reverse_proxy ${upstream}
         ${extraConfig}
@@ -208,13 +208,13 @@ in {
       }
 
       ${optionalString useAuthelia ''
-      # Authelia forward_auth snippet (can be imported)
-      (authelia) {
-        forward_auth localhost:${toString authCfg.port} {
-          uri /api/authz/forward-auth
-          copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+        # Authelia forward_auth snippet (can be imported)
+        (authelia) {
+          forward_auth localhost:${toString authCfg.port} {
+            uri /api/authz/forward-auth
+            copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+          }
         }
-      }
       ''}
 
       # Routes from manual configuration
@@ -277,4 +277,3 @@ in {
       ];
     };
 }
-
