@@ -368,7 +368,7 @@ in {
                   # Setup user: ${userName} for database: ${dbCfg.name}
                   if [ -f "${userCfg.passwordFile}" ]; then
                     PASSWORD=$(cat "${userCfg.passwordFile}")
-                    mysql -u root <<EOF
+                    mariadb -u root <<EOF
                   CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
                   ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
                   GRANT ${userCfg.permissions} ON ${dbCfg.name}.* TO '${userName}'@'${userCfg.host}';
@@ -387,7 +387,7 @@ in {
       in ''
         # Wait for MySQL to be ready
         for i in {1..30}; do
-          if mysql -u root -e "SELECT 1" &>/dev/null; then
+          if mariadb -u root -e "SELECT 1" &>/dev/null; then
             break
           fi
           echo "Waiting for MySQL to be ready..."
@@ -405,5 +405,8 @@ in {
     # ----------------------------------------------------------------------------
 
     networking.firewall.allowedTCPPorts = mkIf (cfg.bindAddress != "127.0.0.1") [cfg.port];
+
+    # Add MariaDB client tools for database management
+    environment.systemPackages = [cfg.package];
   };
 }
