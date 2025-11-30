@@ -107,21 +107,19 @@ in {
   fleet.media.shared = {
     enable = true;
     baseDir = "/data";
-    # Directory structure (TRaSH-guide recommended):
-    # /media/
+    # Directory structure:
+    # /data/
     # ├── torrents/
-    # │   ├── books/
-    # │   ├── movies/
-    # │   ├── music/
-    # │   └── tv/
+    # │   ├── incomplete/   <- qBittorrent temp path
+    # │   └── complete/     <- qBittorrent save path (Sonarr/Radarr imports from here)
     # ├── usenet/
-    # │   ├── incomplete/
-    # │   └── complete/
+    # │   ├── incomplete/   <- SABnzbd temp path
+    # │   └── complete/     <- SABnzbd complete path (per-category)
     # │       ├── books/
     # │       ├── movies/
     # │       ├── music/
     # │       └── tv/
-    # └── media/          <- Final library (Jellyfin/Plex points here)
+    # └── media/            <- Final library (Jellyfin/arr apps point here)
     #     ├── books/
     #     ├── movies/
     #     ├── music/
@@ -136,7 +134,7 @@ in {
   fleet.media.jellyfin = {
     enable = true;
     domain = "jellyfin.sn0wstorm.com";
-    # Uses default: sharedCfg.paths.media.root (/media/media)
+    # Uses default: sharedCfg.paths.media.root (/data/media)
   };
 
   # Sonarr - TV series management
@@ -205,7 +203,7 @@ in {
     enable = true;
     domain = "qbittorrent.sn0wstorm.com";
     port = 9000;
-    # Uses default: sharedCfg.paths.torrents.root (/media/torrents)
+    # Uses default: sharedCfg.paths.torrents.complete (/data/torrents/complete)
 
     # Route ALL torrent traffic through PIA VPN
     vpn = {
@@ -226,7 +224,7 @@ in {
   fleet.media.navidrome = {
     enable = true;
     domain = "navidrome.sn0wstorm.com";
-    # Uses default: sharedCfg.paths.media.music (/media/media/music)
+    # Uses default: sharedCfg.paths.media.music (/data/media/music)
   };
 
   # ============================================================================

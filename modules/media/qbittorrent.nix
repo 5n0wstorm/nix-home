@@ -45,9 +45,9 @@ in {
       type = types.str;
       default =
         if sharedCfg.enable
-        then sharedCfg.paths.torrents.root
-        else "/data/torrents";
-      description = "Download directory for qBittorrent (defaults to shared torrents path)";
+        then sharedCfg.paths.torrents.complete
+        else "/data/torrents/complete";
+      description = "Download directory for qBittorrent (defaults to shared torrents complete path)";
     };
 
     user = mkOption {
@@ -265,16 +265,16 @@ in {
 
     # --------------------------------------------------------------------------
     # QBITTORRENT CONFIG SETUP SERVICE
-    # Pre-configures download paths and categories for arr stack integration
+    # Pre-configures download paths for arr stack integration
     # --------------------------------------------------------------------------
 
     systemd.services.qbittorrent-config = mkIf cfg.vpn.enable {
-      description = "Setup qBittorrent download paths and categories";
+      description = "Setup qBittorrent download paths";
       before = ["podman-qbittorrent.service"];
       requiredBy = ["podman-qbittorrent.service"];
       wantedBy = ["multi-user.target"];
 
-      path = [pkgs.coreutils pkgs.jq];
+      path = [pkgs.coreutils];
 
       serviceConfig = {
         Type = "oneshot";
@@ -287,45 +287,26 @@ in {
         CONFIG_DIR="${cfg.dataDir}/qBittorrent"
         mkdir -p "$CONFIG_DIR"
 
-        # Create categories.json for arr stack integration
-        # These paths are INSIDE the container where /data is mounted
-        cat > "$CONFIG_DIR/categories.json" << 'EOF'
-        {
-          "books": {
-            "save_path": "/data/torrents/books"
-          },
-          "movies": {
-            "save_path": "/data/torrents/movies"
-          },
-          "music": {
-            "save_path": "/data/torrents/music"
-          },
-          "tv": {
-            "save_path": "/data/torrents/tv"
-          }
-        }
-        EOF
-
         # Only create qBittorrent.conf if it doesn't exist (preserve user settings)
         if [ ! -f "$CONFIG_DIR/qBittorrent.conf" ]; then
           cat > "$CONFIG_DIR/qBittorrent.conf" << 'EOF'
         [BitTorrent]
-        Session\DefaultSavePath=/data/torrents
-        Session\TempPath=/data/torrents
-        Session\TempPathEnabled=false
+        Session\DefaultSavePath=/data/torrents/complete
+        Session\TempPath=/data/torrents/incomplete
+        Session\TempPathEnabled=true
 
         [Preferences]
-        Downloads\SavePath=/data/torrents
-        Downloads\TempPath=/data/torrents
-        Downloads\TempPathEnabled=false
+        Downloads\SavePath=/data/torrents/complete
+        Downloads\TempPath=/data/torrents/incomplete
+        Downloads\TempPathEnabled=true
         WebUI\Port=8080
         EOF
-          echo "Created initial qBittorrent.conf"
+          echo "Created initial qBittorrent.conf with incomplete/complete paths"
         else
           echo "qBittorrent.conf already exists, skipping (preserving user settings)"
         fi
 
-        echo "qBittorrent categories configured for arr stack"
+        echo "qBittorrent configured for arr stack"
       '';
     };
 
