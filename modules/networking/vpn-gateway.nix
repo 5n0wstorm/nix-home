@@ -170,7 +170,6 @@ in {
 
     systemd.tmpfiles.rules = [
       "d /var/lib/gluetun 0755 root root -"
-      "d /run/gluetun 0700 root root -"
     ];
 
     # --------------------------------------------------------------------------
@@ -183,10 +182,14 @@ in {
       before = ["podman-${cfg.containerName}.service"];
       requiredBy = ["podman-${cfg.containerName}.service"];
       after = ["sops-nix.service"];
+      wantedBy = ["multi-user.target"];
 
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
+        # Use RuntimeDirectory for proper /run handling
+        RuntimeDirectory = "gluetun";
+        RuntimeDirectoryMode = "0700";
       };
 
       script = ''
@@ -194,14 +197,12 @@ in {
         USERNAME=$(cat ${cfg.pia.usernameFile} | tr -d '[:space:]')
         PASSWORD=$(cat ${cfg.pia.passwordFile} | tr -d '[:space:]')
 
-        # Create environment file for Gluetun
-        cat > /run/gluetun/credentials.env << EOF
-        OPENVPN_USER=$USERNAME
-        OPENVPN_PASSWORD=$PASSWORD
-        EOF
+        # Create environment file for Gluetun (RuntimeDirectory creates /run/gluetun)
+        echo "OPENVPN_USER=$USERNAME" > /run/gluetun/credentials.env
+        echo "OPENVPN_PASSWORD=$PASSWORD" >> /run/gluetun/credentials.env
 
         chmod 400 /run/gluetun/credentials.env
-        echo "Gluetun credentials prepared"
+        echo "Gluetun credentials prepared at /run/gluetun/credentials.env"
       '';
     };
 
