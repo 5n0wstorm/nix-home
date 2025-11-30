@@ -159,23 +159,27 @@ with lib; let
       # echo "Checking drive: $drive" >&2
       if [ -b "$drive" ]; then
         # Get SMART health status - try different options for different drive types
+        SMART_CMD=""
         if echo "$drive" | grep -q "^/dev/nvme"; then
           # NVMe drives - try with nvme device type first, then fallback to auto
           if smartctl -d nvme -H "$drive" &>/dev/null; then
             SMART_CMD="smartctl -d nvme"
           elif smartctl -H "$drive" &>/dev/null; then
             SMART_CMD="smartctl"
-          else
-            continue  # Skip this drive if SMART doesn't work
           fi
         else
           # SATA drives use default
-          SMART_CMD="smartctl"
-          if ! $SMART_CMD -H "$drive" &>/dev/null; then
-            continue  # Skip this drive if SMART doesn't work
+          if smartctl -H "$drive" &>/dev/null; then
+            SMART_CMD="smartctl"
           fi
         fi
-          HEALTH=$($SMART_CMD -H "$drive" | grep -i "overall-health" | awk '{print $NF}')
+
+        # Skip drive if SMART doesn't work
+        if [ -z "$SMART_CMD" ]; then
+          continue
+        fi
+
+        HEALTH=$($SMART_CMD -H "$drive" | grep -i "overall-health" | awk '{print $NF}')
           TEMP=$($SMART_CMD -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
           MODEL=$($SMART_CMD -i "$drive" | grep -E "(Device Model|Model Number|Model)" | head -1 | cut -d: -f2- | sed 's/^[[:space:]]*//' | xargs)
 
@@ -318,3 +322,4 @@ in {
     '';
   };
 }
+
