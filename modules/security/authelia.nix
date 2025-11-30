@@ -509,17 +509,17 @@ in {
           name = "authelia_session";
           cookies = [
             ({
-              domain = cfg.sessionDomain;
-              authelia_url = "https://${cfg.domain}";
-              same_site = "lax";
-              expiration = cfg.sessionExpiration;
-              inactivity = cfg.sessionInactivity;
-              remember_me = cfg.rememberMeDuration;
-            }
-            # Only add default_redirection_url if explicitly set and different from authelia_url
-            // (lib.optionalAttrs (cfg.defaultRedirectionUrl != null) {
-              default_redirection_url = cfg.defaultRedirectionUrl;
-            }))
+                domain = cfg.sessionDomain;
+                authelia_url = "https://${cfg.domain}";
+                same_site = "lax";
+                expiration = cfg.sessionExpiration;
+                inactivity = cfg.sessionInactivity;
+                remember_me = cfg.rememberMeDuration;
+              }
+              # Only add default_redirection_url if explicitly set and different from authelia_url
+              // (lib.optionalAttrs (cfg.defaultRedirectionUrl != null) {
+                default_redirection_url = cfg.defaultRedirectionUrl;
+              }))
           ];
         };
 
