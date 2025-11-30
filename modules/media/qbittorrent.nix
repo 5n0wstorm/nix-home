@@ -340,8 +340,8 @@ in {
         }
 
         while true; do
-          # Get the forwarded port from gluetun control server
-          FORWARDED_PORT=$(curl -s "http://localhost:${toString vpnCfg.ports.control}/v1/openvpn/portforwarded" 2>/dev/null | jq -r '.port // empty')
+          # Get the forwarded port from gluetun control server (-L follows redirects)
+          FORWARDED_PORT=$(curl -sL "http://localhost:${toString vpnCfg.ports.control}/v1/openvpn/portforwarded" 2>/dev/null | jq -r '.port // empty')
 
           if [ -n "$FORWARDED_PORT" ] && [ "$FORWARDED_PORT" != "0" ] && [ "$FORWARDED_PORT" != "null" ]; then
             echo "VPN forwarded port: $FORWARDED_PORT"

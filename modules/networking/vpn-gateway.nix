@@ -333,8 +333,8 @@ in {
           # Wait for gluetun to be ready
           sleep 30
 
-          # Get the forwarded port from gluetun control server
-          PORT=$(curl -s http://localhost:${toString cfg.ports.control}/v1/openvpn/portforwarded 2>/dev/null | jq -r '.port // empty')
+          # Get the forwarded port from gluetun control server (-L follows redirects)
+          PORT=$(curl -sL "http://localhost:${toString cfg.ports.control}/v1/openvpn/portforwarded" 2>/dev/null | jq -r '.port // empty')
 
           if [ -n "$PORT" ] && [ "$PORT" != "0" ]; then
             echo "$PORT" > ${cfg.portForwardingStatusPath}
