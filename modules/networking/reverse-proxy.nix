@@ -138,15 +138,14 @@ in {
     useAuthelia = cfg.enableAuthelia && authCfg.enable;
 
     # Authelia nginx snippets for forward auth
+    # Using AuthRequest endpoint - returns 401 on failure, we handle redirect
     autheliaAuthSnippet = ''
-      # Authelia forward authentication using ForwardAuth endpoint
-      # This endpoint returns 302 with proper redirect handling
-      auth_request /authelia-forward;
+      # Authelia forward authentication
+      auth_request /authelia;
       auth_request_set $user $upstream_http_remote_user;
       auth_request_set $groups $upstream_http_remote_groups;
       auth_request_set $name $upstream_http_remote_name;
       auth_request_set $email $upstream_http_remote_email;
-      auth_request_set $authelia_redirect $upstream_http_location;
 
       # Pass authentication info to backend
       proxy_set_header Remote-User $user;
@@ -154,18 +153,19 @@ in {
       proxy_set_header Remote-Name $name;
       proxy_set_header Remote-Email $email;
 
-      # Error handling - if Authelia returns 401, use the redirect URL from Authelia
-      error_page 401 =302 $authelia_redirect;
+      # Error handling - redirect to Authelia on 401
+      # Authelia will read X-Original-URL from its session/headers
+      error_page 401 =302 https://${authCfg.domain}/?rd=$scheme://$http_host$request_uri;
 
       # Ensure the session cookie is forwarded properly
       proxy_set_header Cookie $http_cookie;
     '';
 
     # Authelia location blocks for each virtual host
-    # Uses ForwardAuth endpoint which returns proper redirect Location header
+    # Uses AuthRequest endpoint which returns 401 on auth failure
     autheliaLocations = {
-      "/authelia-forward" = {
-        proxyPass = "http://127.0.0.1:${toString authCfg.port}/api/authz/forward-auth";
+      "/authelia" = {
+        proxyPass = "http://127.0.0.1:${toString authCfg.port}/api/authz/auth-request";
         extraConfig = ''
           internal;
           proxy_pass_request_body off;
