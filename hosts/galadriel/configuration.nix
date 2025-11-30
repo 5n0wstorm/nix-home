@@ -373,7 +373,7 @@ in {
     # Global path bypasses (regex patterns)
     bypassPaths = [
       "^/\\.well-known/.*"
-      "^/signalr/.*"  # Bypass signalr websocket connections (arr apps)
+      "^/signalr/.*" # Bypass signalr websocket connections (arr apps)
     ];
 
     # Brute force protection
