@@ -504,22 +504,23 @@ in {
         };
 
         # Session configuration
+        # Note: In Authelia 4.38+, expiration/inactivity/remember_me must be inside each cookie
         session = {
           name = "authelia_session";
           cookies = [
             {
               domain = cfg.sessionDomain;
-
+              authelia_url = "https://${cfg.domain}";
               same_site = "lax";
               default_redirection_url =
                 if cfg.defaultRedirectionUrl != null
                 then cfg.defaultRedirectionUrl
                 else "https://${cfg.domain}";
+              expiration = cfg.sessionExpiration;
+              inactivity = cfg.sessionInactivity;
+              remember_me = cfg.rememberMeDuration;
             }
           ];
-          expiration = cfg.sessionExpiration;
-          inactivity = cfg.sessionInactivity;
-          remember_me = cfg.rememberMeDuration;
         };
 
         storage =
