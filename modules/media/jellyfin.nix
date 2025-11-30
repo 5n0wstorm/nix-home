@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 with lib; let
@@ -160,6 +161,21 @@ in {
       enable = true;
       openFirewall = cfg.openFirewall;
       dataDir = cfg.dataDir;
+    };
+
+    # --------------------------------------------------------------------------
+    # FONT CONFIGURATION FOR SUBTITLE RENDERING
+    # --------------------------------------------------------------------------
+    fonts.packages = with pkgs; [
+      noto-fonts
+      noto-fonts-cjk-sans
+      noto-fonts-emoji
+      liberation_ttf
+      dejavu_fonts
+    ];
+
+    systemd.services.jellyfin.environment = {
+      FONTCONFIG_PATH = "/etc/fonts";
     };
 
     # --------------------------------------------------------------------------
