@@ -159,11 +159,8 @@ in {
       category = cfg.homepage.category;
       widget = {
         type = "qbittorrent";
-        # When using VPN, qBittorrent runs inside gluetun container
-        url =
-          if cfg.vpn.enable
-          then "http://localhost:${toString vpnCfg.ports.webui}"
-          else "http://localhost:${toString cfg.port}";
+        # Use public URL for consistent access (localhost from container network has issues)
+        url = "https://${cfg.domain}";
         fields = ["leech" "download" "seed" "upload"];
       };
     };
@@ -331,7 +328,8 @@ in {
         # Wait for qBittorrent to be ready
         sleep 90
 
-        QB_HOST="http://localhost:${toString vpnCfg.ports.webui}"
+        # Use public URL - localhost connections from container network get 401
+        QB_HOST="https://${cfg.domain}"
         QB_USER="${cfg.vpn.apiUsername}"
         QB_PASS_FILE="${cfg.vpn.apiPasswordFile}"
         COOKIE_FILE="/tmp/qb_cookie_$$"
