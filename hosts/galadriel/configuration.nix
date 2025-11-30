@@ -41,6 +41,7 @@ in {
     ../../modules/media/transmission.nix
     ../../modules/media/sabnzbd.nix
     ../../modules/media/navidrome.nix
+    ../../modules/media/configarr.nix
   ];
 
   # ============================================================================
@@ -225,6 +226,24 @@ in {
     enable = true;
     domain = "navidrome.sn0wstorm.com";
     # Uses default: sharedCfg.paths.media.music (/data/media/music)
+  };
+
+  # Configarr - TRaSH Guides configuration sync
+  fleet.media.configarr = {
+    enable = true;
+    schedule = "daily";  # Sync once per day
+
+    sonarr = {
+      enable = true;
+      url = "http://localhost:8989";
+      apiKeyFile = "/run/secrets/sonarr/api-key";
+    };
+
+    radarr = {
+      enable = true;
+      url = "http://localhost:7878";
+      apiKeyFile = "/run/secrets/radarr/api-key";
+    };
   };
 
   # ============================================================================
@@ -614,6 +633,20 @@ in {
       "mysql/mama_spirit" = {
         owner = "mysql";
         group = "mysql";
+        mode = "0400";
+      };
+
+      # Sonarr API key for Configarr
+      "sonarr/api-key" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+
+      # Radarr API key for Configarr
+      "radarr/api-key" = {
+        owner = "root";
+        group = "root";
         mode = "0400";
       };
     };
