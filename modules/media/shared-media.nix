@@ -133,13 +133,15 @@ in {
     # Set the media group for services that support it directly
     # --------------------------------------------------------------------------
 
-    services.sonarr.group = mkIf (config.services.sonarr.enable or false) cfg.group;
-    services.radarr.group = mkIf (config.services.radarr.enable or false) cfg.group;
-    services.lidarr.group = mkIf (config.services.lidarr.enable or false) cfg.group;
-    services.readarr.group = mkIf (config.services.readarr.enable or false) cfg.group;
-    services.bazarr.group = mkIf (config.services.bazarr.enable or false) cfg.group;
-    services.jellyfin.group = mkIf (config.services.jellyfin.enable or false) cfg.group;
-    services.sabnzbd.group = mkIf (config.services.sabnzbd.enable or false) cfg.group;
+    # Use mkForce to ensure media group is used for all services
+    # This allows hardlinks between downloads and library directories
+    services.sonarr.group = mkIf (config.services.sonarr.enable or false) (mkForce cfg.group);
+    services.radarr.group = mkIf (config.services.radarr.enable or false) (mkForce cfg.group);
+    services.lidarr.group = mkIf (config.services.lidarr.enable or false) (mkForce cfg.group);
+    services.readarr.group = mkIf (config.services.readarr.enable or false) (mkForce cfg.group);
+    services.bazarr.group = mkIf (config.services.bazarr.enable or false) (mkForce cfg.group);
+    services.jellyfin.group = mkIf (config.services.jellyfin.enable or false) (mkForce cfg.group);
+    services.sabnzbd.group = mkIf (config.services.sabnzbd.enable or false) (mkForce cfg.group);
 
     # --------------------------------------------------------------------------
     # SYSTEMD SUPPLEMENTARY GROUPS
