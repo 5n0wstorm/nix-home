@@ -230,39 +230,6 @@ in {
       readOnly = true;
       description = "Computed database connection information for services";
     };
-
-    # Homepage integration
-    homepage = {
-      enable = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Register this service with the homepage dashboard";
-      };
-
-      name = mkOption {
-        type = types.str;
-        default = "MySQL";
-        description = "Display name on homepage";
-      };
-
-      description = mkOption {
-        type = types.str;
-        default = "Database Server";
-        description = "Description shown on homepage";
-      };
-
-      icon = mkOption {
-        type = types.str;
-        default = "si-mysql";
-        description = "Icon for homepage";
-      };
-
-      category = mkOption {
-        type = types.enum ["Apps" "Dev" "Monitoring" "Infrastructure" "Media" "Services"];
-        default = "Infrastructure";
-        description = "Category on the homepage dashboard";
-      };
-    };
   };
 
   # ============================================================================
@@ -311,18 +278,6 @@ in {
         '';
       }
     ];
-
-    # ----------------------------------------------------------------------------
-    # HOMEPAGE DASHBOARD REGISTRATION
-    # ----------------------------------------------------------------------------
-
-    fleet.apps.homepage.serviceRegistry.mysql = mkIf cfg.homepage.enable {
-      name = cfg.homepage.name;
-      description = cfg.homepage.description;
-      icon = cfg.homepage.icon;
-      # MySQL doesn't have a web interface, so no href
-      category = cfg.homepage.category;
-    };
 
     # ----------------------------------------------------------------------------
     # MYSQL SERVICE CONFIGURATION
