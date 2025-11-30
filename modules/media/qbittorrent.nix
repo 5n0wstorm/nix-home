@@ -243,7 +243,11 @@ in {
         # Mount downloads directory to /downloads (qBittorrent default path)
         "${cfg.downloadDir}:/downloads"
         # Mount full media directory for hardlinks/moves to library folders
-        "${if sharedCfg.enable then sharedCfg.baseDir else cfg.downloadDir}:/media"
+        "${
+          if sharedCfg.enable
+          then sharedCfg.baseDir
+          else cfg.downloadDir
+        }:/media"
       ];
 
       # Use gluetun's network namespace - ALL traffic goes through VPN
