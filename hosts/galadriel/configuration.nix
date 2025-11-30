@@ -304,7 +304,7 @@ in {
     enable = true;
     domain = "auth.sn0wstorm.com";
     theme = "light";
-    defaultRedirectionUrl = "https://auth.sn0wstorm.com/";
+    defaultRedirectionUrl = "https://home.sn0wstorm.com/";
 
     # Default policy - deny, with explicit rules for access
     defaultPolicy = "deny";
@@ -398,8 +398,8 @@ in {
 
     # Session settings (from Docker config)
     sessionDomain = "sn0wstorm.com";
-    sessionExpiration = "1h";
-    sessionInactivity = "5m";
+    sessionExpiration = "12h";
+    sessionInactivity = "1h";
     rememberMeDuration = "1M";
 
     usersFile = "/run/secrets/authelia/users";
