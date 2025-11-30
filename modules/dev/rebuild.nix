@@ -164,9 +164,40 @@ with lib;
             exit 1
         fi
 
+        # State file to track last deployed commit per host
+        STATE_DIR="/var/lib/nixos-rebuild"
+        STATE_FILE="$STATE_DIR/$HOSTNAME-last-deployed"
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+
         # Check for changes (unless force rebuild is enabled)
         if [ "$FORCE_REBUILD" = false ]; then
-            if git diff --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"; then
+            NEEDS_REBUILD=false
+
+            # Check 1: Uncommitted local changes in config files
+            if ! git diff --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null; then
+                echo "Uncommitted local changes detected."
+                NEEDS_REBUILD=true
+            fi
+
+            # Check 2: Staged but uncommitted changes
+            if ! git diff --cached --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null; then
+                echo "Staged changes detected."
+                NEEDS_REBUILD=true
+            fi
+
+            # Check 3: Current commit differs from last deployed commit
+            if [ -f "$STATE_FILE" ]; then
+                LAST_DEPLOYED=$(cat "$STATE_FILE")
+                if [ "$CURRENT_COMMIT" != "$LAST_DEPLOYED" ]; then
+                    echo "New commits detected since last deploy (last: ''${LAST_DEPLOYED:0:8}, current: ''${CURRENT_COMMIT:0:8})."
+                    NEEDS_REBUILD=true
+                fi
+            else
+                echo "No previous deploy recorded for $HOSTNAME - first deploy or state was cleared."
+                NEEDS_REBUILD=true
+            fi
+
+            if [ "$NEEDS_REBUILD" = false ]; then
                 echo "No changes detected in configuration files, exiting."
                 echo "Use --force or -f to rebuild anyway."
                 exit 0
@@ -177,7 +208,16 @@ with lib;
             echo "Force rebuilding - skipping change analysis"
         else
             echo "Analysing changes..."
-            git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix"
+            # Show uncommitted changes
+            git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null || true
+            # Show changes since last deploy
+            if [ -f "$STATE_FILE" ]; then
+                LAST_DEPLOYED=$(cat "$STATE_FILE")
+                if [ "$CURRENT_COMMIT" != "$LAST_DEPLOYED" ]; then
+                    echo "Commits since last deploy:"
+                    git log --oneline "$LAST_DEPLOYED".."$CURRENT_COMMIT" -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null || true
+                fi
+            fi
         fi
 
         echo "Rebuilding NixOS..."
@@ -188,6 +228,11 @@ with lib;
         nh os switch . -H "$HOSTNAME"
 
         echo "NixOS Rebuild Completed!"
+
+        # Record the deployed commit for future change detection
+        sudo mkdir -p "$STATE_DIR"
+        echo "$CURRENT_COMMIT" | sudo tee "$STATE_FILE" > /dev/null
+        echo "Recorded deploy commit: ''${CURRENT_COMMIT:0:8}"
 
         # Get current generation info
         current=$(nixos-rebuild list-generations --json | ${pkgs.jq}/bin/jq -r '.[] | select(.current == true) | .generation')
