@@ -219,7 +219,7 @@ in {
   fleet.media.navidrome = {
     enable = true;
     domain = "navidrome.sn0wstorm.com";
-    musicFolder = config.fleet.media.shared.paths.music;
+    # Uses default: sharedCfg.paths.media.music (/data/media/music)
   };
 
   # ============================================================================
