@@ -131,9 +131,7 @@ in {
         "fleet.reverse-proxy.ssl" = "true";
         "fleet.reverse-proxy.websockets" = "true";
         "fleet.reverse-proxy.extra-config" = ''
-          request_body {
-            max_size 525MB
-          }
+          client_max_body_size 525M;
         '';
         # Vaultwarden handles its own authentication
         "fleet.authelia.bypass" = "true";

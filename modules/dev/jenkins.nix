@@ -89,9 +89,9 @@ in {
         "fleet.reverse-proxy.ssl" = "true";
         "fleet.reverse-proxy.websockets" = "true";
         "fleet.reverse-proxy.extra-config" = ''
-          request_body {
-            max_size 500MB
-          }
+          client_max_body_size 500M;
+          proxy_read_timeout 300;
+          proxy_send_timeout 300;
         '';
       };
     };
