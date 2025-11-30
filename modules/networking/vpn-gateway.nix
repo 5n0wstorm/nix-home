@@ -90,6 +90,27 @@ in {
       description = "Name of the Gluetun container";
     };
 
+    # Port mappings for services routed through VPN
+    ports = {
+      webui = mkOption {
+        type = types.port;
+        default = 8088;
+        description = "Port for qBittorrent web UI (exposed through VPN)";
+      };
+
+      torrent = mkOption {
+        type = types.port;
+        default = 6881;
+        description = "Port for BitTorrent connections";
+      };
+
+      control = mkOption {
+        type = types.port;
+        default = 8000;
+        description = "Port for Gluetun control server";
+      };
+    };
+
     # Port forwarding output (for dependent services)
     portForwardingStatusPath = mkOption {
       type = types.str;
