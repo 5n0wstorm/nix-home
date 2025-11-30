@@ -233,6 +233,37 @@ in {
     };
 
     # --------------------------------------------------------------------------
+    # QBITTORRENT CREDENTIALS PREPARATION SERVICE
+    # Creates environment file with WebUI password from secrets
+    # --------------------------------------------------------------------------
+
+    systemd.services.qbittorrent-credentials = mkIf (cfg.vpn.enable && cfg.vpn.apiPasswordFile != null) {
+      description = "Prepare qBittorrent WebUI credentials from secrets";
+      before = ["podman-qbittorrent.service"];
+      requiredBy = ["podman-qbittorrent.service"];
+      wantedBy = ["multi-user.target"];
+
+      path = [pkgs.coreutils];
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+
+      script = ''
+        # Read password from secrets
+        PASSWORD=$(cat ${cfg.vpn.apiPasswordFile} | tr -d '[:space:]')
+
+        # Create environment file for qBittorrent container
+        echo "WEBUI_USERNAME=${cfg.vpn.apiUsername}" > ${cfg.dataDir}/credentials.env
+        echo "WEBUI_PASSWORD=$PASSWORD" >> ${cfg.dataDir}/credentials.env
+
+        chmod 400 ${cfg.dataDir}/credentials.env
+        echo "qBittorrent credentials prepared at ${cfg.dataDir}/credentials.env"
+      '';
+    };
+
+    # --------------------------------------------------------------------------
     # QBITTORRENT CONTAINER (VPN MODE)
     # Routes all traffic through gluetun VPN container
     # --------------------------------------------------------------------------
@@ -251,6 +282,11 @@ in {
         TZ = "America/New_York";
         WEBUI_PORT = "8080";
       };
+
+      # Load WebUI credentials from environment file (created by qbittorrent-credentials service)
+      environmentFiles = mkIf (cfg.vpn.apiPasswordFile != null) [
+        "${cfg.dataDir}/credentials.env"
+      ];
 
       volumes = [
         "${cfg.dataDir}:/config"
