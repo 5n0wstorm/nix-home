@@ -306,6 +306,24 @@ in {
         }
         trap cleanup EXIT
 
+        # URL encode a string (for special characters in password)
+        urlencode() {
+          local string="$1"
+          local strlen=''${#string}
+          local encoded=""
+          local pos c o
+
+          for (( pos=0 ; pos<strlen ; pos++ )); do
+            c=''${string:$pos:1}
+            case "$c" in
+              [-_.~a-zA-Z0-9] ) o="$c" ;;
+              * ) printf -v o '%%%02X' "'$c" ;;
+            esac
+            encoded+="$o"
+          done
+          echo "$encoded"
+        }
+
         # Function to authenticate with qBittorrent
         qb_login() {
           if [ ! -f "$QB_PASS_FILE" ]; then
@@ -313,9 +331,10 @@ in {
             return 1
           fi
           QB_PASS=$(cat "$QB_PASS_FILE" | tr -d '[:space:]')
+          QB_PASS_ENCODED=$(urlencode "$QB_PASS")
 
           RESPONSE=$(curl -s -c "$COOKIE_FILE" -X POST "$QB_HOST/api/v2/auth/login" \
-            -d "username=$QB_USER&password=$QB_PASS" 2>/dev/null)
+            -d "username=$QB_USER&password=$QB_PASS_ENCODED" 2>/dev/null)
 
           if [ "$RESPONSE" = "Ok." ]; then
             echo "Successfully authenticated with qBittorrent"
