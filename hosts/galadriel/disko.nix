@@ -2,17 +2,16 @@
 # DISKO CONFIGURATION - Declarative disk partitioning for galadriel
 # ============================================================================
 #
-# NVMe disk with LVM layout:
-#   /dev/nvme0n1p1 - BIOS boot partition (1MB)
-#   /dev/nvme0n1p2 - /boot ext4 (1GB)
-#   /dev/nvme0n1p3 - LVM PV (remaining space)
+# NVMe disk with UEFI + LVM layout:
+#   /dev/nvme0n1p1 - EFI System Partition (512MB, vfat, /boot)
+#   /dev/nvme0n1p2 - LVM PV (remaining space)
 #     └─ vg_galadriel
 #        ├─ lv_swap (8GB)
 #        └─ lv_root (remaining - ext4)
 #
-# To verify disk path before deployment:
-#   ssh root@192.168.2.3 lsblk
-#   ssh root@192.168.2.3 ls -la /dev/nvme*
+# Verified: UEFI boot via `ls /sys/firmware/efi`
+# Disk: /dev/nvme0n1 (476.9GB)
+# Network: enp3s0f1
 #
 {
   disko.devices = {
@@ -23,20 +22,15 @@
         content = {
           type = "gpt";
           partitions = {
-            # BIOS boot partition for GRUB (required for legacy BIOS boot)
-            boot = {
-              size = "1M";
-              type = "EF02";
-            };
-            # Separate /boot partition (outside LVM for bootloader compatibility)
+            # EFI System Partition (ESP) for UEFI boot with systemd-boot
             ESP = {
-              size = "1G";
+              size = "512M";
               type = "EF00";
               content = {
                 type = "filesystem";
                 format = "vfat";
                 mountpoint = "/boot";
-                mountOptions = ["defaults"];
+                mountOptions = ["defaults" "umask=0077"];
               };
             };
             # LVM physical volume - all remaining space
