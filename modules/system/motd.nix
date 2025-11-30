@@ -177,19 +177,32 @@ with lib; let
         fi
           HEALTH=$($SMART_CMD -H "$drive" | grep -i "overall-health" | awk '{print $NF}')
           TEMP=$($SMART_CMD -A "$drive" | grep -i temperature | head -1 | awk '{print $10}')
-          MODEL=$($SMART_CMD -i "$drive" | grep "Device Model\|Model Number" | head -1 | cut -d: -f2 | xargs)
+          MODEL=$($SMART_CMD -i "$drive" | grep -E "(Device Model|Model Number|Model)" | head -1 | cut -d: -f2- | sed 's/^[[:space:]]*//' | xargs)
 
           # Get SSD wearout information
           WEAROUT=""
-          # Check for Percentage Used Endurance Indicator (ID 233)
+          # Try multiple common SSD wearout attributes
+          # Check for Percentage Used Endurance Indicator (ID 233 - Samsung, Intel)
           USED_ENDURANCE=$($SMART_CMD -A "$drive" | grep -E "^233" | awk '{print $4}' | sed 's/^0*//')
           if [ -n "$USED_ENDURANCE" ] && [ "$USED_ENDURANCE" != "0" ]; then
             WEAROUT="$USED_ENDURANCE% used"
           else
-            # Check for Media Wearout Indicator (ID 177)
+            # Check for Media Wearout Indicator (ID 177 - Samsung)
             MEDIA_WEAR=$($SMART_CMD -A "$drive" | grep -E "^177" | awk '{print $4}' | sed 's/^0*//')
             if [ -n "$MEDIA_WEAR" ] && [ "$MEDIA_WEAR" != "0" ]; then
               WEAROUT="$MEDIA_WEAR raw"
+            else
+              # Check for Percentage Used (ID 202 - WD, some others)
+              PERCENT_USED=$($SMART_CMD -A "$drive" | grep -E "^202" | awk '{print $4}' | sed 's/^0*//')
+              if [ -n "$PERCENT_USED" ] && [ "$PERCENT_USED" != "0" ]; then
+                WEAROUT="$PERCENT_USED% used"
+              else
+                # Check for SSD Life Left (ID 169)
+                LIFE_LEFT=$($SMART_CMD -A "$drive" | grep -E "^169" | awk '{print $4}' | sed 's/^0*//')
+                if [ -n "$LIFE_LEFT" ] && [ "$LIFE_LEFT" != "0" ]; then
+                  WEAROUT="$LIFE_LEFT% left"
+                fi
+              fi
             fi
           fi
 
