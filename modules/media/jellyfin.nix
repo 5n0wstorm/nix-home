@@ -183,13 +183,11 @@ in {
       extraPackages = with pkgs; (
         if cfg.hardwareAcceleration.type == "amd"
         then [
-          # RADV (Mesa Vulkan) is enabled by default
           libva
           libvdpau-va-gl
           rocmPackages.clr
           rocmPackages.clr.icd
           vulkan-loader
-          # Required for Jellyfin's Vulkan-based subtitle overlay
           libplacebo
           shaderc
         ]
