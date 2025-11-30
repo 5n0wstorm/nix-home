@@ -656,8 +656,8 @@ in {
       description = "Prepare Authelia secrets environment file";
       before = ["authelia-main.service"];
       requiredBy = ["authelia-main.service"];
-      after = ["sops-nix.service" "mysql.service"];
-      wants = ["sops-nix.service" "mysql.service"];
+      after = ["sops-nix.service" "mysql.service" "mysql-user-setup.service"];
+      wants = ["sops-nix.service" "mysql.service" "mysql-user-setup.service"];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
