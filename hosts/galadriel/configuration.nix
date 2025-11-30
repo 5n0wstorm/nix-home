@@ -307,7 +307,11 @@ in {
         mode = "0644";
       };
       
-      "git_identity"= {};
+      "git_identity" = {
+        owner = "dominik";
+        group = "users";
+        mode = "0400";
+      };
 
       # Authelia secrets
       "authelia_jwt_secret" = {
