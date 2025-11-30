@@ -245,10 +245,12 @@ in {
         LIBVA_DRIVER_NAME = "radeonsi";
       });
 
-    # Create fontconfig cache directory for jellyfin user
+    # Create cache directories for jellyfin user (fontconfig + GPU shader caches)
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir}/.cache 0755 jellyfin jellyfin -"
       "d ${cfg.dataDir}/.cache/fontconfig 0755 jellyfin jellyfin -"
+      "d ${cfg.dataDir}/.cache/mesa_shader_cache 0755 jellyfin jellyfin -"
+      "d ${cfg.dataDir}/.cache/radv_builtin_shaders 0755 jellyfin jellyfin -"
     ];
 
     # --------------------------------------------------------------------------
