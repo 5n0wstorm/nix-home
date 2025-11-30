@@ -231,7 +231,7 @@ in {
   # Configarr - TRaSH Guides configuration sync
   fleet.media.configarr = {
     enable = true;
-    schedule = "daily";  # Sync once per day
+    schedule = "daily"; # Sync once per day
 
     sonarr = {
       enable = true;
