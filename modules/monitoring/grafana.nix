@@ -170,18 +170,7 @@ in {
     networking.firewall.allowedTCPPorts = [cfg.port];
 
     # --------------------------------------------------------------------------
-    # DATABASE FIXES AND PERMISSIONS
-    # --------------------------------------------------------------------------
-
-    systemd.tmpfiles.rules = [
-      "d /var/lib/grafana 755 grafana grafana"
-      "d /var/lib/grafana/data 755 grafana grafana"
-      "d /var/lib/grafana/dashboards 755 grafana grafana"
-      "C /var/lib/grafana/dashboards/node-exporter.json 644 grafana grafana - /etc/grafana/dashboards/node-exporter.json"
-    ] ++ (lib.optional (cfg.homepage.enable && homepageCfg.enable) "d /var/lib/grafana/plugins 755 grafana grafana");
-
-    # --------------------------------------------------------------------------
-    # DASHBOARD SETUP
+    # DASHBOARD SETUP AND PERMISSIONS
     # --------------------------------------------------------------------------
 
     # Fetch the popular Node Exporter Full dashboard
@@ -190,10 +179,12 @@ in {
       sha256 = "sha256-lOpPVIW4Rih8/5zWnjC3K0kKgK5Jc1vQgCgj4CVkYP4=";
     };
 
-    # Create directory for dashboards and copy our dashboard
+    # Ensure proper permissions for Grafana data directory, database file, and dashboards
     systemd.tmpfiles.rules = [
+      "d /var/lib/grafana 755 grafana grafana"
+      "d /var/lib/grafana/data 755 grafana grafana"
       "d /var/lib/grafana/dashboards 755 grafana grafana"
       "C /var/lib/grafana/dashboards/node-exporter.json 644 grafana grafana - /etc/grafana/dashboards/node-exporter.json"
-    ];
+    ] ++ (lib.optional (cfg.homepage.enable && homepageCfg.enable) "d /var/lib/grafana/plugins 755 grafana grafana");
   };
 }
