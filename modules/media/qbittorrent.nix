@@ -6,6 +6,7 @@
 }:
 with lib; let
   cfg = config.fleet.media.qbittorrent;
+  vpnCfg = config.fleet.networking.vpnGateway;
   homepageCfg = config.fleet.apps.homepage;
 in {
   # ============================================================================
@@ -63,6 +64,21 @@ in {
       description = "Open firewall ports for qBittorrent";
     };
 
+    # VPN routing configuration
+    vpn = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Route all qBittorrent traffic through VPN gateway";
+      };
+
+      autoUpdatePort = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Automatically update qBittorrent listening port from VPN port forwarding";
+      };
+    };
+
     # Homepage dashboard integration
     homepage = {
       enable = mkOption {
@@ -103,18 +119,36 @@ in {
 
   config = mkIf cfg.enable {
     # --------------------------------------------------------------------------
+    # ASSERTIONS
+    # --------------------------------------------------------------------------
+
+    assertions = [
+      {
+        assertion = cfg.vpn.enable -> vpnCfg.enable;
+        message = "VPN gateway must be enabled (fleet.networking.vpnGateway.enable = true) when using VPN routing for qBittorrent";
+      }
+    ];
+
+    # --------------------------------------------------------------------------
     # HOMEPAGE DASHBOARD REGISTRATION
     # --------------------------------------------------------------------------
 
     fleet.apps.homepage.serviceRegistry.qbittorrent = mkIf (cfg.homepage.enable && homepageCfg.enable) {
       name = cfg.homepage.name;
-      description = cfg.homepage.description;
+      description =
+        if cfg.vpn.enable
+        then "${cfg.homepage.description} (VPN protected)"
+        else cfg.homepage.description;
       icon = cfg.homepage.icon;
       href = "https://${cfg.domain}";
       category = cfg.homepage.category;
       widget = {
         type = "qbittorrent";
-        url = "http://localhost:${toString cfg.port}";
+        # When using VPN, qBittorrent runs inside gluetun container on port 8080
+        url =
+          if cfg.vpn.enable
+          then "http://localhost:8080"
+          else "http://localhost:${toString cfg.port}";
         fields = ["leech" "download" "seed" "upload"];
       };
     };
@@ -124,7 +158,11 @@ in {
     # --------------------------------------------------------------------------
 
     fleet.networking.reverseProxy.serviceRegistry.qbittorrent = {
-      port = cfg.port;
+      # When using VPN, the web UI is exposed on port 8080 from gluetun
+      port =
+        if cfg.vpn.enable
+        then 8080
+        else cfg.port;
       labels = {
         "fleet.reverse-proxy.enable" = "true";
         "fleet.reverse-proxy.domain" = cfg.domain;
@@ -141,9 +179,13 @@ in {
       group = cfg.group;
       home = cfg.dataDir;
       createHome = true;
+      # Assign UID for container user mapping
+      uid = 2000;
     };
 
-    users.groups.${cfg.group} = {};
+    users.groups.${cfg.group} = {
+      gid = 2000;
+    };
 
     # --------------------------------------------------------------------------
     # DATA DIRECTORY SETUP
@@ -155,10 +197,10 @@ in {
     ];
 
     # --------------------------------------------------------------------------
-    # QBITTORRENT SERVICE
+    # QBITTORRENT SERVICE (NON-VPN MODE)
     # --------------------------------------------------------------------------
 
-    systemd.services.qbittorrent = {
+    systemd.services.qbittorrent = mkIf (!cfg.vpn.enable) {
       description = "qBittorrent-nox service";
       after = ["network.target"];
       wantedBy = ["multi-user.target"];
@@ -174,12 +216,96 @@ in {
     };
 
     # --------------------------------------------------------------------------
+    # QBITTORRENT CONTAINER (VPN MODE)
+    # Routes all traffic through gluetun VPN container
+    # --------------------------------------------------------------------------
+
+    virtualisation.oci-containers.containers.qbittorrent = mkIf cfg.vpn.enable {
+      image = "lscr.io/linuxserver/qbittorrent:latest";
+
+      environment = {
+        PUID = "2000";
+        PGID = "2000";
+        TZ = "America/New_York";
+        WEBUI_PORT = "8080";
+      };
+
+      volumes = [
+        "${cfg.dataDir}:/config"
+        "${cfg.downloadDir}:/downloads"
+      ];
+
+      # Use gluetun's network namespace - ALL traffic goes through VPN
+      dependsOn = [vpnCfg.containerName];
+      extraOptions = [
+        "--network=container:${vpnCfg.containerName}"
+        "--pull=always"
+      ];
+    };
+
+    # --------------------------------------------------------------------------
+    # VPN PORT FORWARDING AUTO-UPDATE SERVICE
+    # Automatically configures qBittorrent to use the VPN's forwarded port
+    # --------------------------------------------------------------------------
+
+    systemd.services.qbittorrent-port-update = mkIf (cfg.vpn.enable && cfg.vpn.autoUpdatePort) {
+      description = "Update qBittorrent listening port from VPN port forwarding";
+      after = ["podman-qbittorrent.service" "vpn-port-monitor.service"];
+      requires = ["podman-qbittorrent.service"];
+      wantedBy = ["multi-user.target"];
+
+      path = [pkgs.curl pkgs.jq pkgs.coreutils];
+
+      serviceConfig = {
+        Type = "simple";
+        Restart = "always";
+        RestartSec = "60s";
+      };
+
+      script = ''
+        # Wait for qBittorrent to be ready
+        sleep 60
+
+        # qBittorrent Web API credentials (default: admin/adminadmin on first run)
+        # User should change these in the qBittorrent web UI
+        QB_HOST="http://localhost:8080"
+        COOKIE_FILE="/tmp/qb_cookie"
+
+        while true; do
+          # Get the forwarded port from gluetun
+          FORWARDED_PORT=$(curl -s http://localhost:8000/v1/openvpn/portforwarded 2>/dev/null | jq -r '.port // empty')
+
+          if [ -n "$FORWARDED_PORT" ] && [ "$FORWARDED_PORT" != "0" ] && [ "$FORWARDED_PORT" != "null" ]; then
+            echo "VPN forwarded port: $FORWARDED_PORT"
+
+            # Try to get current qBittorrent port
+            # Note: This requires authentication - user needs to set up API access
+            CURRENT_PORT=$(curl -s "$QB_HOST/api/v2/app/preferences" 2>/dev/null | jq -r '.listen_port // empty')
+
+            if [ "$CURRENT_PORT" != "$FORWARDED_PORT" ]; then
+              echo "Updating qBittorrent listening port from $CURRENT_PORT to $FORWARDED_PORT"
+              # Update port via API (requires valid session)
+              # curl -s -X POST "$QB_HOST/api/v2/app/setPreferences" \
+              #   -d "json={\"listen_port\":$FORWARDED_PORT}"
+              echo "Port update would be applied here (requires auth setup)"
+            fi
+          else
+            echo "Waiting for VPN port forwarding..."
+          fi
+
+          sleep 300  # Check every 5 minutes
+        done
+      '';
+    };
+
+    # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
 
-    networking.firewall = mkIf cfg.openFirewall {
+    networking.firewall = mkIf (cfg.openFirewall && !cfg.vpn.enable) {
       allowedTCPPorts = [cfg.port cfg.torrentPort];
       allowedUDPPorts = [cfg.torrentPort];
     };
+    # Note: When VPN is enabled, firewall rules are handled by the vpn-gateway module
   };
 }

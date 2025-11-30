@@ -17,6 +17,7 @@ in {
     ../../modules/security/authelia.nix
     # Networking
     ../../modules/networking/reverse-proxy.nix
+    ../../modules/networking/vpn-gateway.nix
     # Monitoring
     ../../modules/monitoring/prometheus.nix
     ../../modules/monitoring/grafana.nix
@@ -151,12 +152,37 @@ in {
     domain = "overseerr.sn0wstorm.com";
   };
 
-  # qBittorrent - Torrent client
+  # ============================================================================
+  # VPN GATEWAY (Gluetun with PIA)
+  # ============================================================================
+
+  fleet.networking.vpnGateway = {
+    enable = true;
+    provider = "private_internet_access";
+
+    pia = {
+      # Regions that support port forwarding
+      serverRegions = ["cz" "fi"];
+      portForwarding = true;
+      usernameFile = "/run/secrets/pia-vpn/username";
+      passwordFile = "/run/secrets/pia-vpn/password";
+    };
+
+    killSwitch = true;
+  };
+
+  # qBittorrent - Torrent client (VPN protected)
   fleet.media.qbittorrent = {
     enable = true;
     domain = "qbittorrent.sn0wstorm.com";
     port = 9000;
     downloadDir = "/media/downloads";
+
+    # Route ALL torrent traffic through PIA VPN
+    vpn = {
+      enable = true;
+      autoUpdatePort = true;
+    };
   };
 
   fleet.media.sabnzbd = {
@@ -447,6 +473,18 @@ in {
     # SOPS secrets
     secrets = {
       "cloudflare_api_token" = {};
+
+      # VPN credentials for PIA (read from pia-vpn.username and pia-vpn.password in secrets.yaml)
+      "pia-vpn/username" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "pia-vpn/password" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
 
       "ssh_key" = {
         path = "/home/dominik/.ssh/id_ed25519";
