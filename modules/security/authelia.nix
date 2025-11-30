@@ -449,7 +449,6 @@ in {
       settings = {
         theme = cfg.theme;
         default_2fa_method = "totp";
-        default_redirection_url = mkIf (cfg.defaultRedirectionUrl != null) cfg.defaultRedirectionUrl;
 
         server = {
           address = "tcp://127.0.0.1:${toString cfg.port}";
@@ -478,10 +477,8 @@ in {
         webauthn = {
           display_name = "Fleet Auth";
           timeout = "60s";
-          selection_criteria = {
-            attestation_conveyance_preference = "indirect";
-            user_verification = "preferred";
-          };
+          attestation_conveyance_preference = "indirect";
+          user_verification = "preferred";
         };
 
         # NTP configuration
@@ -507,6 +504,10 @@ in {
               domain = cfg.sessionDomain;
               authelia_url = "https://${cfg.domain}";
               same_site = "lax";
+              default_redirection_url =
+                if cfg.defaultRedirectionUrl != null
+                then cfg.defaultRedirectionUrl
+                else "https://${cfg.domain}";
             }
           ];
           expiration = cfg.sessionExpiration;
@@ -515,15 +516,11 @@ in {
         };
 
         # Storage configuration
-        # For file-based secrets, we use Authelia's env var support:
-        # AUTHELIA__STORAGE__MYSQL__HOST, AUTHELIA__STORAGE__MYSQL__DATABASE, etc.
         storage =
           if cfg.database.enable
           then {
             mysql = {
-              # These get overridden by environment variables when file-based secrets are used
-              host = cfg.database.host;
-              port = cfg.database.port;
+              address = "tcp://${cfg.database.host}:${toString cfg.database.port}";
               database = cfg.database.database;
               username = cfg.database.username;
             };
@@ -651,8 +648,8 @@ in {
     };
 
     # Create environment file with secrets from files
-    # Authelia supports AUTHELIA__* environment variables to override config
-    systemd.services."authelia-main-secrets" = mkIf cfg.database.enable {
+    # Authelia supports X_AUTHELIA_*_FILE environment variables for file-based secrets
+    systemd.services."authelia-main-secrets" = mkIf (cfg.database.enable || (cfg.smtp.enable && cfg.smtp.passwordFile != null)) {
       description = "Prepare Authelia secrets environment file";
       before = ["authelia-main.service"];
       requiredBy = ["authelia-main.service"];
@@ -660,7 +657,6 @@ in {
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        # Run as root to create directory, then chown
       };
       script = let
         envFile = "/run/authelia-main/secrets.env";
@@ -674,37 +670,17 @@ in {
         chmod 600 ${envFile}
         chown authelia-main:authelia-main ${envFile}
 
-        ${optionalString (cfg.database.hostFile != null) ''
-          if [ -f "${cfg.database.hostFile}" ]; then
-            echo "AUTHELIA__STORAGE__MYSQL__HOST=$(cat ${cfg.database.hostFile})" >> ${envFile}
-          else
-            echo "Warning: ${cfg.database.hostFile} not found"
-          fi
-        ''}
-        ${optionalString (cfg.database.databaseFile != null) ''
-          if [ -f "${cfg.database.databaseFile}" ]; then
-            echo "AUTHELIA__STORAGE__MYSQL__DATABASE=$(cat ${cfg.database.databaseFile})" >> ${envFile}
-          else
-            echo "Warning: ${cfg.database.databaseFile} not found"
-          fi
-        ''}
-        ${optionalString (cfg.database.usernameFile != null) ''
-          if [ -f "${cfg.database.usernameFile}" ]; then
-            echo "AUTHELIA__STORAGE__MYSQL__USERNAME=$(cat ${cfg.database.usernameFile})" >> ${envFile}
-          else
-            echo "Warning: ${cfg.database.usernameFile} not found"
-          fi
-        ''}
+        # Use X_AUTHELIA_*_FILE format for file-based secrets
         ${optionalString (cfg.database.passwordFile != null) ''
           if [ -f "${cfg.database.passwordFile}" ]; then
-            echo "AUTHELIA__STORAGE__MYSQL__PASSWORD=$(cat ${cfg.database.passwordFile})" >> ${envFile}
+            echo "X_AUTHELIA_STORAGE_MYSQL_PASSWORD_FILE=${cfg.database.passwordFile}" >> ${envFile}
           else
             echo "Warning: ${cfg.database.passwordFile} not found"
           fi
         ''}
         ${optionalString (cfg.smtp.enable && cfg.smtp.passwordFile != null) ''
           if [ -f "${cfg.smtp.passwordFile}" ]; then
-            echo "AUTHELIA__NOTIFIER__SMTP__PASSWORD=$(cat ${cfg.smtp.passwordFile})" >> ${envFile}
+            echo "X_AUTHELIA_NOTIFIER_SMTP_PASSWORD_FILE=${cfg.smtp.passwordFile}" >> ${envFile}
           else
             echo "Warning: ${cfg.smtp.passwordFile} not found"
           fi
@@ -714,7 +690,7 @@ in {
       '';
     };
 
-    systemd.services."authelia-main" = mkIf cfg.database.enable {
+    systemd.services."authelia-main" = mkIf (cfg.database.enable || (cfg.smtp.enable && cfg.smtp.passwordFile != null)) {
       serviceConfig.EnvironmentFile = "/run/authelia-main/secrets.env";
     };
 

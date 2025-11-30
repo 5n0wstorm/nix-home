@@ -387,12 +387,12 @@ in {
       storageEncryptionKeyFile = "/run/secrets/authelia/storage_key";
     };
 
-    # Database configuration (MariaDB via fleet.apps.mysql)
     database = {
       enable = true;
-      hostFile = "/run/secrets/authelia/database/host";
-      databaseFile = "/run/secrets/authelia/database/name";
-      usernameFile = "/run/secrets/authelia/database/username";
+      host = "localhost";
+      port = 3306;
+      database = "authelia";
+      username = "authelia";
       passwordFile = "/run/secrets/authelia/database/password";
     };
 
@@ -493,24 +493,6 @@ in {
       };
 
       "authelia/smtp/password" = {
-        owner = "authelia-main";
-        group = "authelia-main";
-        mode = "0400";
-      };
-
-      "authelia/database/host" = {
-        owner = "authelia-main";
-        group = "authelia-main";
-        mode = "0400";
-      };
-
-      "authelia/database/name" = {
-        owner = "authelia-main";
-        group = "authelia-main";
-        mode = "0400";
-      };
-
-      "authelia/database/username" = {
         owner = "authelia-main";
         group = "authelia-main";
         mode = "0400";
