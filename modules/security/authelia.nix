@@ -36,14 +36,28 @@ in {
       description = "Port for Authelia service";
     };
 
+    theme = mkOption {
+      type = types.enum ["light" "dark" "grey" "auto"];
+      default = "light";
+      description = "UI theme for Authelia portal";
+    };
+
+    defaultRedirectionUrl = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Default URL to redirect to after authentication if no referer";
+      example = "https://home.example.com/";
+    };
+
     defaultPolicy = mkOption {
-      type = types.enum ["bypass" "one_factor" "two_factor"];
+      type = types.enum ["bypass" "one_factor" "two_factor" "deny"];
       default = "one_factor";
       description = ''
         Default access policy for all domains.
         - bypass: No authentication required
         - one_factor: Username/password required
         - two_factor: Username/password + TOTP/WebAuthn required
+        - deny: Deny all access
       '';
     };
 
@@ -60,13 +74,14 @@ in {
     bypassPaths = mkOption {
       type = types.listOf types.str;
       default = [
-        "/api/**"
-        "/.well-known/**"
+        "^/api/.*"
+        "^/\\.well-known/.*"
       ];
       description = ''
-        List of paths to bypass authentication on all domains.
-        Useful for API endpoints and discovery paths.
+        List of path regex patterns to bypass authentication on all domains.
+        Uses regex syntax (not glob). Useful for API endpoints and discovery paths.
       '';
+      example = ["^/api/.*" "^/public/.*"];
     };
 
     twoFactorDomains = mkOption {
@@ -76,6 +91,37 @@ in {
         List of domains requiring two-factor authentication.
         These override the default policy.
       '';
+    };
+
+    apiBypassDomains = mkOption {
+      type = types.listOf types.str;
+      default = [];
+      description = ''
+        List of domains where /api/* paths should bypass authentication.
+        Useful for *arr apps and similar services with API access.
+      '';
+      example = ["sonarr.example.com" "radarr.example.com"];
+    };
+
+    # Regulation (brute force protection)
+    regulation = {
+      maxRetries = mkOption {
+        type = types.int;
+        default = 3;
+        description = "Number of failed login attempts before user is banned";
+      };
+
+      findTime = mkOption {
+        type = types.str;
+        default = "2m";
+        description = "Time window for counting failed attempts";
+      };
+
+      banTime = mkOption {
+        type = types.str;
+        default = "5m";
+        description = "Duration of ban after max retries exceeded";
+      };
     };
 
     # Secrets configuration
@@ -132,6 +178,65 @@ in {
       };
     };
 
+    # Database storage configuration
+    database = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Use MySQL/MariaDB database instead of SQLite";
+      };
+
+      # Direct value options (for simple configs)
+      host = mkOption {
+        type = types.str;
+        default = "localhost";
+        description = "Database server hostname (ignored if hostFile is set)";
+      };
+
+      port = mkOption {
+        type = types.port;
+        default = 3306;
+        description = "Database server port";
+      };
+
+      database = mkOption {
+        type = types.str;
+        default = "authelia";
+        description = "Database name (ignored if databaseFile is set)";
+      };
+
+      username = mkOption {
+        type = types.str;
+        default = "authelia";
+        description = "Database username (ignored if usernameFile is set)";
+      };
+
+      passwordFile = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        description = "Path to file containing database password";
+      };
+
+      # File-based options (for secrets management)
+      hostFile = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        description = "Path to file containing database hostname";
+      };
+
+      databaseFile = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        description = "Path to file containing database name";
+      };
+
+      usernameFile = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        description = "Path to file containing database username";
+      };
+    };
+
     # File-based authentication (default)
     usersFile = mkOption {
       type = types.nullOr types.path;
@@ -170,6 +275,12 @@ in {
       description = "Session inactivity timeout";
     };
 
+    rememberMeDuration = mkOption {
+      type = types.str;
+      default = "1M";
+      description = "Duration for 'remember me' sessions (use -1 to disable)";
+    };
+
     # SMTP settings for notifications
     smtp = {
       enable = mkOption {
@@ -202,10 +313,37 @@ in {
         description = "SMTP sender address";
       };
 
+      identifier = mkOption {
+        type = types.str;
+        default = "";
+        description = "HELO/EHLO identifier for SMTP";
+        example = "galadriel.sn0wstorm.com";
+      };
+
       passwordFile = mkOption {
         type = types.nullOr types.path;
         default = null;
         description = "Path to file containing SMTP password";
+      };
+
+      tls = {
+        serverName = mkOption {
+          type = types.str;
+          default = "";
+          description = "TLS server name for certificate validation";
+        };
+
+        skipVerify = mkOption {
+          type = types.bool;
+          default = false;
+          description = "Skip TLS certificate verification (not recommended)";
+        };
+
+        minimumVersion = mkOption {
+          type = types.str;
+          default = "TLS1.2";
+          description = "Minimum TLS version";
+        };
       };
     };
 
@@ -309,8 +447,9 @@ in {
       };
 
       settings = {
-        theme = "auto";
+        theme = cfg.theme;
         default_2fa_method = "totp";
+        default_redirection_url = mkIf (cfg.defaultRedirectionUrl != null) cfg.defaultRedirectionUrl;
 
         server = {
           address = "tcp://127.0.0.1:${toString cfg.port}";
@@ -338,9 +477,26 @@ in {
         # WebAuthn configuration
         webauthn = {
           display_name = "Fleet Auth";
-          attestation_conveyance_preference = "indirect";
-          user_verification = "preferred";
           timeout = "60s";
+          selection_criteria = {
+            attestation_conveyance_preference = "indirect";
+            user_verification = "preferred";
+          };
+        };
+
+        # NTP configuration
+        ntp = {
+          address = "time.cloudflare.com:123";
+          version = 4;
+          max_desync = "3s";
+          disable_startup_check = true;
+        };
+
+        # Regulation (brute force protection)
+        regulation = {
+          max_retries = cfg.regulation.maxRetries;
+          find_time = cfg.regulation.findTime;
+          ban_time = cfg.regulation.banTime;
         };
 
         # Session configuration
@@ -350,18 +506,33 @@ in {
             {
               domain = cfg.sessionDomain;
               authelia_url = "https://${cfg.domain}";
+              same_site = "lax";
             }
           ];
           expiration = cfg.sessionExpiration;
           inactivity = cfg.sessionInactivity;
+          remember_me = cfg.rememberMeDuration;
         };
 
-        # Storage (local SQLite)
-        storage = {
-          local = {
-            path = "/var/lib/authelia-main/db.sqlite3";
+        # Storage configuration
+        # For file-based secrets, we use Authelia's env var support:
+        # AUTHELIA__STORAGE__MYSQL__HOST, AUTHELIA__STORAGE__MYSQL__DATABASE, etc.
+        storage =
+          if cfg.database.enable
+          then {
+            mysql = {
+              # These get overridden by environment variables when file-based secrets are used
+              host = cfg.database.host;
+              port = cfg.database.port;
+              database = cfg.database.database;
+              username = cfg.database.username;
+            };
+          }
+          else {
+            local = {
+              path = "/var/lib/authelia-main/db.sqlite3";
+            };
           };
-        };
 
         # Access control rules
         access_control = {
@@ -374,6 +545,14 @@ in {
                 policy = "bypass";
               })
               cfg.bypassDomains)
+            ++
+            # API bypass for specific domains (e.g., *arr apps)
+            (map (domain: {
+                domain = domain;
+                resources = ["^/api/.*$"];
+                policy = "bypass";
+              })
+              cfg.apiBypassDomains)
             ++
             # Bypass rules for specific paths on all domains
             (map (path: {
@@ -390,6 +569,15 @@ in {
               })
               cfg.twoFactorDomains)
             ++
+            # Catch-all rule for wildcard domain with default one_factor
+            # (ensures *.domain.com gets one_factor even if default is deny)
+            [
+              {
+                domain = "*.${acmeCfg.domain}";
+                policy = "one_factor";
+              }
+            ]
+            ++
             # Always bypass the auth portal itself
             [
               {
@@ -403,11 +591,31 @@ in {
         notifier =
           if cfg.smtp.enable
           then {
-            smtp = {
-              address = "submission://${cfg.smtp.host}:${toString cfg.smtp.port}";
-              username = cfg.smtp.username;
-              sender = cfg.smtp.sender;
-            };
+            disable_startup_check = true;
+            smtp =
+              {
+                address = "submission://${cfg.smtp.host}:${toString cfg.smtp.port}";
+                username = cfg.smtp.username;
+                sender = cfg.smtp.sender;
+                subject = "[Authelia] {title}";
+                startup_check_address = "test@authelia.com";
+              }
+              // (
+                if cfg.smtp.identifier != ""
+                then {identifier = cfg.smtp.identifier;}
+                else {}
+              )
+              // {
+                tls = {
+                  skip_verify = cfg.smtp.tls.skipVerify;
+                  minimum_version = cfg.smtp.tls.minimumVersion;
+                }
+                // (
+                  if cfg.smtp.tls.serverName != ""
+                  then {server_name = cfg.smtp.tls.serverName;}
+                  else {}
+                );
+              };
           }
           else {
             # Filesystem notifier for development/testing
@@ -441,9 +649,46 @@ in {
       };
     };
 
-    # SMTP password environment
-    systemd.services."authelia-main" = mkIf cfg.smtp.enable {
-      serviceConfig.EnvironmentFile = mkIf (cfg.smtp.passwordFile != null) cfg.smtp.passwordFile;
+    # Create environment file with secrets from files
+    # Authelia supports AUTHELIA__* environment variables to override config
+    systemd.services."authelia-main-secrets" = mkIf cfg.database.enable {
+      description = "Prepare Authelia secrets environment file";
+      before = ["authelia-main.service"];
+      requiredBy = ["authelia-main.service"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "authelia-main";
+        Group = "authelia-main";
+      };
+      script = let
+        envFile = "/run/authelia-main/secrets.env";
+      in ''
+        mkdir -p /run/authelia-main
+        rm -f ${envFile}
+        touch ${envFile}
+        chmod 600 ${envFile}
+
+        ${optionalString (cfg.database.hostFile != null) ''
+          echo "AUTHELIA__STORAGE__MYSQL__HOST=$(cat ${cfg.database.hostFile})" >> ${envFile}
+        ''}
+        ${optionalString (cfg.database.databaseFile != null) ''
+          echo "AUTHELIA__STORAGE__MYSQL__DATABASE=$(cat ${cfg.database.databaseFile})" >> ${envFile}
+        ''}
+        ${optionalString (cfg.database.usernameFile != null) ''
+          echo "AUTHELIA__STORAGE__MYSQL__USERNAME=$(cat ${cfg.database.usernameFile})" >> ${envFile}
+        ''}
+        ${optionalString (cfg.database.passwordFile != null) ''
+          echo "AUTHELIA__STORAGE__MYSQL__PASSWORD=$(cat ${cfg.database.passwordFile})" >> ${envFile}
+        ''}
+        ${optionalString (cfg.smtp.enable && cfg.smtp.passwordFile != null) ''
+          echo "AUTHELIA__NOTIFIER__SMTP__PASSWORD=$(cat ${cfg.smtp.passwordFile})" >> ${envFile}
+        ''}
+      '';
+    };
+
+    systemd.services."authelia-main" = mkIf cfg.database.enable {
+      serviceConfig.EnvironmentFile = "/run/authelia-main/secrets.env";
     };
 
     # --------------------------------------------------------------------------

@@ -24,6 +24,7 @@ in {
     ../../modules/dev/jenkins.nix
     # Apps
     ../../modules/apps/homepage.nix
+    ../../modules/apps/mysql.nix
     ../../modules/apps/vaultwarden.nix
     # Media
     ../../modules/media/jellyfin.nix
@@ -170,6 +171,70 @@ in {
   };
 
   # ============================================================================
+  # MYSQL DATABASE SERVICE
+  # ============================================================================
+
+  fleet.apps.mysql = {
+    enable = true;
+    bindAddress = "127.0.0.1";
+    port = 3306;
+
+    # Database requests from services (migrated from Docker MariaDB)
+    databaseRequests = {
+      # Authentication & SSO
+      authelia = {
+        database = "authelia";
+        passwordFile = "/run/secrets/authelia/database/password";
+      };
+      keycloak = {
+        database = "keycloak";
+        passwordFile = "/run/secrets/mysql/keycloak";
+      };
+
+      # Cloud & Storage
+      nextcloud = {
+        database = "nextcloud";
+        passwordFile = "/run/secrets/mysql/nextcloud";
+      };
+      photoprism = {
+        database = "photoprism";
+        passwordFile = "/run/secrets/mysql/photoprism";
+      };
+
+      # Documentation & Wiki
+      bookstack = {
+        database = "bookstackapp";
+        passwordFile = "/run/secrets/mysql/bookstack";
+      };
+
+      # Finance
+      firefly = {
+        database = "firefly";
+        passwordFile = "/run/secrets/mysql/firefly";
+      };
+
+      # Portfolio & Other
+      photo_portfolio = {
+        database = "photo_portfolio";
+        passwordFile = "/run/secrets/mysql/photo_portfolio";
+      };
+      mama_spirit = {
+        database = "mama_spirit";
+        passwordFile = "/run/secrets/mysql/mama_spirit";
+      };
+    };
+
+    settings = {
+      mysqld = {
+        innodb_buffer_pool_size = "128M";
+        innodb_log_file_size = "32M";
+        max_connections = 100;
+        skip_name_resolve = true;
+      };
+    };
+  };
+
+  # ============================================================================
   # CLOUDFLARE DYNAMIC DNS SERVICE
   # ============================================================================
 
@@ -238,35 +303,122 @@ in {
   fleet.security.authelia = {
     enable = true;
     domain = "auth.sn0wstorm.com";
+    theme = "light";
+    defaultRedirectionUrl = "https://auth.sn0wstorm.com/";
 
-    defaultPolicy = "one_factor";
+    # Default policy - deny, with explicit rules for access
+    defaultPolicy = "deny";
 
+    # Domains that bypass authentication entirely (have their own auth)
     bypassDomains = [
+      # Services with their own authentication
       "bitwarden.sn0wstorm.com"
       "jellyfin.sn0wstorm.com"
       "navidrome.sn0wstorm.com"
+      # Legacy services from Docker config
+      "grocy.sn0wstorm.com"
+      "photos.sn0wstorm.com"
+      "keycloak.sn0wstorm.com"
+      "archive.sn0wstorm.com"
+      "www.sn0wstorm.com"
+      "wp.sn0wstorm.com"
+      "plexms.sn0wstorm.com"
+      "paperless.sn0wstorm.com"
+      "gitlab.sn0wstorm.com"
+      "git.sn0wstorm.com"
+      "registry.sn0wstorm.com"
+      "pokemon.sn0wstorm.com"
+      "trilium.sn0wstorm.com"
+      "cloud.sn0wstorm.com"
+      "onlyoffice.sn0wstorm.com"
+      "bookstack.sn0wstorm.com"
+      "stats.sn0wstorm.com"
+      "calweb.sn0wstorm.com"
+      "fhir.sn0wstorm.com"
+      "po.sn0wstorm.com"
+      "headscale.sn0wstorm.com"
+      "mail.sn0wstorm.com"
     ];
 
-    bypassPaths = [
-      "/api/**"
-      "/.well-known/**"
-    ];
-
+    # Domains requiring two-factor authentication
     twoFactorDomains = [
       "grafana.sn0wstorm.com"
       "prometheus.sn0wstorm.com"
+      "stash.sn0wstorm.com"
+      "guac.sn0wstorm.com"
+      "emby.sn0wstorm.com"
+      "dozzle.sn0wstorm.com"
+      "code.sn0wstorm.com"
+      "heimdall.sn0wstorm.com"
+      "adminer.sn0wstorm.com"
+      "pmox.sn0wstorm.com"
+      "headscale-admin.sn0wstorm.com"
     ];
 
-    secrets = {
-      jwtSecretFile = "/run/secrets/authelia_jwt_secret";
-      storageEncryptionKeyFile = "/run/secrets/authelia_storage_key";
+    # Domains where /api/* bypasses auth (for *arr apps)
+    apiBypassDomains = [
+      "sonarr.sn0wstorm.com"
+      "radarr.sn0wstorm.com"
+      "lidarr.sn0wstorm.com"
+      "bazarr.sn0wstorm.com"
+      "jackett.sn0wstorm.com"
+      "lazy.sn0wstorm.com"
+      "prowlarr.sn0wstorm.com"
+      "readarr.sn0wstorm.com"
+      "overseerr.sn0wstorm.com"
+      "qbittorrent.sn0wstorm.com"
+      "sabnzbd.sn0wstorm.com"
+    ];
+
+    # Global path bypasses (regex patterns)
+    bypassPaths = [
+      "^/\\.well-known/.*"
+    ];
+
+    # Brute force protection
+    regulation = {
+      maxRetries = 3;
+      findTime = "2m";
+      banTime = "5m";
     };
 
-    usersFile = "/run/secrets/authelia_users";
+    secrets = {
+      jwtSecretFile = "/run/secrets/authelia/jwt_secret";
+      storageEncryptionKeyFile = "/run/secrets/authelia/storage_key";
+    };
 
+    # Database configuration (MariaDB via fleet.apps.mysql)
+    database = {
+      enable = true;
+      hostFile = "/run/secrets/authelia/database/host";
+      databaseFile = "/run/secrets/authelia/database/name";
+      usernameFile = "/run/secrets/authelia/database/username";
+      passwordFile = "/run/secrets/authelia/database/password";
+    };
+
+    # Session settings (from Docker config)
     sessionDomain = "sn0wstorm.com";
-    sessionExpiration = "12h";
-    sessionInactivity = "45m";
+    sessionExpiration = "1h";
+    sessionInactivity = "5m";
+    rememberMeDuration = "1M";
+
+    usersFile = "/run/secrets/authelia/users";
+
+    # SMTP configuration
+    smtp = {
+      enable = true;
+      host = "mail.sn0wstorm.com";
+      port = 587;
+      username = "authelia@sn0wstorm.com";
+      sender = "Authelia <authelia@sn0wstorm.com>";
+      identifier = "galadriel.sn0wstorm.com";
+      passwordFile = "/run/secrets/authelia/smtp/password";
+      tls = {
+        serverName = "mail.sn0wstorm.com";
+        skipVerify = false;
+        minimumVersion = "TLS1.2";
+      };
+    };
   };
 
   # ============================================================================
@@ -321,21 +473,88 @@ in {
         mode = "0400";
       };
 
-      "authelia_jwt_secret" = {
+      # Authelia secrets (grouped)
+      "authelia/jwt_secret" = {
         owner = "authelia-main";
         group = "authelia-main";
         mode = "0400";
       };
 
-      "authelia_storage_key" = {
+      "authelia/storage_key" = {
         owner = "authelia-main";
         group = "authelia-main";
         mode = "0400";
       };
 
-      "authelia_users" = {
+      "authelia/users" = {
         owner = "authelia-main";
         group = "authelia-main";
+        mode = "0400";
+      };
+
+      "authelia/smtp/password" = {
+        owner = "authelia-main";
+        group = "authelia-main";
+        mode = "0400";
+      };
+
+      "authelia/database/host" = {
+        owner = "authelia-main";
+        group = "authelia-main";
+        mode = "0400";
+      };
+
+      "authelia/database/name" = {
+        owner = "authelia-main";
+        group = "authelia-main";
+        mode = "0400";
+      };
+
+      "authelia/database/username" = {
+        owner = "authelia-main";
+        group = "authelia-main";
+        mode = "0400";
+      };
+
+      "authelia/database/password" = {
+        owner = "authelia-main";
+        group = "authelia-main";
+        mode = "0400";
+      };
+
+      "mysql/keycloak" = {
+        owner = "mysql";
+        group = "mysql";
+        mode = "0400";
+      };
+      "mysql/nextcloud" = {
+        owner = "mysql";
+        group = "mysql";
+        mode = "0400";
+      };
+      "mysql/photoprism" = {
+        owner = "mysql";
+        group = "mysql";
+        mode = "0400";
+      };
+      "mysql/bookstack" = {
+        owner = "mysql";
+        group = "mysql";
+        mode = "0400";
+      };
+      "mysql/firefly" = {
+        owner = "mysql";
+        group = "mysql";
+        mode = "0400";
+      };
+      "mysql/photo_portfolio" = {
+        owner = "mysql";
+        group = "mysql";
+        mode = "0400";
+      };
+      "mysql/mama_spirit" = {
+        owner = "mysql";
+        group = "mysql";
         mode = "0400";
       };
     };
