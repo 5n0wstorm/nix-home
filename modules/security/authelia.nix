@@ -648,8 +648,8 @@ in {
       };
     };
 
-    # Create environment file with secrets from files
-    # Authelia supports X_AUTHELIA_*_FILE environment variables for file-based secrets
+    # Create environment file with secrets read from files
+    # We read secrets and set them directly as environment variables
     systemd.services."authelia-main-secrets" = mkIf (cfg.database.enable || (cfg.smtp.enable && cfg.smtp.passwordFile != null)) {
       description = "Prepare Authelia secrets environment file";
       before = ["authelia-main.service"];
@@ -672,11 +672,12 @@ in {
         chmod 600 ${envFile}
         chown authelia-main:authelia-main ${envFile}
 
-        # Use X_AUTHELIA_*_FILE format for file-based secrets
+        # Read secrets from files and set as environment variables
         ${optionalString (cfg.database.passwordFile != null) ''
           if [ -f "${cfg.database.passwordFile}" ]; then
-            echo "X_AUTHELIA_STORAGE_MYSQL_PASSWORD_FILE=${cfg.database.passwordFile}" >> ${envFile}
-            echo "Authelia database password file found: ${cfg.database.passwordFile}"
+            DB_PASS=$(cat "${cfg.database.passwordFile}" | tr -d '\n')
+            echo "AUTHELIA_STORAGE_MYSQL_PASSWORD=$DB_PASS" >> ${envFile}
+            echo "Authelia database password loaded from: ${cfg.database.passwordFile}"
           else
             echo "Warning: Authelia database password file not found: ${cfg.database.passwordFile}"
             ls -la /run/secrets/authelia/ || echo "Authelia secrets directory not found"
@@ -684,7 +685,9 @@ in {
         ''}
         ${optionalString (cfg.smtp.enable && cfg.smtp.passwordFile != null) ''
           if [ -f "${cfg.smtp.passwordFile}" ]; then
-            echo "X_AUTHELIA_NOTIFIER_SMTP_PASSWORD_FILE=${cfg.smtp.passwordFile}" >> ${envFile}
+            SMTP_PASS=$(cat "${cfg.smtp.passwordFile}" | tr -d '\n')
+            echo "AUTHELIA_NOTIFIER_SMTP_PASSWORD=$SMTP_PASS" >> ${envFile}
+            echo "Authelia SMTP password loaded from: ${cfg.smtp.passwordFile}"
           else
             echo "Warning: ${cfg.smtp.passwordFile} not found"
           fi
