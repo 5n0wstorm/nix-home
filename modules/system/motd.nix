@@ -237,7 +237,6 @@ with lib; let
           printf "\n"
         fi
       fi
-      fi
     done
     echo ""
 
