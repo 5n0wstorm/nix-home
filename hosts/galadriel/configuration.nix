@@ -304,7 +304,6 @@ in {
     enable = true;
     domain = "auth.sn0wstorm.com";
     theme = "light";
-    defaultRedirectionUrl = "https://home.sn0wstorm.com/";
 
     # Default policy - deny, with explicit rules for access
     defaultPolicy = "deny";
