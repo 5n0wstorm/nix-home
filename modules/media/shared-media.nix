@@ -131,26 +131,33 @@ in {
     users.users.dominik.extraGroups = [cfg.group];
 
     # --------------------------------------------------------------------------
-    # SERVICE GROUP CONFIGURATION
-    # Set the media group for services that support it directly
-    # --------------------------------------------------------------------------
-
-    # Use mkForce to ensure media group is used for all services
-    # This allows hardlinks between downloads and library directories
-    services.sonarr.group = mkIf (config.services.sonarr.enable or false) (mkForce cfg.group);
-    services.radarr.group = mkIf (config.services.radarr.enable or false) (mkForce cfg.group);
-    services.lidarr.group = mkIf (config.services.lidarr.enable or false) (mkForce cfg.group);
-    services.readarr.group = mkIf (config.services.readarr.enable or false) (mkForce cfg.group);
-    services.bazarr.group = mkIf (config.services.bazarr.enable or false) (mkForce cfg.group);
-    services.jellyfin.group = mkIf (config.services.jellyfin.enable or false) (mkForce cfg.group);
-    services.sabnzbd.group = mkIf (config.services.sabnzbd.enable or false) (mkForce cfg.group);
-
-    # --------------------------------------------------------------------------
     # SYSTEMD SUPPLEMENTARY GROUPS
-    # For services that use DynamicUser or don't have a group option
+    # Add media group as supplementary so services can access /media/*
+    # but keep their own data directories (/var/lib/*) with original ownership
     # --------------------------------------------------------------------------
 
-    systemd.services.prowlarr.serviceConfig.SupplementaryGroups =
+    systemd.services.sonarr.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.sonarr.enable or false) [cfg.group];
+    
+    systemd.services.radarr.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.radarr.enable or false) [cfg.group];
+    
+    systemd.services.lidarr.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.lidarr.enable or false) [cfg.group];
+    
+    systemd.services.readarr.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.readarr.enable or false) [cfg.group];
+    
+    systemd.services.bazarr.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.bazarr.enable or false) [cfg.group];
+    
+    systemd.services.jellyfin.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.jellyfin.enable or false) [cfg.group];
+    
+    systemd.services.sabnzbd.serviceConfig.SupplementaryGroups = 
+      mkIf (config.services.sabnzbd.enable or false) [cfg.group];
+    
+    systemd.services.prowlarr.serviceConfig.SupplementaryGroups = 
       mkIf (config.services.prowlarr.enable or false) [cfg.group];
 
     systemd.services.transmission.serviceConfig.SupplementaryGroups =
