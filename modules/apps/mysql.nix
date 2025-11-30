@@ -333,32 +333,46 @@ in {
       package = cfg.package;
       dataDir = cfg.dataDir;
 
-      # Combine databaseRequests with explicit databases
+      # Combine databaseRequests with explicit databases for initial databases
       initialDatabases = let
         # Convert databaseRequests to database format
         fromRequests = mapAttrs' (serviceName: req: nameValuePair req.database {
           name = req.database;
           schema = req.schema;
-          users = {
-            ${if req.user != "" then req.user else serviceName} = {
-              inherit (req) passwordFile permissions host;
-            };
-          };
         }) cfg.databaseRequests;
 
-        # Merge with explicit databases, giving precedence to explicit config
-        allDatabases = fromRequests // cfg.databases;
+        # Merge with explicit databases
+        allDatabases = fromRequests // (mapAttrs (name: dbCfg: {
+          inherit (dbCfg) name schema;
+        }) cfg.databases);
       in mapAttrsToList (name: dbCfg: {
         inherit (dbCfg) name;
         inherit (dbCfg) schema;
       }) allDatabases;
 
-      # Generate initial script for users
-      initialScript = let
+      inherit (cfg) settings;
+    };
+
+    # ----------------------------------------------------------------------------
+    # DATABASE USER SETUP SERVICE
+    # ----------------------------------------------------------------------------
+    # Creates database users after MySQL starts, reading passwords from secret files
+
+    systemd.services.mysql-user-setup = {
+      description = "Setup MySQL database users";
+      after = ["mysql.service"];
+      requires = ["mysql.service"];
+      wantedBy = ["multi-user.target"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "root";
+      };
+      path = [cfg.package];
+      script = let
         # Combine databaseRequests with explicit databases
         fromRequests = mapAttrs' (serviceName: req: nameValuePair req.database {
           name = req.database;
-          schema = req.schema;
           users = {
             ${if req.user != "" then req.user else serviceName} = {
               inherit (req) passwordFile permissions host;
@@ -367,24 +381,42 @@ in {
         }) cfg.databaseRequests;
 
         allDatabases = fromRequests // cfg.databases;
-      in concatStringsSep "\n" (
-        flatten (
-          mapAttrsToList (dbName: dbCfg: [
-            "# Database: ${dbName}"
-          ] ++ (
-            mapAttrsToList (userName: userCfg: [
-              "CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY LOAD_FILE('${userCfg.passwordFile}');"
-              "GRANT ${userCfg.permissions} ON ${dbCfg.name}.* TO '${userName}'@'${userCfg.host}';"
-            ]) dbCfg.users
-          ) ++ [
-            "FLUSH PRIVILEGES;"
-            ""
-          ])
-          allDatabases
-        )
-      );
 
-      inherit (cfg) settings;
+        userCommands = concatStringsSep "\n" (
+          flatten (
+            mapAttrsToList (dbName: dbCfg:
+              mapAttrsToList (userName: userCfg: ''
+                # Setup user: ${userName} for database: ${dbCfg.name}
+                if [ -f "${userCfg.passwordFile}" ]; then
+                  PASSWORD=$(cat "${userCfg.passwordFile}")
+                  mysql -u root <<EOF
+                CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
+                ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
+                GRANT ${userCfg.permissions} ON ${dbCfg.name}.* TO '${userName}'@'${userCfg.host}';
+                FLUSH PRIVILEGES;
+                EOF
+                  echo "User ${userName}@${userCfg.host} configured for ${dbCfg.name}"
+                else
+                  echo "Warning: Password file ${userCfg.passwordFile} not found for ${userName}"
+                fi
+              '') dbCfg.users
+            ) allDatabases
+          )
+        );
+      in ''
+        # Wait for MySQL to be ready
+        for i in {1..30}; do
+          if mysql -u root -e "SELECT 1" &>/dev/null; then
+            break
+          fi
+          echo "Waiting for MySQL to be ready..."
+          sleep 1
+        done
+
+        ${userCommands}
+
+        echo "MySQL user setup complete"
+      '';
     };
 
     # ----------------------------------------------------------------------------
