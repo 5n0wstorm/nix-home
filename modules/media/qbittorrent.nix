@@ -144,10 +144,10 @@ in {
       category = cfg.homepage.category;
       widget = {
         type = "qbittorrent";
-        # When using VPN, qBittorrent runs inside gluetun container on port 8080
+        # When using VPN, qBittorrent runs inside gluetun container
         url =
           if cfg.vpn.enable
-          then "http://localhost:8080"
+          then "http://localhost:${toString vpnCfg.ports.webui}"
           else "http://localhost:${toString cfg.port}";
         fields = ["leech" "download" "seed" "upload"];
       };
@@ -158,10 +158,10 @@ in {
     # --------------------------------------------------------------------------
 
     fleet.networking.reverseProxy.serviceRegistry.qbittorrent = {
-      # When using VPN, the web UI is exposed on port 8080 from gluetun
+      # When using VPN, the web UI is exposed from gluetun
       port =
         if cfg.vpn.enable
-        then 8080
+        then vpnCfg.ports.webui
         else cfg.port;
       labels = {
         "fleet.reverse-proxy.enable" = "true";
@@ -268,12 +268,12 @@ in {
 
         # qBittorrent Web API credentials (default: admin/adminadmin on first run)
         # User should change these in the qBittorrent web UI
-        QB_HOST="http://localhost:8080"
+        QB_HOST="http://localhost:${toString vpnCfg.ports.webui}"
         COOKIE_FILE="/tmp/qb_cookie"
 
         while true; do
-          # Get the forwarded port from gluetun
-          FORWARDED_PORT=$(curl -s http://localhost:8000/v1/openvpn/portforwarded 2>/dev/null | jq -r '.port // empty')
+          # Get the forwarded port from gluetun control server
+          FORWARDED_PORT=$(curl -s http://localhost:${toString vpnCfg.ports.control}/v1/openvpn/portforwarded 2>/dev/null | jq -r '.port // empty')
 
           if [ -n "$FORWARDED_PORT" ] && [ "$FORWARDED_PORT" != "0" ] && [ "$FORWARDED_PORT" != "null" ]; then
             echo "VPN forwarded port: $FORWARDED_PORT"

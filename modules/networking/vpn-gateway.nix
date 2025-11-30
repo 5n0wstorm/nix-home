@@ -302,10 +302,10 @@ in {
       # Expose ports for services that will route through VPN
       # qBittorrent web UI and BitTorrent ports
       ports = [
-        "8080:8080" # qBittorrent Web UI (internal container port)
-        "6881:6881" # BitTorrent TCP
-        "6881:6881/udp" # BitTorrent UDP
-        "8000:8000" # Gluetun control server (for monitoring)
+        "${toString cfg.ports.webui}:8080" # qBittorrent Web UI (internal container port 8080)
+        "${toString cfg.ports.torrent}:${toString cfg.ports.torrent}" # BitTorrent TCP
+        "${toString cfg.ports.torrent}:${toString cfg.ports.torrent}/udp" # BitTorrent UDP
+        "${toString cfg.ports.control}:8000" # Gluetun control server (for monitoring)
       ];
     };
 
@@ -334,7 +334,7 @@ in {
           sleep 30
 
           # Get the forwarded port from gluetun control server
-          PORT=$(curl -s http://localhost:8000/v1/openvpn/portforwarded 2>/dev/null | jq -r '.port // empty')
+          PORT=$(curl -s http://localhost:${toString cfg.ports.control}/v1/openvpn/portforwarded 2>/dev/null | jq -r '.port // empty')
 
           if [ -n "$PORT" ] && [ "$PORT" != "0" ]; then
             echo "$PORT" > ${cfg.portForwardingStatusPath}
@@ -359,8 +359,8 @@ in {
     # The gluetun container handles its own firewall/kill switch
     # We just need to allow the exposed ports on the host
     networking.firewall = {
-      allowedTCPPorts = [8080 6881 8000];
-      allowedUDPPorts = [6881];
+      allowedTCPPorts = [cfg.ports.webui cfg.ports.torrent cfg.ports.control];
+      allowedUDPPorts = [cfg.ports.torrent];
     };
   };
 }
