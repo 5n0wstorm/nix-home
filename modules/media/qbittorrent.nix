@@ -361,8 +361,8 @@ in {
 
     systemd.services.qbittorrent-port-update = mkIf (cfg.vpn.enable && cfg.vpn.autoUpdatePort && cfg.vpn.apiPasswordFile != null) {
       description = "Update qBittorrent listening port from VPN port forwarding";
-      after = ["podman-qbittorrent.service" "vpn-port-monitor.service"];
-      requires = ["podman-qbittorrent.service"];
+      after = ["podman-${vpnCfg.containerName}.service" "podman-qbittorrent.service"];
+      requires = ["podman-qbittorrent.service" "podman-${vpnCfg.containerName}.service"];
       wantedBy = ["multi-user.target"];
 
       path = [pkgs.curl pkgs.jq pkgs.coreutils];
@@ -374,15 +374,24 @@ in {
       };
 
       script = ''
-        # Wait for qBittorrent to be ready
+        # Wait for qBittorrent and Gluetun to be ready
         sleep 90
 
-        # Use public URL - localhost connections from container network get 401
-        QB_HOST="https://${cfg.domain}"
+        # Use local host access (qBittorrent WebUI exposed via Gluetun container)
+        QB_HOST="http://127.0.0.1:${toString vpnCfg.ports.webui}"
         QB_USER="${cfg.vpn.apiUsername}"
         QB_PASS_FILE="${cfg.vpn.apiPasswordFile}"
         COOKIE_FILE="/tmp/qb_cookie_$$"
-        LAST_PORT=""
+        STATE_FILE="${cfg.dataDir}/last_forwarded_port"
+        PORT_FILE="${vpnCfg.portForwardingStatusPath}"
+
+        # Load last known port from state file
+        if [ -f "$STATE_FILE" ]; then
+          LAST_PORT=$(cat "$STATE_FILE" | tr -d '[:space:]')
+          echo "Loaded last known port from state: $LAST_PORT"
+        else
+          LAST_PORT=""
+        fi
 
         cleanup() {
           rm -f "$COOKIE_FILE"
@@ -441,11 +450,26 @@ in {
           return $?
         }
 
-        while true; do
-          # Get the forwarded port from gluetun control server (-L follows redirects)
-          FORWARDED_PORT=$(curl -sL "http://localhost:${toString vpnCfg.ports.control}/v1/openvpn/portforwarded" 2>/dev/null | jq -r '.port // empty')
+        # Validate port number
+        is_valid_port() {
+          local port=$1
+          if [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
+            return 0
+          else
+            return 1
+          fi
+        }
 
-          if [ -n "$FORWARDED_PORT" ] && [ "$FORWARDED_PORT" != "0" ] && [ "$FORWARDED_PORT" != "null" ]; then
+        while true; do
+          # Read the forwarded port from Gluetun's status file
+          if [ -f "$PORT_FILE" ]; then
+            FORWARDED_PORT=$(cat "$PORT_FILE" | tr -d '[:space:]')
+          else
+            FORWARDED_PORT=""
+          fi
+
+          # Validate the forwarded port
+          if [ -n "$FORWARDED_PORT" ] && is_valid_port "$FORWARDED_PORT"; then
             echo "VPN forwarded port: $FORWARDED_PORT"
 
             # Only update if port changed
@@ -460,17 +484,23 @@ in {
                   if qb_set_port "$FORWARDED_PORT"; then
                     echo "Successfully updated qBittorrent port to $FORWARDED_PORT"
                     LAST_PORT="$FORWARDED_PORT"
+                    # Persist the last known port to state file
+                    echo "$LAST_PORT" > "$STATE_FILE"
                   else
                     echo "Failed to update qBittorrent port"
                   fi
                 else
                   echo "Port already set correctly"
                   LAST_PORT="$FORWARDED_PORT"
+                  # Persist the last known port to state file
+                  echo "$LAST_PORT" > "$STATE_FILE"
                 fi
               fi
+            else
+              echo "Port unchanged ($FORWARDED_PORT), skipping update"
             fi
           else
-            echo "Waiting for VPN port forwarding..."
+            echo "Waiting for valid VPN port forwarding (current value: '$FORWARDED_PORT')..."
           fi
 
           sleep 300  # Check every 5 minutes

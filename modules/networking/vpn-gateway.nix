@@ -262,6 +262,7 @@ in {
           then "on"
           else "off";
         VPN_PORT_FORWARDING_PROVIDER = "private internet access";
+        VPN_PORT_FORWARDING_STATUS_FILE = "/gluetun/forwarded_port";
 
         # DNS
         DOT = "off"; # Use custom DNS
@@ -313,44 +314,9 @@ in {
     # PORT FORWARDING MONITOR SERVICE
     # --------------------------------------------------------------------------
 
-    # Service to monitor and export the forwarded port
-    systemd.services.vpn-port-monitor = mkIf cfg.pia.portForwarding {
-      description = "Monitor VPN forwarded port and export for qBittorrent";
-      after = ["podman-${cfg.containerName}.service"];
-      requires = ["podman-${cfg.containerName}.service"];
-      wantedBy = ["multi-user.target"];
-
-      path = [pkgs.curl pkgs.jq pkgs.coreutils];
-
-      serviceConfig = {
-        Type = "simple";
-        Restart = "always";
-        RestartSec = "30s";
-      };
-
-      script = ''
-        while true; do
-          # Wait for gluetun to be ready
-          sleep 30
-
-          # Get the forwarded port from gluetun control server (-L follows redirects)
-          PORT=$(curl -sL "http://localhost:${toString cfg.ports.control}/v1/openvpn/portforwarded" 2>/dev/null | jq -r '.port // empty')
-
-          if [ -n "$PORT" ] && [ "$PORT" != "0" ]; then
-            echo "$PORT" > ${cfg.portForwardingStatusPath}
-            echo "VPN forwarded port: $PORT"
-
-            # Update qBittorrent if it's running
-            # qBittorrent API call to update listening port would go here
-            # This requires qBittorrent to be configured first
-          else
-            echo "Waiting for port forwarding..."
-          fi
-
-          sleep 60
-        done
-      '';
-    };
+    # NOTE: vpn-port-monitor is no longer needed since Gluetun writes the
+    # forwarded port directly to /var/lib/gluetun/forwarded_port via
+    # VPN_PORT_FORWARDING_STATUS_FILE environment variable
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
