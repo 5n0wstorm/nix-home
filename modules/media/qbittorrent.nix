@@ -377,8 +377,10 @@ in {
         # Wait for qBittorrent and Gluetun to be ready
         sleep 90
 
-        # Use local host access (qBittorrent WebUI exposed via Gluetun container)
-        QB_HOST="http://127.0.0.1:${toString vpnCfg.ports.webui}"
+        # Use public URL for API access. In this setup, the local forwarded
+        # port can return "Unauthorized" (not qBittorrent's normal "Ok."/Fails."),
+        # while the public URL works reliably.
+        QB_HOST="https://${cfg.domain}"
         QB_USER="${cfg.vpn.apiUsername}"
         QB_PASS_FILE="${cfg.vpn.apiPasswordFile}"
         COOKIE_FILE="/tmp/qb_cookie_$$"
