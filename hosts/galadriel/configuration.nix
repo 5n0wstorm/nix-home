@@ -335,6 +335,16 @@ in {
       max_connections = 100;
       shared_buffers = "128MB";
     };
+
+    # Allow LAN clients; all TCP auth will be forced to TLS via hostssl/hostnossl.
+    allowedCIDRs = ["192.168.2.0/24"];
+
+    ssl = {
+      enable = true;
+      require = true;
+      certFile = "/var/lib/postgresql/16/server.crt";
+      keyFile = "/var/lib/postgresql/16/server.key";
+    };
   };
 
   # ============================================================================

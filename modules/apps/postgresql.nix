@@ -103,6 +103,38 @@ in {
       };
       description = "PostgreSQL configuration settings";
     };
+
+    allowedCIDRs = mkOption {
+      type = types.listOf types.str;
+      default = [];
+      description = "Extra TCP client CIDR ranges to allow in pg_hba.conf (e.g. [\"192.168.2.0/24\"]).";
+    };
+
+    ssl = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Enable TLS (ssl=on) for PostgreSQL.";
+      };
+
+      require = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Require TLS for TCP connections by using hostssl/hostnossl rules in pg_hba.conf.";
+      };
+
+      certFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Path to server TLS certificate (e.g. /var/lib/postgresql/16/server.crt).";
+      };
+
+      keyFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Path to server TLS private key (e.g. /var/lib/postgresql/16/server.key).";
+      };
+    };
   };
 
   # ============================================================================
@@ -110,6 +142,13 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = (!cfg.ssl.enable) || (cfg.ssl.certFile != null && cfg.ssl.keyFile != null);
+        message = "fleet.apps.postgresql.ssl.enable requires fleet.apps.postgresql.ssl.certFile and fleet.apps.postgresql.ssl.keyFile to be set.";
+      }
+    ];
+
     # --------------------------------------------------------------------------
     # POSTGRESQL SERVICE CONFIGURATION
     # --------------------------------------------------------------------------
@@ -128,15 +167,37 @@ in {
         otherSettings
         // {
           listen_addresses = mkForce listenAddr;
+        }
+        // (mkIf cfg.ssl.enable {
+          ssl = mkForce true;
+          ssl_cert_file = mkForce cfg.ssl.certFile;
+          ssl_key_file = mkForce cfg.ssl.keyFile;
         };
 
       # Enable peer authentication for local postgres user
-      authentication = mkOverride 10 ''
+      authentication = let
+        hostType =
+          if cfg.ssl.enable
+          then "hostssl"
+          else "host";
+
+        extraAllowed =
+          concatStringsSep "\n" (map (cidr: "${hostType} all all ${cidr} scram-sha-256") cfg.allowedCIDRs);
+
+        extraReject =
+          optionalString (cfg.ssl.enable && cfg.ssl.require && cfg.allowedCIDRs != [])
+          (concatStringsSep "\n" (map (cidr: "hostnossl all all ${cidr} reject") cfg.allowedCIDRs));
+      in
+        mkOverride 10 ''
         # TYPE  DATABASE        USER            ADDRESS                 METHOD
         local   all             postgres                                peer
         local   all             all                                     peer
-        host    all             all             127.0.0.1/32            scram-sha-256
-        host    all             all             ::1/128                 scram-sha-256
+        ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all 127.0.0.1/32 reject\n"}
+        ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all ::1/128 reject\n"}
+        ${extraReject}
+        ${hostType} all             all             127.0.0.1/32            scram-sha-256
+        ${hostType} all             all             ::1/128                 scram-sha-256
+        ${extraAllowed}
       '';
     };
 
