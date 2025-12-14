@@ -168,42 +168,34 @@ in {
               exit 1
             fi
 
-            # Escape single quotes in password for SQL (replace ' with '')
-            PASSWORD_ESCAPED=$(printf %s "$PASSWORD" | sed "s/'/''/g")
-
             echo "  Username: $USERNAME"
             echo "  Database: ${dbName}"
 
             # Check if role exists
-            if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$USERNAME'" | grep -q 1; then
+            if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = :'role'" -v role="$USERNAME" | grep -q 1; then
               echo "  Role $USERNAME exists, updating password..."
-              psql -v ON_ERROR_STOP=1 <<EOF
-            ALTER ROLE "$USERNAME" WITH LOGIN PASSWORD '$PASSWORD_ESCAPED';
-            EOF
+              psql -v ON_ERROR_STOP=1 -v role="$USERNAME" -v pw="$PASSWORD" \
+                -c "ALTER ROLE :\"role\" WITH LOGIN PASSWORD :'pw';"
             else
               echo "  Creating role $USERNAME..."
-              psql -v ON_ERROR_STOP=1 <<EOF
-            CREATE ROLE "$USERNAME" WITH LOGIN PASSWORD '$PASSWORD_ESCAPED';
-            EOF
+              psql -v ON_ERROR_STOP=1 -v role="$USERNAME" -v pw="$PASSWORD" \
+                -c "CREATE ROLE :\"role\" WITH LOGIN PASSWORD :'pw';"
             fi
 
             # Check if database exists
-            if psql -tAc "SELECT 1 FROM pg_database WHERE datname='${dbName}'" | grep -q 1; then
+            if psql -tAc "SELECT 1 FROM pg_database WHERE datname = :'db'" -v db="${dbName}" | grep -q 1; then
               echo "  Database ${dbName} exists, updating owner..."
-              psql -v ON_ERROR_STOP=1 <<EOF
-            ALTER DATABASE "${dbName}" OWNER TO "$USERNAME";
-            EOF
+              psql -v ON_ERROR_STOP=1 -v db="${dbName}" -v role="$USERNAME" \
+                -c "ALTER DATABASE :\"db\" OWNER TO :\"role\";"
             else
               echo "  Creating database ${dbName}..."
-              psql -v ON_ERROR_STOP=1 <<EOF
-            CREATE DATABASE "${dbName}" OWNER "$USERNAME";
-            EOF
+              psql -v ON_ERROR_STOP=1 -v db="${dbName}" -v role="$USERNAME" \
+                -c "CREATE DATABASE :\"db\" OWNER :\"role\";"
             fi
 
             # Grant all privileges
-            psql -v ON_ERROR_STOP=1 <<EOF
-            GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "$USERNAME";
-            EOF
+            psql -v ON_ERROR_STOP=1 -v db="${dbName}" -v role="$USERNAME" \
+              -c "GRANT ALL PRIVILEGES ON DATABASE :\"db\" TO :\"role\";"
 
             echo "  ✓ Database ${dbName} provisioned successfully"
           ''
@@ -259,7 +251,8 @@ in {
     # --------------------------------------------------------------------------
 
     # Only open firewall if not listening on localhost only
-    networking.firewall.allowedTCPPorts = mkIf (cfg.settings.listen_addresses or "127.0.0.1" != "127.0.0.1") [cfg.port];
+    networking.firewall.allowedTCPPorts =
+      mkIf ((cfg.settings.listen_addresses or "127.0.0.1") != "127.0.0.1") [cfg.port];
 
     # Add PostgreSQL client tools for database management
     environment.systemPackages = [cfg.package];
