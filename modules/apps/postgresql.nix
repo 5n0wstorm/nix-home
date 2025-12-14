@@ -168,11 +168,11 @@ in {
         // {
           listen_addresses = mkForce listenAddr;
         }
-        // (mkIf cfg.ssl.enable {
+        // (optionalAttrs cfg.ssl.enable {
           ssl = mkForce true;
           ssl_cert_file = mkForce cfg.ssl.certFile;
           ssl_key_file = mkForce cfg.ssl.keyFile;
-        };
+        });
 
       # Enable peer authentication for local postgres user
       authentication = let
