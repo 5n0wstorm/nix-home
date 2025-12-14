@@ -162,22 +162,22 @@ in {
             USERNAME=$(cat "${usernameFile}")
             PASSWORD=$(cat "${passwordFile}")
 
-            # Escape single quotes in password for SQL
-            PASSWORD_ESCAPED=$(echo "''$PASSWORD" | sed "s/'/''/g")
+            # Escape single quotes in password for SQL (replace ' with '')
+            PASSWORD_ESCAPED="''${PASSWORD//\'/\'\'}"
 
-            echo "  Username: ''$USERNAME"
+            echo "  Username: ''${USERNAME}"
             echo "  Database: ${dbName}"
 
             # Check if role exists
-            if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='''$USERNAME'" | grep -q 1; then
-              echo "  Role ''$USERNAME exists, updating password..."
+            if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname=''\'''${USERNAME}''\''" | grep -q 1; then
+              echo "  Role ''${USERNAME} exists, updating password..."
               psql -v ON_ERROR_STOP=1 <<EOF
-            ALTER ROLE "''$USERNAME" WITH LOGIN PASSWORD '''$PASSWORD_ESCAPED';
+            ALTER ROLE "''${USERNAME}" WITH LOGIN PASSWORD '''${PASSWORD_ESCAPED}';
             EOF
             else
-              echo "  Creating role ''$USERNAME..."
+              echo "  Creating role ''${USERNAME}..."
               psql -v ON_ERROR_STOP=1 <<EOF
-            CREATE ROLE "''$USERNAME" WITH LOGIN PASSWORD '''$PASSWORD_ESCAPED';
+            CREATE ROLE "''${USERNAME}" WITH LOGIN PASSWORD '''${PASSWORD_ESCAPED}';
             EOF
             fi
 
@@ -185,18 +185,18 @@ in {
             if psql -tAc "SELECT 1 FROM pg_database WHERE datname='${dbName}'" | grep -q 1; then
               echo "  Database ${dbName} exists, updating owner..."
               psql -v ON_ERROR_STOP=1 <<EOF
-            ALTER DATABASE "${dbName}" OWNER TO "''$USERNAME";
+            ALTER DATABASE "${dbName}" OWNER TO "''${USERNAME}";
             EOF
             else
               echo "  Creating database ${dbName}..."
               psql -v ON_ERROR_STOP=1 <<EOF
-            CREATE DATABASE "${dbName}" OWNER "''$USERNAME";
+            CREATE DATABASE "${dbName}" OWNER "''${USERNAME}";
             EOF
             fi
 
             # Grant all privileges
             psql -v ON_ERROR_STOP=1 <<EOF
-            GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "''$USERNAME";
+            GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "''${USERNAME}";
             EOF
 
             echo "  ✓ Database ${dbName} provisioned successfully"
