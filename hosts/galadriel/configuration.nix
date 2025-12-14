@@ -331,7 +331,7 @@ in {
     };
 
     settings = {
-      listen_addresses = "127.0.0.1";
+      listen_addresses = "*";
       max_connections = 100;
       shared_buffers = "128MB";
     };
