@@ -178,34 +178,38 @@ in {
               exit 1
             fi
 
+            # Escape single quotes in password for SQL literals using awk octal escapes.
+            # This avoids embedding the Nix indented-string terminator sequence.
+            PASSWORD_ESCAPED=$(printf %s "$PASSWORD" | awk '{ gsub(/\047/, "\047\047"); printf "%s", $0 }')
+
             echo "  Username: $USERNAME"
             echo "  Database: ${dbName}"
 
             # Check if role exists
-            if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = :'role'" -v role="$USERNAME" | grep -q 1; then
+            if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$USERNAME'" | grep -q 1; then
               echo "  Role $USERNAME exists, updating password..."
-              psql -v ON_ERROR_STOP=1 -v role="$USERNAME" -v pw="$PASSWORD" \
-                -c "ALTER ROLE :\"role\" WITH LOGIN PASSWORD :'pw';"
+              psql -v ON_ERROR_STOP=1 \
+                -c "ALTER ROLE \"$USERNAME\" WITH LOGIN PASSWORD '$PASSWORD_ESCAPED';"
             else
               echo "  Creating role $USERNAME..."
-              psql -v ON_ERROR_STOP=1 -v role="$USERNAME" -v pw="$PASSWORD" \
-                -c "CREATE ROLE :\"role\" WITH LOGIN PASSWORD :'pw';"
+              psql -v ON_ERROR_STOP=1 \
+                -c "CREATE ROLE \"$USERNAME\" WITH LOGIN PASSWORD '$PASSWORD_ESCAPED';"
             fi
 
             # Check if database exists
-            if psql -tAc "SELECT 1 FROM pg_database WHERE datname = :'db'" -v db="${dbName}" | grep -q 1; then
+            if psql -tAc "SELECT 1 FROM pg_database WHERE datname='${dbName}'" | grep -q 1; then
               echo "  Database ${dbName} exists, updating owner..."
-              psql -v ON_ERROR_STOP=1 -v db="${dbName}" -v role="$USERNAME" \
-                -c "ALTER DATABASE :\"db\" OWNER TO :\"role\";"
+              psql -v ON_ERROR_STOP=1 \
+                -c "ALTER DATABASE \"${dbName}\" OWNER TO \"$USERNAME\";"
             else
               echo "  Creating database ${dbName}..."
-              psql -v ON_ERROR_STOP=1 -v db="${dbName}" -v role="$USERNAME" \
-                -c "CREATE DATABASE :\"db\" OWNER :\"role\";"
+              psql -v ON_ERROR_STOP=1 \
+                -c "CREATE DATABASE \"${dbName}\" OWNER \"$USERNAME\";"
             fi
 
             # Grant all privileges
-            psql -v ON_ERROR_STOP=1 -v db="${dbName}" -v role="$USERNAME" \
-              -c "GRANT ALL PRIVILEGES ON DATABASE :\"db\" TO :\"role\";"
+            psql -v ON_ERROR_STOP=1 \
+              -c "GRANT ALL PRIVILEGES ON DATABASE \"${dbName}\" TO \"$USERNAME\";"
 
             echo "  ✓ Database ${dbName} provisioned successfully"
           ''
@@ -225,7 +229,10 @@ in {
         Group = "postgres";
       };
 
-      path = [cfg.package];
+      path = [
+        cfg.package
+        pkgs.gawk
+      ];
 
       script = ''
         set -e
