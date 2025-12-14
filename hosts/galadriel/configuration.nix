@@ -26,6 +26,7 @@ in {
     # Apps
     ../../modules/apps/homepage.nix
     ../../modules/apps/mysql.nix
+    ../../modules/apps/postgresql.nix
     ../../modules/apps/vaultwarden.nix
     # Media
     ../../modules/media/shared-media.nix
@@ -311,6 +312,30 @@ in {
         max_connections = 100;
         skip_name_resolve = true;
       };
+    };
+  };
+
+  # ============================================================================
+  # POSTGRESQL DATABASE
+  # ============================================================================
+
+  fleet.apps.postgresql = {
+    enable = true;
+    port = 5432;
+
+    # Database configurations - each creates a role and database
+    # Example app - replace with actual app name
+    databases = {
+      exampleapp = {
+        dbName = "exampleapp";
+        secretPrefix = "postgresql/exampleapp";
+      };
+    };
+
+    settings = {
+      listen_addresses = "127.0.0.1";
+      max_connections = 100;
+      shared_buffers = "128MB";
     };
   };
 
@@ -651,6 +676,18 @@ in {
       "radarr/api-key" = {
         owner = "root";
         group = "root";
+        mode = "0400";
+      };
+
+      # PostgreSQL credentials
+      "postgresql/exampleapp/username" = {
+        owner = "postgres";
+        group = "postgres";
+        mode = "0400";
+      };
+      "postgresql/exampleapp/password" = {
+        owner = "postgres";
+        group = "postgres";
         mode = "0400";
       };
     };
