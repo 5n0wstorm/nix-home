@@ -118,7 +118,17 @@ in {
       enable = true;
       package = cfg.package;
       dataDir = cfg.dataDir;
-      settings = cfg.settings;
+      # NixOS sets `services.postgresql.settings.listen_addresses = "localhost"` in
+      # its module. If we set a different value at the same priority it causes a
+      # conflict, so we force our desired listen address and keep the rest merged.
+      settings = let
+        listenAddr = cfg.settings.listen_addresses or "127.0.0.1";
+        otherSettings = removeAttrs cfg.settings ["listen_addresses"];
+      in
+        otherSettings
+        // {
+          listen_addresses = mkForce listenAddr;
+        };
 
       # Enable peer authentication for local postgres user
       authentication = mkOverride 10 ''
