@@ -189,16 +189,16 @@ in {
           (concatStringsSep "\n" (map (cidr: "hostnossl all all ${cidr} reject") cfg.allowedCIDRs));
       in
         mkOverride 10 ''
-        # TYPE  DATABASE        USER            ADDRESS                 METHOD
-        local   all             postgres                                peer
-        local   all             all                                     peer
-        ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all 127.0.0.1/32 reject\n"}
-        ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all ::1/128 reject\n"}
-        ${extraReject}
-        ${hostType} all             all             127.0.0.1/32            scram-sha-256
-        ${hostType} all             all             ::1/128                 scram-sha-256
-        ${extraAllowed}
-      '';
+          # TYPE  DATABASE        USER            ADDRESS                 METHOD
+          local   all             postgres                                peer
+          local   all             all                                     peer
+          ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all 127.0.0.1/32 reject\n"}
+          ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all ::1/128 reject\n"}
+          ${extraReject}
+          ${hostType} all             all             127.0.0.1/32            scram-sha-256
+          ${hostType} all             all             ::1/128                 scram-sha-256
+          ${extraAllowed}
+        '';
     };
 
     # --------------------------------------------------------------------------
