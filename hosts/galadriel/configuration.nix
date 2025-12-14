@@ -323,12 +323,10 @@ in {
     enable = true;
     port = 5432;
 
-    # Database configurations - each creates a role and database
-    # Example app - replace with actual app name
     databases = {
-      exampleapp = {
-        dbName = "exampleapp";
-        secretPrefix = "postgresql/exampleapp";
+      gallery_dl = {
+        dbName = "gallery_dl";
+        secretPrefix = "postgresql/gallery_dl";
       };
     };
 
@@ -680,12 +678,12 @@ in {
       };
 
       # PostgreSQL credentials
-      "postgresql/exampleapp/username" = {
+      "postgresql/gallery_dl/username" = {
         owner = "postgres";
         group = "postgres";
         mode = "0400";
       };
-      "postgresql/exampleapp/password" = {
+      "postgresql/gallery_dl/password" = {
         owner = "postgres";
         group = "postgres";
         mode = "0400";
