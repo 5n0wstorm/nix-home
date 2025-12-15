@@ -103,6 +103,7 @@ in {
   # Custom gallery-dl from Gitea fork
   fleet.apps.galleryDl = {
     enable = true;
+    forceData0777 = true;
 
     instances.telegram = {
       enable = true;
@@ -113,10 +114,11 @@ in {
       workingDir = "/data/archive/telegram";
       config = {
         extractor = {
-          "base-directory" = "/data/archive/telegram";
-          # Drop the default "{category}" directory component so telegram downloads land at:
-          # /data/archive/telegram/<chat>/messages/<id>...
-          directory = ["{subcategory}"];
+          # Use default gallery-dl layout:
+          # /data/archive/<category>/<subcategory>/...
+          # For telegram this becomes:
+          # /data/archive/telegram/<chat>/...
+          "base-directory" = "/data/archive";
           archive = "@ARCHIVE_URL@";
           telegram = {
             "api-id" = "@TG_API_ID@";
