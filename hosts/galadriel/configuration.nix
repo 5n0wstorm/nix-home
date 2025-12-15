@@ -114,6 +114,9 @@ in {
       config = {
         extractor = {
           "base-directory" = "/data/archive/telegram";
+          # Drop the default "{category}" directory component so telegram downloads land at:
+          # /data/archive/telegram/<chat>/messages/<id>...
+          directory = ["{subcategory}"];
           archive = "@ARCHIVE_URL@";
           telegram = {
             "api-id" = "@TG_API_ID@";
