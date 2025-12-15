@@ -11,7 +11,7 @@
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     gallery-dl-src = {
-      url = "git+ssh://gitea@git.sn0wstorm.com/Dominik/gallery-dl.git?ref=master";
+      url = "git+ssh://gitea@192.168.2.10/Dominik/gallery-dl.git?ref=master";
       flake = false;
     };
   };
