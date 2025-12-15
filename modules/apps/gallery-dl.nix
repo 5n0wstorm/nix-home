@@ -176,36 +176,37 @@ in {
           if inst.workingDir != null
           then inst.workingDir
           else "${galleryDlBaseDir}/${name}";
-      in "d ${instanceDir} 0775 ${cfg.user} ${archiveGroup} -") enabledInstances);
+      in "d ${instanceDir} 0775 ${cfg.user} ${archiveGroup} -")
+      enabledInstances);
 
     # --------------------------------------------------------------------------
     # SERVICES + TIMERS (multi-instance)
     # --------------------------------------------------------------------------
 
-    systemd.services =
-      mapAttrs' (name: inst: let
-        instanceDir =
-          if inst.workingDir != null
-          then inst.workingDir
-          else "${galleryDlBaseDir}/${name}";
-        renderedConfigFile = "${instanceDir}/config.json";
-        effectiveConfigFile =
-          if inst.config != null
-          then renderedConfigFile
-          else inst.configFile;
-        archiveFile =
-          if inst.downloadArchiveFile != null
-          then inst.downloadArchiveFile
-          else "${instanceDir}/archive.txt";
-        args =
-          (optional (effectiveConfigFile != null) "--config")
-          ++ (optional (effectiveConfigFile != null) (toString effectiveConfigFile))
-          ++ ["--download-archive" archiveFile]
-          ++ (optional (inst.urlFile != null) "--input-file")
-          ++ (optional (inst.urlFile != null) inst.urlFile)
-          ++ inst.args
-          ++ (optionals (inst.urlFile == null) inst.urls);
-      in nameValuePair "gallery-dl-${name}" {
+    systemd.services = mapAttrs' (name: inst: let
+      instanceDir =
+        if inst.workingDir != null
+        then inst.workingDir
+        else "${galleryDlBaseDir}/${name}";
+      renderedConfigFile = "${instanceDir}/config.json";
+      effectiveConfigFile =
+        if inst.config != null
+        then renderedConfigFile
+        else inst.configFile;
+      archiveFile =
+        if inst.downloadArchiveFile != null
+        then inst.downloadArchiveFile
+        else "${instanceDir}/archive.txt";
+      args =
+        (optional (effectiveConfigFile != null) "--config")
+        ++ (optional (effectiveConfigFile != null) (toString effectiveConfigFile))
+        ++ ["--download-archive" archiveFile]
+        ++ (optional (inst.urlFile != null) "--input-file")
+        ++ (optional (inst.urlFile != null) inst.urlFile)
+        ++ inst.args
+        ++ (optionals (inst.urlFile == null) inst.urls);
+    in
+      nameValuePair "gallery-dl-${name}" {
         description = "gallery-dl instance: ${name}";
 
         serviceConfig = {
@@ -252,10 +253,11 @@ in {
 
           exec ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl ${escapeShellArgs args}
         '';
-      }) enabledInstances;
+      })
+    enabledInstances;
 
-    systemd.timers =
-      mapAttrs' (name: inst: nameValuePair "gallery-dl-${name}" {
+    systemd.timers = mapAttrs' (name: inst:
+      nameValuePair "gallery-dl-${name}" {
         description = "gallery-dl timer: ${name}";
         wantedBy = ["timers.target"];
         timerConfig = {
@@ -263,7 +265,8 @@ in {
           Persistent = true;
           Unit = "gallery-dl-${name}.service";
         };
-      }) enabledInstances;
+      })
+    enabledInstances;
 
     # --------------------------------------------------------------------------
     # PACKAGE INSTALLATION
