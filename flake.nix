@@ -48,14 +48,14 @@
           postPatch =
             (oldAttrs.postPatch or "")
             + ''
-              if [ -f gallery_dl/exception.py ] && ! grep -q "MissingDependencyError" gallery_dl/exception.py; then
-                cat >> gallery_dl/exception.py <<'EOF'
+                            if [ -f gallery_dl/exception.py ] && ! grep -q "MissingDependencyError" gallery_dl/exception.py; then
+                              cat >> gallery_dl/exception.py <<'EOF'
 
 
-class MissingDependencyError(ImportError):
-    """Raised when an optional runtime dependency is missing."""
-EOF
-              fi
+              class MissingDependencyError(ImportError):
+                  """Raised when an optional runtime dependency is missing."""
+              EOF
+                            fi
             '';
         });
       in {
