@@ -175,7 +175,7 @@ in {
     '';
   };
 
-  systemd.tmpfiles.rules = [
+  systemd.tmpfiles.rules = pkgs.lib.mkBefore [
     "d /data/archive 0777 root root -"
     "d /data/archive/telegram 0777 root root -"
     "f /data/archive/telegram/urls.txt 0666 root root -"
