@@ -162,18 +162,15 @@ in {
     # DIRECTORY STRUCTURE
     # --------------------------------------------------------------------------
 
-    systemd.tmpfiles.rules = [
-      # Ensure /data/archive exists even if not provided by other modules.
-      "d /data/archive 0775 root ${archiveGroup} -"
-
-      # gallery-dl workspace (archives, downloads, metadata, etc.)
-      "d ${archiveBase} 0775 root ${archiveGroup} -"
-      "d ${galleryDlBaseDir} 0775 root ${archiveGroup} -"
-    ];
-
-    # Per-instance directories
     systemd.tmpfiles.rules =
-      systemd.tmpfiles.rules
+      [
+        # Ensure /data/archive exists even if not provided by other modules.
+        "d /data/archive 0775 root ${archiveGroup} -"
+
+        # gallery-dl workspace (archives, downloads, metadata, etc.)
+        "d ${archiveBase} 0775 root ${archiveGroup} -"
+        "d ${galleryDlBaseDir} 0775 root ${archiveGroup} -"
+      ]
       ++ (mapAttrsToList (name: inst: let
         instanceDir =
           if inst.workingDir != null
