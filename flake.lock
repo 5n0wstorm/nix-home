@@ -89,6 +89,23 @@
         "type": "github"
       }
     },
+    "gallery-dl-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1765799313,
+        "narHash": "sha256-rTqcUETADPJugu8njXwBhG2zvSfQBEa+0/J7Fj9Tu0E=",
+        "ref": "master",
+        "rev": "06ea2788fb100373e17ddef7ebb201f0651b6284",
+        "revCount": 7549,
+        "type": "git",
+        "url": "ssh://gitea@192.168.2.10/Dominik/gallery-dl.git"
+      },
+      "original": {
+        "ref": "master",
+        "type": "git",
+        "url": "ssh://gitea@192.168.2.10/Dominik/gallery-dl.git"
+      }
+    },
     "nix-github-actions": {
       "inputs": {
         "nixpkgs": [
@@ -197,6 +214,7 @@
       "inputs": {
         "colmena": "colmena",
         "disko": "disko",
+        "gallery-dl-src": "gallery-dl-src",
         "nixos-wsl": "nixos-wsl",
         "nixpkgs": "nixpkgs_3",
         "sops-nix": "sops-nix"

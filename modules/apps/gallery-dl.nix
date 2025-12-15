@@ -6,7 +6,12 @@
 }:
 with lib; let
   cfg = config.fleet.apps.galleryDl;
-  sharedMediaCfg = attrByPath ["fleet" "media" "shared"] {enable = false; group = "root";} config;
+  sharedMediaCfg =
+    attrByPath ["fleet" "media" "shared"] {
+      enable = false;
+      group = "root";
+    }
+    config;
   archiveGroup =
     if (sharedMediaCfg.enable or false)
     then sharedMediaCfg.group
@@ -53,4 +58,3 @@ in {
     ];
   };
 }
-
