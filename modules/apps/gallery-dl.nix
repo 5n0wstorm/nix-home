@@ -252,11 +252,12 @@ in {
           else inst.configFile;
         archiveFile =
           if inst.useDownloadArchiveFile
-          then (
-            if inst.downloadArchiveFile != null
-            then inst.downloadArchiveFile
-            else "${instanceDir}/archive.txt"
-          )
+          then
+            (
+              if inst.downloadArchiveFile != null
+              then inst.downloadArchiveFile
+              else "${instanceDir}/archive.txt"
+            )
           else null;
         args =
           (optional (effectiveConfigFile != null) "--config")
