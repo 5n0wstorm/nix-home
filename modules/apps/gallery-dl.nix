@@ -55,6 +55,10 @@ in {
 
     environment.systemPackages = [
       pkgs.gallery-dl-custom
+      # Telegram exporter dependency (python Telethon)
+      (pkgs.python3.withPackages (ps: [
+        ps.telethon
+      ]))
     ];
   };
 }
