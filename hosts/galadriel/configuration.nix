@@ -18,6 +18,7 @@ in {
     # Networking
     ../../modules/networking/reverse-proxy.nix
     ../../modules/networking/vpn-gateway.nix
+    ../../modules/networking/samba.nix
     # Monitoring
     ../../modules/monitoring/prometheus.nix
     ../../modules/monitoring/grafana.nix
@@ -315,6 +316,21 @@ in {
     };
 
     killSwitch = true;
+  };
+
+  # ============================================================================
+  # SAMBA SHARE FOR /data
+  # ============================================================================
+
+  fleet.networking.sambaDataShare = {
+    enable = true;
+    shareName = "data";
+    path = "/data";
+    usernameFile = config.sops.secrets."samba/data/username".path;
+    passwordFile = config.sops.secrets."samba/data/password".path;
+    allowedNetworks = ["192.168.2.0/24" "127.0.0.1"];
+    openFirewall = true;
+    wsdd.enable = true;
   };
 
   # qBittorrent - Torrent client (VPN protected)
@@ -871,6 +887,18 @@ in {
         mode = "0400";
       };
       "hetzner_smb/password" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+
+      # Samba /data share credentials
+      "samba/data/username" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "samba/data/password" = {
         owner = "root";
         group = "root";
         mode = "0400";
