@@ -67,11 +67,26 @@ in {
     port = 3001;
     appName = "Fleet Git";
     disableRegistration = true;
+    requireSigninView = true;
 
     # This host runs Gitea behind nginx reverse proxy + TLS
     listenAddress = "127.0.0.1";
     openFirewall = false;
     bypassAuth = true;
+
+    # Match the old Docker layout under /data:
+    # - /data/gitea (attachments/avatars/sessions/logs/...)
+    # - /data/git (repositories + lfs)
+    paths = {
+      appDataPath = "/var/lib/gitea/gitea";
+      repositoryRoot = "/var/lib/gitea/git/repositories";
+      lfsPath = "/var/lib/gitea/git/lfs";
+    };
+
+    database = {
+      type = "mysql";
+      mysql.useFleetMysql = true;
+    };
   };
 
   # Vaultwarden Password Manager
@@ -283,6 +298,10 @@ in {
       authelia = {
         database = "authelia";
         passwordFile = "/run/secrets/authelia/database/password";
+      };
+      gitea = {
+        database = "gitea";
+        passwordFile = "/run/secrets/mysql/gitea";
       };
       keycloak = {
         database = "keycloak";

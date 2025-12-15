@@ -335,9 +335,10 @@ in {
       };
     };
 
-    # Create log directory
+    # Create mount point and log directory
     systemd.tmpfiles.rules = [
       "d /var/log 0755 root root -"
+      "d ${cfg.mountPoint} 0700 root root -"
     ];
   };
 }

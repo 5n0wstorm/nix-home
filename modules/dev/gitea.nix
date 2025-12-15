@@ -84,10 +84,99 @@ in {
       description = "Disable user registration";
     };
 
+    requireSigninView = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Require authentication to view repositories and pages";
+    };
+
     bypassAuth = mkOption {
       type = types.bool;
       default = true;
       description = "Bypass Authelia authentication (Gitea has built-in auth)";
+    };
+
+    environmentFile = mkOption {
+      type = types.nullOr types.path;
+      default = null;
+      description = ''
+        Optional environment file for the gitea systemd service.
+        Useful for keeping sensitive config out of the Nix store via GITEA__* variables.
+      '';
+      example = "/run/secrets/gitea/env";
+    };
+
+    paths = {
+      appDataPath = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Gitea APP_DATA_PATH (where attachments/avatars/sessions/logs live)";
+        example = "/var/lib/gitea/gitea";
+      };
+
+      repositoryRoot = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Gitea repository ROOT directory";
+        example = "/var/lib/gitea/git/repositories";
+      };
+
+      lfsPath = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Gitea LFS storage path";
+        example = "/var/lib/gitea/git/lfs";
+      };
+    };
+
+    database = {
+      type = mkOption {
+        type = types.enum ["sqlite3" "mysql"];
+        default = "sqlite3";
+        description = "Database backend for Gitea";
+      };
+
+      sqlitePath = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "SQLite DB path (when database.type = sqlite3). Defaults to ${dataDir}/data/gitea.db";
+      };
+
+      mysql = {
+        useFleetMysql = mkOption {
+          type = types.bool;
+          default = true;
+          description = "Use connection info from fleet.apps.mysql.connections.gitea (requires a mysql databaseRequest)";
+        };
+
+        host = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          description = "MySQL host:port (when database.type = mysql and not using fleet mysql connection)";
+          example = "127.0.0.1:3306";
+        };
+
+        name = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          description = "MySQL database name";
+          example = "gitea";
+        };
+
+        user = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          description = "MySQL username";
+          example = "gitea";
+        };
+
+        passwordFile = mkOption {
+          type = types.nullOr types.path;
+          default = null;
+          description = "Path to file containing the MySQL user password";
+          example = "/run/secrets/mysql/gitea";
+        };
+      };
     };
 
     # Homepage dashboard integration
@@ -168,42 +257,90 @@ in {
       appName = cfg.appName;
       stateDir = cfg.dataDir;
 
-      settings = {
-        server = {
-          DOMAIN = cfg.domain;
-          ROOT_URL = effectiveRootUrl;
-          HTTP_PORT = cfg.port;
-          HTTP_ADDR = cfg.listenAddress;
-          DISABLE_SSH = false;
-          SSH_PORT = 22;
-        };
+      settings = mkMerge [
+        {
+          server = {
+            DOMAIN = cfg.domain;
+            ROOT_URL = effectiveRootUrl;
+            HTTP_PORT = cfg.port;
+            HTTP_ADDR = cfg.listenAddress;
+            DISABLE_SSH = false;
+            SSH_PORT = 22;
+          };
 
-        service = {
-          DISABLE_REGISTRATION = cfg.disableRegistration;
-          REQUIRE_SIGNIN_VIEW = false;
-        };
+          service = {
+            DISABLE_REGISTRATION = cfg.disableRegistration;
+            REQUIRE_SIGNIN_VIEW = cfg.requireSigninView;
+          };
 
-        mailer = {
-          ENABLED = false;
-          SENDMAIL_PATH = "${pkgs.system-sendmail}/bin/sendmail";
-        };
+          mailer = {
+            ENABLED = false;
+            SENDMAIL_PATH = "${pkgs.system-sendmail}/bin/sendmail";
+          };
 
-        repository = {
-          DEFAULT_BRANCH = "main";
-        };
+          repository = {
+            DEFAULT_BRANCH = "main";
+          };
 
-        # Backup configuration
-        dump = {
-          ENABLED = true;
-          SCHEDULE = "@midnight";
-          RETENTION_DAYS = 7;
-        };
-      };
+          # Backup configuration
+          dump = {
+            ENABLED = true;
+            SCHEDULE = "@midnight";
+            RETENTION_DAYS = 7;
+          };
+        }
 
-      database = {
-        type = "sqlite3";
-        path = "${cfg.dataDir}/data/gitea.db";
-      };
+        # Optional path overrides (useful for migrating from Docker layout)
+        (mkIf (cfg.paths.appDataPath != null) {
+          server.APP_DATA_PATH = cfg.paths.appDataPath;
+          repository.local.LOCAL_COPY_PATH = "${cfg.paths.appDataPath}/tmp/local-repo";
+          repository.upload.TEMP_PATH = "${cfg.paths.appDataPath}/uploads";
+          indexer.ISSUE_INDEXER_PATH = "${cfg.paths.appDataPath}/indexers/issues.bleve";
+          session = {
+            PROVIDER = "file";
+            PROVIDER_CONFIG = "${cfg.paths.appDataPath}/sessions";
+          };
+          picture = {
+            AVATAR_UPLOAD_PATH = "${cfg.paths.appDataPath}/avatars";
+            REPOSITORY_AVATAR_UPLOAD_PATH = "${cfg.paths.appDataPath}/repo-avatars";
+          };
+          attachment.PATH = "${cfg.paths.appDataPath}/attachments";
+          log.ROOT_PATH = "${cfg.paths.appDataPath}/log";
+        })
+
+        (mkIf (cfg.paths.repositoryRoot != null) {
+          repository.ROOT = cfg.paths.repositoryRoot;
+        })
+
+        (mkIf (cfg.paths.lfsPath != null) {
+          lfs.PATH = cfg.paths.lfsPath;
+        })
+      ];
+
+      database = let
+        mysqlConn = attrByPath ["fleet" "apps" "mysql" "connections" "gitea"] null config;
+        mysqlFromFleet = cfg.database.mysql.useFleetMysql && mysqlConn != null;
+        mysqlHost = if mysqlFromFleet then "${mysqlConn.host}:${toString mysqlConn.port}" else cfg.database.mysql.host;
+        mysqlName = if mysqlFromFleet then mysqlConn.database else cfg.database.mysql.name;
+        mysqlUser = if mysqlFromFleet then mysqlConn.user else cfg.database.mysql.user;
+        mysqlPasswordFile = if mysqlFromFleet then mysqlConn.passwordFile else cfg.database.mysql.passwordFile;
+        sqlitePath =
+          if cfg.database.sqlitePath != null
+          then cfg.database.sqlitePath
+          else "${cfg.dataDir}/data/gitea.db";
+      in
+        if cfg.database.type == "mysql"
+        then {
+          type = "mysql";
+          host = mysqlHost;
+          name = mysqlName;
+          user = mysqlUser;
+          passwordFile = mysqlPasswordFile;
+        }
+        else {
+          type = "sqlite3";
+          path = sqlitePath;
+        };
 
       lfs.enable = true;
     };
@@ -220,6 +357,9 @@ in {
     systemd.services.gitea.preStart = mkBefore ''
       install -d -m 0750 -o gitea -g gitea ${escapeShellArg cfg.dataDir}/custom/conf
     '';
+
+    # Optional environment file for secrets (GITEA__* variables).
+    systemd.services.gitea.serviceConfig.EnvironmentFile = mkIf (cfg.environmentFile != null) cfg.environmentFile;
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
