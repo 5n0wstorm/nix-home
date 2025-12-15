@@ -188,7 +188,9 @@ in {
         if inst.workingDir != null
         then inst.workingDir
         else "${galleryDlBaseDir}/${name}";
-      renderedConfigFile = "${instanceDir}/config.json";
+      # Render config into a per-run RuntimeDirectory (tmpfs), so it is always writable
+      # and secrets don't get persisted under /data.
+      renderedConfigFile = "/run/gallery-dl-${name}/config.json";
       effectiveConfigFile =
         if inst.config != null
         then renderedConfigFile
@@ -214,6 +216,8 @@ in {
           User = cfg.user;
           Group = cfg.group;
           SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+          RuntimeDirectory = "gallery-dl-${name}";
+          RuntimeDirectoryMode = "0700";
           WorkingDirectory = instanceDir;
           Nice = 10;
         };
