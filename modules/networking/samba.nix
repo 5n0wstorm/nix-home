@@ -71,6 +71,10 @@ in {
       enable = true;
       openFirewall = cfg.openFirewall;
 
+      # Ensure state directory exists
+      enableWinbindd = false;
+      enableNmbd = true;
+
       settings = {
         global = {
           security = "user";
@@ -134,13 +138,23 @@ in {
     users.groups.smb-data = {};
 
     # ==========================================================================
+    # STATE DIRECTORY
+    # ==========================================================================
+
+    # Ensure Samba state directories exist before services start
+    systemd.tmpfiles.rules = [
+      "d /var/lib/samba 0755 root root -"
+      "d /var/lib/samba/private 0700 root root -"
+    ];
+
+    # ==========================================================================
     # PROVISIONING SERVICE
     # ==========================================================================
 
     systemd.services.samba-data-provision = {
       description = "Provision Samba user and ACLs for ${cfg.shareName} share";
       wantedBy = ["multi-user.target"];
-      after = ["sops-nix.service" "local-fs.target"];
+      after = ["sops-nix.service" "local-fs.target" "systemd-tmpfiles-setup.service"];
       before = ["samba-smbd.service"];
       # Don't require - let Samba start even if provisioning fails initially
       # requiredBy = ["samba-smbd.service"];
