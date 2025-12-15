@@ -37,11 +37,41 @@
     # =========================================================================
 
     overlays = [
-      (final: prev: {
-        gallery-dl-custom = prev.gallery-dl.overrideAttrs (oldAttrs: {
+      (final: prev: let
+        galleryDlCustom = prev.gallery-dl.overrideAttrs (oldAttrs: {
           src = gallery-dl-src;
           version = "custom-${gallery-dl-src.shortRev or "unknown"}";
         });
+
+        # Fix for forks/patchsets where telegram extractor expects
+        # gallery_dl.exception.MissingDependencyError but it's absent.
+        galleryDlSitecustomize = prev.writeTextFile {
+          name = "gallery-dl-sitecustomize";
+          destination = "/${prev.python3.sitePackages}/sitecustomize.py";
+          text = ''
+            try:
+                import gallery_dl.exception as exc
+                if not hasattr(exc, "MissingDependencyError"):
+                    class MissingDependencyError(ImportError):
+                        pass
+                    exc.MissingDependencyError = MissingDependencyError
+            except Exception:
+                pass
+          '';
+        };
+
+        galleryDlCustomFixed = prev.symlinkJoin {
+          name = "gallery-dl-custom-fixed";
+          paths = [galleryDlCustom];
+          buildInputs = [prev.makeWrapper];
+          postBuild = ''
+            wrapProgram $out/bin/gallery-dl \
+              --prefix PYTHONPATH : ${galleryDlSitecustomize}/${prev.python3.sitePackages}
+          '';
+        };
+      in {
+        gallery-dl-custom = galleryDlCustom;
+        gallery-dl-custom-fixed = galleryDlCustomFixed;
       })
     ];
     # For scaling up your homelab, you'd likely want automated host generation:

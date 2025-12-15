@@ -101,7 +101,51 @@ in {
   };
 
   # Custom gallery-dl from Gitea fork
-  fleet.apps.galleryDl.enable = true;
+  fleet.apps.galleryDl = {
+    enable = true;
+
+    instances.telegram = {
+      enable = true;
+      # every minute
+      onCalendar = "minutely";
+
+      # Render config from Nix attrset + sops secrets (no external template file)
+      config = {
+        extractor = {
+          "base-directory" = "./gallery-dl";
+          archive = "@ARCHIVE_URL@";
+          telegram = {
+            "api-id" = "@TG_API_ID@";
+            "api-hash" = "@TG_API_HASH@";
+            "session-type" = "string";
+            "session-string" = "@TG_SESSION_STRING@";
+            download = [
+              "messages"
+              "stories"
+              "text"
+            ];
+            "avatar-size" = [64 64];
+            "media-mime-types" = [];
+            "batch-size" = 2000;
+            "order-messages" = "desc";
+            limit = null;
+          };
+        };
+      };
+      configSubstitutions = {
+        "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
+        "@TG_API_ID@" = config.sops.secrets."gallery-dl/telegram/api-id".path;
+        "@TG_API_HASH@" = config.sops.secrets."gallery-dl/telegram/api-hash".path;
+        "@TG_SESSION_STRING@" = config.sops.secrets."gallery-dl/telegram/session-string".path;
+      };
+
+      # one URL per line
+      urlFile = "/data/archive/gallery-dl/telegram/urls.txt";
+
+      # Add your preferred args here (example):
+      # args = ["--verbose"];
+    };
+  };
 
   # Homepage Dashboard
   fleet.apps.homepage = {
@@ -633,6 +677,28 @@ in {
       "qbittorrent/password" = {
         owner = "root";
         group = "root";
+        mode = "0400";
+      };
+
+      # gallery-dl (telegram) secrets used to render config.json at runtime
+      "gallery-dl/archive-url" = {
+        owner = config.fleet.apps.galleryDl.user;
+        group = config.fleet.apps.galleryDl.group;
+        mode = "0400";
+      };
+      "gallery-dl/telegram/api-id" = {
+        owner = config.fleet.apps.galleryDl.user;
+        group = config.fleet.apps.galleryDl.group;
+        mode = "0400";
+      };
+      "gallery-dl/telegram/api-hash" = {
+        owner = config.fleet.apps.galleryDl.user;
+        group = config.fleet.apps.galleryDl.group;
+        mode = "0400";
+      };
+      "gallery-dl/telegram/session-string" = {
+        owner = config.fleet.apps.galleryDl.user;
+        group = config.fleet.apps.galleryDl.group;
         mode = "0400";
       };
 
