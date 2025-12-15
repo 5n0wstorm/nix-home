@@ -6,7 +6,22 @@
 }:
 with lib; let
   cfg = config.fleet.dev.gitea;
-  homepageCfg = config.fleet.apps.homepage;
+  homepageCfg = attrByPath ["fleet" "apps" "homepage"] {enable = false;} config;
+  reverseProxyCfg = attrByPath ["fleet" "networking" "reverseProxy"] {enable = false;} config;
+
+  # Safely check whether other modules are present (avoids evaluation failures on hosts
+  # that don't import homepage/reverse-proxy).
+  hasHomepageRegistry = hasAttrByPath ["fleet" "apps" "homepage" "serviceRegistry"] config;
+  hasReverseProxyRegistry = hasAttrByPath ["fleet" "networking" "reverseProxy" "serviceRegistry"] config;
+
+  defaultRootUrl =
+    if (reverseProxyCfg.enable or false)
+    then "https://${cfg.domain}/"
+    else "http://${cfg.domain}:${toString cfg.port}/";
+  effectiveRootUrl =
+    if cfg.rootUrl != null
+    then cfg.rootUrl
+    else defaultRootUrl;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -21,10 +36,34 @@ in {
       description = "Port for Gitea web interface";
     };
 
+    listenAddress = mkOption {
+      type = types.str;
+      default = "0.0.0.0";
+      description = "Address for Gitea to bind to (use 127.0.0.1 when behind reverse proxy)";
+      example = "127.0.0.1";
+    };
+
+    openFirewall = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Open firewall port for the Gitea HTTP interface";
+    };
+
     domain = mkOption {
       type = types.str;
       default = "localhost";
       description = "Domain name for Gitea";
+    };
+
+    rootUrl = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        External URL for Gitea (used for redirects/clone URLs). When unset, defaults to:
+        - https://<domain>/ if reverse proxy is enabled
+        - http://<domain>:<port>/ otherwise
+      '';
+      example = "https://git.example.com/";
     };
 
     dataDir = mkOption {
@@ -43,6 +82,12 @@ in {
       type = types.bool;
       default = false;
       description = "Disable user registration";
+    };
+
+    bypassAuth = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Bypass Authelia authentication (Gitea has built-in auth)";
     };
 
     # Homepage dashboard integration
@@ -88,12 +133,30 @@ in {
     # HOMEPAGE DASHBOARD REGISTRATION
     # --------------------------------------------------------------------------
 
-    fleet.apps.homepage.serviceRegistry.gitea = mkIf (cfg.homepage.enable && homepageCfg.enable) {
+    fleet.apps.homepage.serviceRegistry.gitea = mkIf (hasHomepageRegistry && cfg.homepage.enable && (homepageCfg.enable or false)) {
       name = cfg.homepage.name;
       description = cfg.homepage.description;
       icon = cfg.homepage.icon;
-      href = "http://${cfg.domain}:${toString cfg.port}";
+      href = removeSuffix "/" effectiveRootUrl;
       category = cfg.homepage.category;
+    };
+
+    # --------------------------------------------------------------------------
+    # REVERSE PROXY REGISTRATION
+    # --------------------------------------------------------------------------
+
+    fleet.networking.reverseProxy.serviceRegistry.gitea = mkIf (hasReverseProxyRegistry && (reverseProxyCfg.enable or false)) {
+      port = cfg.port;
+      labels = {
+        "fleet.reverse-proxy.enable" = "true";
+        "fleet.reverse-proxy.domain" = cfg.domain;
+        "fleet.reverse-proxy.ssl" = "true";
+        "fleet.reverse-proxy.websockets" = "true";
+        "fleet.authelia.bypass" =
+          if cfg.bypassAuth
+          then "true"
+          else "false";
+      };
     };
 
     # --------------------------------------------------------------------------
@@ -108,8 +171,9 @@ in {
       settings = {
         server = {
           DOMAIN = cfg.domain;
-          ROOT_URL = "http://${cfg.domain}:${toString cfg.port}/";
+          ROOT_URL = effectiveRootUrl;
           HTTP_PORT = cfg.port;
+          HTTP_ADDR = cfg.listenAddress;
           DISABLE_SSH = false;
           SSH_PORT = 22;
         };
@@ -148,6 +212,6 @@ in {
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
 
-    networking.firewall.allowedTCPPorts = [cfg.port];
+    networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [cfg.port];
   };
 }

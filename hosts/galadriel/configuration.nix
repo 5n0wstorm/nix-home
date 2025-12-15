@@ -22,6 +22,7 @@ in {
     ../../modules/monitoring/prometheus.nix
     ../../modules/monitoring/grafana.nix
     # Dev
+    ../../modules/dev/gitea.nix
     ../../modules/dev/jenkins.nix
     # Apps
     ../../modules/apps/homepage.nix
@@ -56,6 +57,20 @@ in {
   # ============================================================================
 
   fleet.dev.jenkins.enable = true;
+
+  fleet.dev.gitea = {
+    enable = true;
+    domain = "git.sn0wstorm.com";
+    # Avoid collision with Grafana (also defaults to 3000)
+    port = 3001;
+    appName = "Fleet Git";
+    disableRegistration = true;
+
+    # This host runs Gitea behind nginx reverse proxy + TLS
+    listenAddress = "127.0.0.1";
+    openFirewall = false;
+    bypassAuth = true;
+  };
 
   # Vaultwarden Password Manager
   fleet.apps.vaultwarden = {
