@@ -10,11 +10,16 @@ with lib; let
   # msmtp does not support `tls_min_version` (it errors with "unknown command").
   # Use gnutls priority strings via `tls_priorities` instead.
   tlsPrioritiesForMinVersion = v:
-    if v == "" then ""
-    else if v == "TLS1.0" || v == "TLSv1.0" then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2:+VERS-TLS1.1:+VERS-TLS1.0"
-    else if v == "TLS1.1" || v == "TLSv1.1" then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2:+VERS-TLS1.1"
-    else if v == "TLS1.2" || v == "TLSv1.2" then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2"
-    else if v == "TLS1.3" || v == "TLSv1.3" then "NORMAL:-VERS-ALL:+VERS-TLS1.3"
+    if v == ""
+    then ""
+    else if v == "TLS1.0" || v == "TLSv1.0"
+    then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2:+VERS-TLS1.1:+VERS-TLS1.0"
+    else if v == "TLS1.1" || v == "TLSv1.1"
+    then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2:+VERS-TLS1.1"
+    else if v == "TLS1.2" || v == "TLSv1.2"
+    then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2"
+    else if v == "TLS1.3" || v == "TLSv1.3"
+    then "NORMAL:-VERS-ALL:+VERS-TLS1.3"
     else "";
 
   # Build the backup script
