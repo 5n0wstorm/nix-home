@@ -61,7 +61,10 @@
           # Telegram extractor needs telethon available in gallery-dl's Python env.
           propagatedBuildInputs =
             (oldAttrs.propagatedBuildInputs or [])
-            ++ [prev.python3Packages.telethon];
+            ++ [
+              prev.python3Packages.telethon
+              prev.python3Packages.psycopg
+            ];
         });
       in {
         gallery-dl-custom = galleryDlCustom;

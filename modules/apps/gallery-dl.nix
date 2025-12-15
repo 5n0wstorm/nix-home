@@ -192,7 +192,36 @@ in {
     # SERVICES + TIMERS (multi-instance)
     # --------------------------------------------------------------------------
 
-    systemd.services = mapAttrs' (name: inst: let
+    systemd.services =
+      # Wrapper service (triggered by timer): spawns the actual job without blocking.
+      (mapAttrs' (name: _inst:
+        nameValuePair "gallery-dl-${name}" {
+          description = "gallery-dl instance launcher: ${name}";
+
+          # Avoid nixos-rebuild blocking: this unit should be fast and should not be restarted automatically.
+          restartIfChanged = false;
+
+          serviceConfig = {
+            Type = "oneshot";
+            User = "root";
+            Group = "root";
+          };
+
+          script = ''
+            set -euo pipefail
+
+            # If a previous run is still active, don't start another one.
+            if ${pkgs.systemd}/bin/systemctl -q is-active "gallery-dl-job-${name}.service"; then
+              exit 0
+            fi
+
+            exec ${pkgs.systemd}/bin/systemctl start --no-block "gallery-dl-job-${name}.service"
+          '';
+        })
+      enabledInstances)
+      //
+      # Actual long-running job service (does the work).
+      (mapAttrs' (name: inst: let
       instanceDir =
         if inst.workingDir != null
         then inst.workingDir
@@ -217,8 +246,11 @@ in {
         ++ inst.args
         ++ (optionals (inst.urlFile == null) inst.urls);
     in
-      nameValuePair "gallery-dl-${name}" {
-        description = "gallery-dl instance: ${name}";
+      nameValuePair "gallery-dl-job-${name}" {
+        description = "gallery-dl instance job: ${name}";
+
+        # If a job is running during a switch, don't restart it (avoids blocking rebuilds).
+        restartIfChanged = false;
 
         serviceConfig = {
           Type = "oneshot";
@@ -265,8 +297,8 @@ in {
 
           exec ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl ${escapeShellArgs args}
         '';
-      })
-    enabledInstances;
+      }))
+      enabledInstances;
 
     systemd.timers = mapAttrs' (name: inst:
       nameValuePair "gallery-dl-${name}" {
