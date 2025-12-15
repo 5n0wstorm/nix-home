@@ -19,7 +19,7 @@ with lib; let
     send_email() {
       local subject="$1"
       local body="$2"
-      
+
       # Create msmtp config
       cat > /tmp/msmtprc.$$ <<EOF
     account default
@@ -31,16 +31,20 @@ with lib; let
     password $(cat ${cfg.email.smtp.passwordFile})
     tls on
     tls_starttls on
-    tls_certcheck ${if cfg.email.smtp.tls.skipVerify then "off" else "on"}
+    tls_certcheck ${
+      if cfg.email.smtp.tls.skipVerify
+      then "off"
+      else "on"
+    }
     ${optionalString (cfg.email.smtp.tls.minimumVersion != "") "tls_min_version ${cfg.email.smtp.tls.minimumVersion}"}
     logfile /var/log/backup-var-lib-msmtp.log
     EOF
       chmod 600 /tmp/msmtprc.$$
-      
+
       # Send email
       echo -e "Subject: $subject\n\n$body" | \
         ${pkgs.msmtp}/bin/msmtp --file=/tmp/msmtprc.$$ -t "${cfg.email.to}"
-      
+
       rm -f /tmp/msmtprc.$$
     }
 
@@ -86,7 +90,7 @@ with lib; let
       --exclude='*.tmp' \
       --exclude='*.cache' \
       --verbose 2>&1)
-    
+
     BACKUP_EXIT=$?
     if [ $BACKUP_EXIT -ne 0 ]; then
       log_error "Restic backup failed with exit code $BACKUP_EXIT"
@@ -113,7 +117,7 @@ with lib; let
     # Extract useful info from backup output
     FILES_NEW=$(echo "$BACKUP_OUTPUT" | grep -oP 'Added to the repository: \K[\d.]+\s+\w+' || echo "N/A")
     FILES_CHANGED=$(echo "$BACKUP_OUTPUT" | grep -oP 'processed \K\d+ files' || echo "N/A")
-    
+
     # Build success email
     EMAIL_BODY="✅ Backup completed successfully!
 
@@ -142,7 +146,7 @@ with lib; let
     "
 
     log "Backup completed successfully in ${DURATION_MIN}m ${DURATION_SEC}s"
-    
+
     # Send success email
     send_email "✅ Backup Successful on $(hostname)" "$EMAIL_BODY"
   '';
@@ -294,7 +298,7 @@ in {
         ExecStart = "${backupScript}";
         User = "root";
         Group = "root";
-        
+
         # Security hardening
         PrivateTmp = true;
         NoNewPrivileges = true;
@@ -305,16 +309,16 @@ in {
           "/var/lib"
           "/var/log"
         ];
-        
+
         # Resource limits
         CPUQuota = "80%";
         MemoryMax = "2G";
         IOWeight = 100;
-        
+
         # Timeout (4 hours max)
         TimeoutStartSec = "4h";
       };
-      
+
       # Ensure network is available
       after = ["network-online.target"];
       wants = ["network-online.target"];
@@ -337,4 +341,3 @@ in {
     ];
   };
 }
-
