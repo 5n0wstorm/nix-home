@@ -229,10 +229,9 @@ in {
 
           ${optionalString (inst.config != null) ''
             # Render config from Nix attrset + secret files at runtime (keeps secrets out of git/Nix store).
-            OUT=${escapeShellArg renderedConfigFile}
-            SUBS_JSON=${escapeShellArg subsJson}
-            CONFIG_JSON=${escapeShellArg configJson}
-
+            OUT=${escapeShellArg renderedConfigFile} \
+            SUBS_JSON=${escapeShellArg subsJson} \
+            CONFIG_JSON=${escapeShellArg configJson} \
             ${pkgs.python3}/bin/python3 - <<'PY'
             import json
             import os
