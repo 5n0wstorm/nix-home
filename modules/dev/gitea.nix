@@ -292,28 +292,28 @@ in {
 
         # Optional path overrides (useful for migrating from Docker layout)
         (mkIf (cfg.paths.appDataPath != null) {
-          server.APP_DATA_PATH = cfg.paths.appDataPath;
-          repository.local.LOCAL_COPY_PATH = "${cfg.paths.appDataPath}/tmp/local-repo";
-          repository.upload.TEMP_PATH = "${cfg.paths.appDataPath}/uploads";
-          indexer.ISSUE_INDEXER_PATH = "${cfg.paths.appDataPath}/indexers/issues.bleve";
+          server.APP_DATA_PATH = mkForce cfg.paths.appDataPath;
+          repository.local.LOCAL_COPY_PATH = mkForce "${cfg.paths.appDataPath}/tmp/local-repo";
+          repository.upload.TEMP_PATH = mkForce "${cfg.paths.appDataPath}/uploads";
+          indexer.ISSUE_INDEXER_PATH = mkForce "${cfg.paths.appDataPath}/indexers/issues.bleve";
           session = {
             PROVIDER = "file";
-            PROVIDER_CONFIG = "${cfg.paths.appDataPath}/sessions";
+            PROVIDER_CONFIG = mkForce "${cfg.paths.appDataPath}/sessions";
           };
           picture = {
-            AVATAR_UPLOAD_PATH = "${cfg.paths.appDataPath}/avatars";
-            REPOSITORY_AVATAR_UPLOAD_PATH = "${cfg.paths.appDataPath}/repo-avatars";
+            AVATAR_UPLOAD_PATH = mkForce "${cfg.paths.appDataPath}/avatars";
+            REPOSITORY_AVATAR_UPLOAD_PATH = mkForce "${cfg.paths.appDataPath}/repo-avatars";
           };
-          attachment.PATH = "${cfg.paths.appDataPath}/attachments";
-          log.ROOT_PATH = "${cfg.paths.appDataPath}/log";
+          attachment.PATH = mkForce "${cfg.paths.appDataPath}/attachments";
+          log.ROOT_PATH = mkForce "${cfg.paths.appDataPath}/log";
         })
 
         (mkIf (cfg.paths.repositoryRoot != null) {
-          repository.ROOT = cfg.paths.repositoryRoot;
+          repository.ROOT = mkForce cfg.paths.repositoryRoot;
         })
 
         (mkIf (cfg.paths.lfsPath != null) {
-          lfs.PATH = cfg.paths.lfsPath;
+          lfs.PATH = mkForce cfg.paths.lfsPath;
         })
       ];
 
