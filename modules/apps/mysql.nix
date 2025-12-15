@@ -298,32 +298,14 @@ in {
       package = cfg.package;
       dataDir = cfg.dataDir;
 
-      # Combine databaseRequests with explicit databases for initial databases
-      initialDatabases = let
-        # Convert databaseRequests to database format
-        fromRequests = mapAttrs' (serviceName: req:
-          nameValuePair req.database {
-            name = req.database;
-            schema = req.schema;
-          })
-        cfg.databaseRequests;
-
-        # Merge with explicit databases
-        allDatabases =
-          fromRequests
-          // (mapAttrs (name: dbCfg: {
-              inherit (dbCfg) name schema;
-            })
-            cfg.databases);
-      in
-        mapAttrsToList (name: dbCfg: {
-          inherit (dbCfg) name;
-          inherit (dbCfg) schema;
-        })
-        allDatabases;
-
       inherit (cfg) settings;
     };
+
+    # The upstream NixOS mysql unit runs an ExecStartPost hook ("mysql-post-start")
+    # which can fail hard (and thus stop the service) if local maintenance auth
+    # doesn't match the existing datadir state. We do our own provisioning via the
+    # mysql-user-setup oneshot below, so keep mysql.service itself healthy.
+    systemd.services.mysql.postStart = mkForce "";
 
     # ----------------------------------------------------------------------------
     # DATABASE USER SETUP SERVICE
@@ -355,10 +337,30 @@ in {
                 inherit (req) passwordFile permissions host;
               };
             };
+            inherit (req) schema;
           })
         cfg.databaseRequests;
 
         allDatabases = fromRequests // cfg.databases;
+
+        dbCommands = concatStringsSep "\n" (
+          mapAttrsToList (dbName: dbCfg: ''
+            # Ensure database exists: ${dbCfg.name}
+            mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root <<EOF
+            CREATE DATABASE IF NOT EXISTS \`${dbCfg.name}\`;
+            EOF
+
+            ${optionalString (dbCfg.schema != null) ''
+              if [ -f "${dbCfg.schema}" ]; then
+                echo "Applying schema for database ${dbCfg.name} from ${dbCfg.schema}"
+                mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root "${dbCfg.name}" < "${dbCfg.schema}"
+              else
+                echo "Warning: Schema file ${dbCfg.schema} not found for database ${dbCfg.name}"
+              fi
+            ''}
+          '')
+          allDatabases
+        );
 
         userCommands = concatStringsSep "\n" (
           flatten (
@@ -368,12 +370,12 @@ in {
                   # Setup user: ${userName} for database: ${dbCfg.name}
                   if [ -f "${userCfg.passwordFile}" ]; then
                     PASSWORD=$(cat "${userCfg.passwordFile}")
-                    mariadb -u root <<EOF
-                  CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
-                  ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
-                  GRANT ${userCfg.permissions} ON ${dbCfg.name}.* TO '${userName}'@'${userCfg.host}';
-                  FLUSH PRIVILEGES;
-                  EOF
+                    mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root <<EOF
+                    CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
+                    ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
+                    GRANT ${userCfg.permissions} ON \`${dbCfg.name}\`.* TO '${userName}'@'${userCfg.host}';
+                    FLUSH PRIVILEGES;
+                    EOF
                     echo "User ${userName}@${userCfg.host} configured for ${dbCfg.name}"
                   else
                     echo "Warning: Password file ${userCfg.passwordFile} not found for ${userName}"
@@ -387,12 +389,14 @@ in {
       in ''
         # Wait for MySQL to be ready
         for i in {1..30}; do
-          if mariadb -u root -e "SELECT 1" &>/dev/null; then
+          if mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root -e "SELECT 1" &>/dev/null; then
             break
           fi
           echo "Waiting for MySQL to be ready..."
           sleep 1
         done
+
+        ${dbCommands}
 
         ${userCommands}
 
