@@ -722,6 +722,13 @@ in {
         group = "mysql";
         mode = "0400";
       };
+      "mysql/gitea" = {
+        # Used by Gitea itself at runtime (gitea-pre-start reads this file),
+        # so ensure the gitea user can read it.
+        owner = "root";
+        group = "gitea";
+        mode = "0440";
+      };
 
       # Sonarr API key for Configarr
       "sonarr/api-key" = {
