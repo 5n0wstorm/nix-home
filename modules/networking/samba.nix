@@ -142,7 +142,8 @@ in {
       wantedBy = ["multi-user.target"];
       after = ["sops-nix.service" "local-fs.target"];
       before = ["samba-smbd.service"];
-      requiredBy = ["samba-smbd.service"];
+      # Don't require - let Samba start even if provisioning fails initially
+      # requiredBy = ["samba-smbd.service"];
 
       serviceConfig = {
         Type = "oneshot";
@@ -162,6 +163,10 @@ in {
 
       script = ''
         set -euo pipefail
+
+        # Ensure Samba directories exist
+        mkdir -p /var/lib/samba/private
+        chmod 700 /var/lib/samba/private
 
         # Read credentials from secret files
         if [ ! -f "${cfg.usernameFile}" ]; then
