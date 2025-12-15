@@ -12,16 +12,16 @@ with lib; let
     set -euo pipefail
 
     # Logging helpers
-    log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-    log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2; }
+    log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ''$*"; }
+    log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ''$*" >&2; }
 
     # Email notification helper
     send_email() {
-      local subject="$1"
-      local body="$2"
+      local subject="''${1}"
+      local body="''${2}"
 
       # Create msmtp config
-      cat > /tmp/msmtprc.$$ <<EOF
+      cat > /tmp/msmtprc.''$$ <<EOF
     account default
     host ${cfg.email.smtp.host}
     port ${toString cfg.email.smtp.port}
@@ -39,13 +39,13 @@ with lib; let
     ${optionalString (cfg.email.smtp.tls.minimumVersion != "") "tls_min_version ${cfg.email.smtp.tls.minimumVersion}"}
     logfile /var/log/backup-var-lib-msmtp.log
     EOF
-      chmod 600 /tmp/msmtprc.$$
+      chmod 600 /tmp/msmtprc.''$$
 
       # Send email
-      echo -e "Subject: $subject\n\n$body" | \
-        ${pkgs.msmtp}/bin/msmtp --file=/tmp/msmtprc.$$ -t "${cfg.email.to}"
+      echo -e "Subject: ''${subject}\n\n''${body}" | \
+        ${pkgs.msmtp}/bin/msmtp --file=/tmp/msmtprc.''$$ -t "${cfg.email.to}"
 
-      rm -f /tmp/msmtprc.$$
+      rm -f /tmp/msmtprc.''$$
     }
 
     # Trap errors and send failure email
@@ -65,9 +65,9 @@ with lib; let
     # Mount the SMB share with seal (encryption)
     log "Mounting SMB share with encryption..."
     ${pkgs.cifs-utils}/bin/mount.cifs \
-      "$SMB_SHARE" \
+      "''${SMB_SHARE}" \
       ${cfg.mountPoint} \
-      -o "vers=3.1.1,seal,nosuid,nodev,noexec,uid=0,gid=0,dir_mode=0700,file_mode=0600,username=$SMB_USERNAME,password=$SMB_PASSWORD"
+      -o "vers=3.1.1,seal,nosuid,nodev,noexec,uid=0,gid=0,dir_mode=0700,file_mode=0600,username=''${SMB_USERNAME},password=''${SMB_PASSWORD}"
 
     # Ensure unmount on exit
     trap 'log "Unmounting SMB share..."; umount ${cfg.mountPoint} 2>/dev/null || true; send_email "❌ Backup Failed on $(hostname)" "Backup job failed at $(date)\n\nCheck logs: journalctl -u backup-var-lib.service\n\nHostname: $(hostname)\nPath: /var/lib"; exit 1' ERR
@@ -91,10 +91,10 @@ with lib; let
       --exclude='*.cache' \
       --verbose 2>&1)
 
-    BACKUP_EXIT=$?
-    if [ $BACKUP_EXIT -ne 0 ]; then
-      log_error "Restic backup failed with exit code $BACKUP_EXIT"
-      exit $BACKUP_EXIT
+    BACKUP_EXIT=''$?
+    if [ ''${BACKUP_EXIT} -ne 0 ]; then
+      log_error "Restic backup failed with exit code ''${BACKUP_EXIT}"
+      exit ''${BACKUP_EXIT}
     fi
 
     # Apply retention policy
@@ -115,8 +115,8 @@ with lib; let
     DURATION_SEC=$((DURATION % 60))
 
     # Extract useful info from backup output
-    FILES_NEW=$(echo "$BACKUP_OUTPUT" | grep -oP 'Added to the repository: \K[\d.]+\s+\w+' || echo "N/A")
-    FILES_CHANGED=$(echo "$BACKUP_OUTPUT" | grep -oP 'processed \K\d+ files' || echo "N/A")
+    FILES_NEW=$(echo "''${BACKUP_OUTPUT}" | grep -oP 'Added to the repository: \K[\d.]+\s+\w+' || echo "N/A")
+    FILES_CHANGED=$(echo "''${BACKUP_OUTPUT}" | grep -oP 'processed \K\d+ files' || echo "N/A")
 
     # Build success email
     EMAIL_BODY="✅ Backup completed successfully!
@@ -124,12 +124,12 @@ with lib; let
     Hostname: $(hostname)
     Backup Path: /var/lib
     Repository: ${cfg.repoPath}
-    Duration: ${DURATION_MIN}m ${DURATION_SEC}s
+    Duration: ''${DURATION_MIN}m ''${DURATION_SEC}s
     Completed: $(date)
 
     === Backup Summary ===
-    $FILES_CHANGED
-    Data Added: $FILES_NEW
+    ''${FILES_CHANGED}
+    Data Added: ''${FILES_NEW}
 
     === Retention Policy ===
     Daily: ${toString cfg.retention.keepDaily}
@@ -137,7 +137,7 @@ with lib; let
     Monthly: ${toString cfg.retention.keepMonthly}
 
     === Repository Stats ===
-    $STATS_OUTPUT
+    ''${STATS_OUTPUT}
 
     === Recent Snapshots ===
     $(${pkgs.restic}/bin/restic snapshots --compact | tail -10)
@@ -145,10 +145,10 @@ with lib; let
     Check full logs: journalctl -u backup-var-lib.service
     "
 
-    log "Backup completed successfully in ${DURATION_MIN}m ${DURATION_SEC}s"
+    log "Backup completed successfully in ''${DURATION_MIN}m ''${DURATION_SEC}s"
 
     # Send success email
-    send_email "✅ Backup Successful on $(hostname)" "$EMAIL_BODY"
+    send_email "✅ Backup Successful on $(hostname)" "''${EMAIL_BODY}"
   '';
 in {
   # ============================================================================
