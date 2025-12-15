@@ -10,6 +10,10 @@
     sops-nix.url = "github:Mic92/sops-nix";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    gallery-dl-src = {
+      url = "git+ssh://gitea@git.sn0wstorm.com/Dominik/gallery-dl.git?ref=master";
+      flake = false;
+    };
   };
 
   # ============================================================================
@@ -22,10 +26,24 @@
     nixos-wsl,
     sops-nix,
     disko,
+    gallery-dl-src,
     ...
   }: let
     # Import host definitions from single source of truth
     hosts = import ./hosts.nix;
+
+    # =========================================================================
+    # OVERLAYS - Custom package overrides
+    # =========================================================================
+
+    overlays = [
+      (final: prev: {
+        gallery-dl-custom = prev.gallery-dl.overrideAttrs (oldAttrs: {
+          src = gallery-dl-src;
+          version = "custom-${gallery-dl-src.shortRev or "unknown"}";
+        });
+      })
+    ];
     # For scaling up your homelab, you'd likely want automated host generation:
     # mkHost = name: hostConfig: {
     #   deployment = {
@@ -55,6 +73,7 @@
         inherit nixos-wsl;
       };
       modules = [
+        {nixpkgs.overlays = overlays;}
         ./hosts/elrond/configuration.nix
         sops-nix.nixosModules.sops
       ];
@@ -63,6 +82,7 @@
     nixosConfigurations.galadriel = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        {nixpkgs.overlays = overlays;}
         ./hosts/galadriel/configuration.nix
         ./hosts/galadriel/disko.nix
         disko.nixosModules.disko
@@ -82,7 +102,7 @@
       meta = {
         nixpkgs = import nixpkgs {
           system = "x86_64-linux";
-          overlays = [];
+          overlays = overlays;
         };
       };
 

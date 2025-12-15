@@ -29,6 +29,7 @@ in {
     ../../modules/apps/mysql.nix
     ../../modules/apps/postgresql.nix
     ../../modules/apps/vaultwarden.nix
+    ../../modules/apps/gallery-dl.nix
     # Media
     ../../modules/media/shared-media.nix
     ../../modules/media/jellyfin.nix
@@ -99,6 +100,9 @@ in {
     # environmentFile = "/run/secrets/vaultwarden-env";
   };
 
+  # Custom gallery-dl from Gitea fork
+  fleet.apps.galleryDl.enable = true;
+
   # Homepage Dashboard
   fleet.apps.homepage = {
     enable = true;
@@ -153,11 +157,13 @@ in {
     # │       ├── movies/
     # │       ├── music/
     # │       └── tv/
-    # └── media/            <- Final library (Jellyfin/arr apps point here)
+    # ├── media/            <- Final library (Jellyfin/arr apps point here)
     #     ├── books/
     #     ├── movies/
     #     ├── music/
     #     └── tv/
+    # └── archive/
+    #     └── gallery-dl/   <- gallery-dl archives/output (via fleet.apps.galleryDl)
   };
 
   # ============================================================================
