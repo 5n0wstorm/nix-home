@@ -175,11 +175,8 @@ in {
     '';
   };
 
-  systemd.tmpfiles.rules = pkgs.lib.mkBefore [
-    "d /data/archive 0777 root root -"
-    "d /data/archive/telegram 0777 root root -"
-    "f /data/archive/telegram/urls.txt 0666 root root -"
-  ];
+  # Ensure /data/archive paths exist for gallery-dl
+  # NOTE: Keep all tmpfiles rules in a single assignment in this file.
 
   # Homepage Dashboard
   fleet.apps.homepage = {
@@ -904,8 +901,13 @@ in {
   # SOPS AGE KEY DIRECTORY
   # ============================================================================
 
-  # Ensure dominik's directories exist
+  # Ensure dominik's directories (and /data/archive paths) exist
   systemd.tmpfiles.rules = [
+    # gallery-dl base
+    "d /data/archive 0777 root root -"
+    "d /data/archive/telegram 0777 root root -"
+    "f /data/archive/telegram/urls.txt 0666 root root -"
+
     "d /home/dominik/.ssh 0700 dominik users"
     "d /home/dominik/.config 0755 dominik users -"
     "d /home/dominik/.config/sops 0755 dominik users -"
