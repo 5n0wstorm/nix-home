@@ -110,6 +110,7 @@ in {
       onCalendar = "minutely";
 
       # Render config from Nix attrset + sops secrets (no external template file)
+      workingDir = "/data/archive/telegram";
       config = {
         extractor = {
           "base-directory" = "/data/archive/telegram";
@@ -140,7 +141,7 @@ in {
       };
 
       # one URL per line
-      urlFile = "/data/archive/gallery-dl/telegram/urls.txt";
+      urlFile = "/data/archive/telegram/urls.txt";
 
       # Add your preferred args here (example):
       # args = ["--verbose"];
