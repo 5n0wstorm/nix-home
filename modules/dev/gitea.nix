@@ -293,8 +293,9 @@ in {
         # Optional path overrides (useful for migrating from Docker layout)
         (mkIf (cfg.paths.appDataPath != null) {
           server.APP_DATA_PATH = mkForce cfg.paths.appDataPath;
-          repository.local.LOCAL_COPY_PATH = mkForce "${cfg.paths.appDataPath}/tmp/local-repo";
-          repository.upload.TEMP_PATH = mkForce "${cfg.paths.appDataPath}/uploads";
+          # INI sections containing dots must use quoted attribute names, e.g. [repository.local]
+          "repository.local".LOCAL_COPY_PATH = mkForce "${cfg.paths.appDataPath}/tmp/local-repo";
+          "repository.upload".TEMP_PATH = mkForce "${cfg.paths.appDataPath}/uploads";
           indexer.ISSUE_INDEXER_PATH = mkForce "${cfg.paths.appDataPath}/indexers/issues.bleve";
           session = {
             PROVIDER = "file";
@@ -355,7 +356,7 @@ in {
     ];
 
     systemd.services.gitea.preStart = mkBefore ''
-      install -d -m 0750 -o gitea -g gitea ${escapeShellArg cfg.dataDir}/custom/conf
+      install -d -m 0750 -o gitea -g gitea ${escapeShellArg "${cfg.dataDir}/custom/conf"}
     '';
 
     # Optional environment file for secrets (GITEA__* variables).

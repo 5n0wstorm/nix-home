@@ -293,6 +293,11 @@ in {
     # Systemd service for backup
     systemd.services.backup-var-lib = {
       description = "Backup /var/lib to encrypted SMB share";
+      
+      # Ensure network is available
+      after = ["network-online.target"];
+      wants = ["network-online.target"];
+      
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${backupScript}";
@@ -301,11 +306,7 @@ in {
 
         # Security hardening
         PrivateTmp = true;
-        NoNewPrivileges = true;
-        # Note: ProtectSystem is disabled because we need to mount filesystems
-        # and create mount points dynamically
-        ProtectHome = true;
-
+        
         # Resource limits
         CPUQuota = "80%";
         MemoryMax = "2G";
@@ -314,10 +315,6 @@ in {
         # Timeout (4 hours max)
         TimeoutStartSec = "4h";
       };
-
-      # Ensure network is available
-      after = ["network-online.target"];
-      wants = ["network-online.target"];
     };
 
     # Systemd timer for scheduled backups
