@@ -44,6 +44,8 @@ in {
     ../../modules/media/sabnzbd.nix
     ../../modules/media/navidrome.nix
     ../../modules/media/configarr.nix
+    # System
+    ../../modules/system/backup-var-lib.nix
   ];
 
   # ============================================================================
@@ -561,6 +563,20 @@ in {
   };
 
   # ============================================================================
+  # BACKUP CONFIGURATION
+  # ============================================================================
+
+  fleet.system.backupVarLib = {
+    enable = true;
+    schedule = "daily";
+    retention = {
+      keepDaily = 7;
+      keepWeekly = 4;
+      keepMonthly = 6;
+    };
+  };
+
+  # ============================================================================
   # SECRETS MANAGEMENT (SOPS-NIX)
   # ============================================================================
 
@@ -711,6 +727,42 @@ in {
       "postgresql/gallery_dl/password" = {
         owner = "postgres";
         group = "postgres";
+        mode = "0400";
+      };
+
+      # Hetzner SMB backup credentials
+      "hetzner_smb/share" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "hetzner_smb/username" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "hetzner_smb/password" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+
+      # Backup restic password
+      "backup/restic/password" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+
+      # Backup SMTP credentials
+      "backup/smtp/username" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "backup/smtp/password" = {
+        owner = "root";
+        group = "root";
         mode = "0400";
       };
     };
