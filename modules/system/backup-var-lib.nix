@@ -302,13 +302,9 @@ in {
         # Security hardening
         PrivateTmp = true;
         NoNewPrivileges = true;
-        ProtectSystem = "strict";
+        # Note: ProtectSystem is disabled because we need to mount filesystems
+        # and create mount points dynamically
         ProtectHome = true;
-        ReadWritePaths = [
-          cfg.mountPoint
-          "/var/lib"
-          "/var/log"
-        ];
 
         # Resource limits
         CPUQuota = "80%";
