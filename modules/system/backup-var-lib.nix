@@ -7,9 +7,21 @@
 with lib; let
   cfg = config.fleet.system.backupVarLib;
 
+  # msmtp does not support `tls_min_version` (it errors with "unknown command").
+  # Use gnutls priority strings via `tls_priorities` instead.
+  tlsPrioritiesForMinVersion = v:
+    if v == "" then ""
+    else if v == "TLS1.0" || v == "TLSv1.0" then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2:+VERS-TLS1.1:+VERS-TLS1.0"
+    else if v == "TLS1.1" || v == "TLSv1.1" then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2:+VERS-TLS1.1"
+    else if v == "TLS1.2" || v == "TLSv1.2" then "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2"
+    else if v == "TLS1.3" || v == "TLSv1.3" then "NORMAL:-VERS-ALL:+VERS-TLS1.3"
+    else "";
+
   # Build the backup script
   backupScript = pkgs.writeShellScript "backup-var-lib" ''
     set -euo pipefail
+
+    HOSTNAME="${config.networking.hostName}"
 
     # Logging helpers
     log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ''$*"; }
@@ -36,7 +48,7 @@ with lib; let
       then "off"
       else "on"
     }
-    ${optionalString (cfg.email.smtp.tls.minimumVersion != "") "tls_min_version ${cfg.email.smtp.tls.minimumVersion}"}
+    ${optionalString ((tlsPrioritiesForMinVersion cfg.email.smtp.tls.minimumVersion) != "") "tls_priorities ${tlsPrioritiesForMinVersion cfg.email.smtp.tls.minimumVersion}"}
     logfile /var/log/backup-var-lib-msmtp.log
     EOF
       chmod 600 /tmp/msmtprc.''$$
@@ -49,7 +61,7 @@ with lib; let
     }
 
     # Trap errors and send failure email
-    trap 'log_error "Backup failed"; send_email "❌ Backup Failed on $(hostname)" "Backup job failed at $(date)\n\nCheck logs: journalctl -u backup-var-lib.service\n\nHostname: $(hostname)\nPath: /var/lib"; exit 1' ERR
+    trap 'log_error "Backup failed"; send_email "❌ Backup Failed on ''${HOSTNAME}" "Backup job failed at $(date)\n\nCheck logs: journalctl -u backup-var-lib.service\n\nHostname: ''${HOSTNAME}\nPath: /var/lib"; exit 1' ERR
 
     START_TIME=$(date +%s)
     log "Starting backup of /var/lib to ${cfg.repoPath}"
@@ -70,7 +82,7 @@ with lib; let
       -o "vers=3.1.1,seal,nosuid,nodev,noexec,uid=0,gid=0,dir_mode=0700,file_mode=0600,username=''${SMB_USERNAME},password=''${SMB_PASSWORD}"
 
     # Ensure unmount on exit
-    trap 'log "Unmounting SMB share..."; umount ${cfg.mountPoint} 2>/dev/null || true; send_email "❌ Backup Failed on $(hostname)" "Backup job failed at $(date)\n\nCheck logs: journalctl -u backup-var-lib.service\n\nHostname: $(hostname)\nPath: /var/lib"; exit 1' ERR
+    trap 'log "Unmounting SMB share..."; umount ${cfg.mountPoint} 2>/dev/null || true; send_email "❌ Backup Failed on ''${HOSTNAME}" "Backup job failed at $(date)\n\nCheck logs: journalctl -u backup-var-lib.service\n\nHostname: ''${HOSTNAME}\nPath: /var/lib"; exit 1' ERR
     trap 'log "Unmounting SMB share..."; umount ${cfg.mountPoint} 2>/dev/null || true' EXIT
 
     # Initialize restic repo if it doesn't exist
@@ -121,7 +133,7 @@ with lib; let
     # Build success email
     EMAIL_BODY="✅ Backup completed successfully!
 
-    Hostname: $(hostname)
+    Hostname: ''${HOSTNAME}
     Backup Path: /var/lib
     Repository: ${cfg.repoPath}
     Duration: ''${DURATION_MIN}m ''${DURATION_SEC}s
@@ -148,7 +160,7 @@ with lib; let
     log "Backup completed successfully in ''${DURATION_MIN}m ''${DURATION_SEC}s"
 
     # Send success email
-    send_email "✅ Backup Successful on $(hostname)" "''${EMAIL_BODY}"
+    send_email "✅ Backup Successful on ''${HOSTNAME}" "''${EMAIL_BODY}"
   '';
 in {
   # ============================================================================
@@ -166,7 +178,7 @@ in {
 
     repoPath = mkOption {
       type = types.str;
-      default = "${config.fleet.system.backupVarLib.mountPoint}/galadriel/restic/var-lib";
+      default = "${config.fleet.system.backupVarLib.mountPoint}/${config.networking.hostName}/restic/var-lib";
       description = "Path to the restic repository on the mounted share";
     };
 

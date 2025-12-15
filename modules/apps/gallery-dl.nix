@@ -35,12 +35,6 @@ in {
       example = "/data/archive/";
     };
 
-    forceData0777 = mkOption {
-      type = types.bool;
-      default = false;
-      description = "If enabled, enforce `chmod -R 0777 /data` via a oneshot systemd service (dangerous: makes secrets world-readable).";
-    };
-
     user = mkOption {
       type = types.str;
       default = "gallery-dl";
@@ -177,41 +171,18 @@ in {
     # DIRECTORY STRUCTURE
     # --------------------------------------------------------------------------
 
-    # Option: force /data permissions (requested)
-    systemd.services.gallery-dl-force-data-perms = mkIf cfg.forceData0777 {
-      description = "Force /data permissions to 0777 recursively (requested)";
-      wantedBy = ["multi-user.target"];
-      after = ["local-fs.target"];
-      restartIfChanged = false;
-
-      serviceConfig = {
-        Type = "oneshot";
-        User = "root";
-        Group = "root";
-      };
-
-      script = ''
-        set -euo pipefail
-        chmod -R 0777 /data
-      '';
-    };
-
     systemd.tmpfiles.rules =
       [
-        # Ensure /data/archive exists even if not provided by other modules.
-        "d /data 0777 root root -"
-        "d /data/archive 0777 root root -"
-
         # gallery-dl workspace (archives, downloads, metadata, etc.)
-        "d ${archiveBase} 0777 root root -"
-        "d ${galleryDlBaseDir} 0777 root root -"
+        "d ${archiveBase} 2775 root ${archiveGroup} -"
+        "d ${galleryDlBaseDir} 2775 root ${archiveGroup} -"
       ]
       ++ (mapAttrsToList (name: inst: let
         instanceDir =
           if inst.workingDir != null
           then inst.workingDir
           else "${galleryDlBaseDir}/${name}";
-      in "d ${instanceDir} 0777 root root -")
+      in "d ${instanceDir} 2775 ${cfg.user} ${archiveGroup} -")
       enabledInstances);
 
     # --------------------------------------------------------------------------

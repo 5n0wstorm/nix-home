@@ -103,7 +103,6 @@ in {
   # Custom gallery-dl from Gitea fork
   fleet.apps.galleryDl = {
     enable = true;
-    forceData0777 = true;
 
     instances.telegram = {
       enable = true;
@@ -152,6 +151,35 @@ in {
       # args = ["--verbose"];
     };
   };
+
+  # --------------------------------------------------------------------------
+  # /data/archive permissions (requested)
+  # WARNING: this makes everything under /data/archive world-readable + writable.
+  # --------------------------------------------------------------------------
+
+  systemd.services.data-archive-permissions = {
+    description = "Force /data/archive permissions to 0777 recursively (requested)";
+    wantedBy = ["multi-user.target"];
+    after = ["local-fs.target"];
+    restartIfChanged = false;
+
+    serviceConfig = {
+      Type = "oneshot";
+      User = "root";
+      Group = "root";
+    };
+
+    script = ''
+      set -euo pipefail
+      chmod -R 0777 /data/archive
+    '';
+  };
+
+  systemd.tmpfiles.rules = [
+    "d /data/archive 0777 root root -"
+    "d /data/archive/telegram 0777 root root -"
+    "f /data/archive/telegram/urls.txt 0666 root root -"
+  ];
 
   # Homepage Dashboard
   fleet.apps.homepage = {
