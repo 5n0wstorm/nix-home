@@ -147,8 +147,8 @@ in {
       # one URL per line
       urlFile = "/data/archive/telegram/urls.txt";
 
-      # Add your preferred args here (example):
-      # args = ["--verbose"];
+      # Add your preferred args here:
+      args = ["--write-metadata"];
     };
   };
 
