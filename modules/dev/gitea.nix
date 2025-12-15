@@ -217,6 +217,10 @@ in {
       "d ${cfg.dataDir}/custom/conf 0750 gitea gitea -"
     ];
 
+    systemd.services.gitea.preStart = mkBefore ''
+      install -d -m 0750 -o gitea -g gitea ${escapeShellArg cfg.dataDir}/custom/conf
+    '';
+
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
