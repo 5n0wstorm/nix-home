@@ -222,82 +222,82 @@ in {
       //
       # Actual long-running job service (does the work).
       (mapAttrs' (name: inst: let
-      instanceDir =
-        if inst.workingDir != null
-        then inst.workingDir
-        else "${galleryDlBaseDir}/${name}";
-      # Render config into a per-run RuntimeDirectory (tmpfs), so it is always writable
-      # and secrets don't get persisted under /data.
-      renderedConfigFile = "/run/gallery-dl-${name}/config.json";
-      effectiveConfigFile =
-        if inst.config != null
-        then renderedConfigFile
-        else inst.configFile;
-      archiveFile =
-        if inst.downloadArchiveFile != null
-        then inst.downloadArchiveFile
-        else "${instanceDir}/archive.txt";
-      args =
-        (optional (effectiveConfigFile != null) "--config")
-        ++ (optional (effectiveConfigFile != null) (toString effectiveConfigFile))
-        ++ ["--download-archive" archiveFile]
-        ++ (optional (inst.urlFile != null) "--input-file")
-        ++ (optional (inst.urlFile != null) inst.urlFile)
-        ++ inst.args
-        ++ (optionals (inst.urlFile == null) inst.urls);
-    in
-      nameValuePair "gallery-dl-job-${name}" {
-        description = "gallery-dl instance job: ${name}";
+        instanceDir =
+          if inst.workingDir != null
+          then inst.workingDir
+          else "${galleryDlBaseDir}/${name}";
+        # Render config into a per-run RuntimeDirectory (tmpfs), so it is always writable
+        # and secrets don't get persisted under /data.
+        renderedConfigFile = "/run/gallery-dl-${name}/config.json";
+        effectiveConfigFile =
+          if inst.config != null
+          then renderedConfigFile
+          else inst.configFile;
+        archiveFile =
+          if inst.downloadArchiveFile != null
+          then inst.downloadArchiveFile
+          else "${instanceDir}/archive.txt";
+        args =
+          (optional (effectiveConfigFile != null) "--config")
+          ++ (optional (effectiveConfigFile != null) (toString effectiveConfigFile))
+          ++ ["--download-archive" archiveFile]
+          ++ (optional (inst.urlFile != null) "--input-file")
+          ++ (optional (inst.urlFile != null) inst.urlFile)
+          ++ inst.args
+          ++ (optionals (inst.urlFile == null) inst.urls);
+      in
+        nameValuePair "gallery-dl-job-${name}" {
+          description = "gallery-dl instance job: ${name}";
 
-        # If a job is running during a switch, don't restart it (avoids blocking rebuilds).
-        restartIfChanged = false;
+          # If a job is running during a switch, don't restart it (avoids blocking rebuilds).
+          restartIfChanged = false;
 
-        serviceConfig = {
-          Type = "oneshot";
-          User = cfg.user;
-          Group = cfg.group;
-          SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
-          RuntimeDirectory = "gallery-dl-${name}";
-          RuntimeDirectoryMode = "0700";
-          WorkingDirectory = instanceDir;
-          Nice = 10;
-        };
+          serviceConfig = {
+            Type = "oneshot";
+            User = cfg.user;
+            Group = cfg.group;
+            SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+            RuntimeDirectory = "gallery-dl-${name}";
+            RuntimeDirectoryMode = "0700";
+            WorkingDirectory = instanceDir;
+            Nice = 10;
+          };
 
-        script = let
-          subsJson = builtins.toJSON (mapAttrs (_k: v: toString v) inst.configSubstitutions);
-          configJson =
-            if inst.config != null
-            then builtins.toJSON inst.config
-            else null;
-        in ''
-          set -euo pipefail
+          script = let
+            subsJson = builtins.toJSON (mapAttrs (_k: v: toString v) inst.configSubstitutions);
+            configJson =
+              if inst.config != null
+              then builtins.toJSON inst.config
+              else null;
+          in ''
+            set -euo pipefail
 
-          ${optionalString (inst.config != null) ''
-            # Render config from Nix attrset + secret files at runtime (keeps secrets out of git/Nix store).
-            OUT=${escapeShellArg renderedConfigFile} \
-            SUBS_JSON=${escapeShellArg subsJson} \
-            CONFIG_JSON=${escapeShellArg configJson} \
-            ${pkgs.python3}/bin/python3 - <<'PY'
-            import json
-            import os
-            from pathlib import Path
+            ${optionalString (inst.config != null) ''
+              # Render config from Nix attrset + secret files at runtime (keeps secrets out of git/Nix store).
+              OUT=${escapeShellArg renderedConfigFile} \
+              SUBS_JSON=${escapeShellArg subsJson} \
+              CONFIG_JSON=${escapeShellArg configJson} \
+              ${pkgs.python3}/bin/python3 - <<'PY'
+              import json
+              import os
+              from pathlib import Path
 
-            template = os.environ["CONFIG_JSON"]
-            subs = json.loads(os.environ["SUBS_JSON"])
+              template = os.environ["CONFIG_JSON"]
+              subs = json.loads(os.environ["SUBS_JSON"])
 
-            for placeholder, secret_path in subs.items():
-                val = Path(secret_path).read_text(encoding="utf-8").strip()
-                template = template.replace(placeholder, val)
+              for placeholder, secret_path in subs.items():
+                  val = Path(secret_path).read_text(encoding="utf-8").strip()
+                  template = template.replace(placeholder, val)
 
-            out_path = Path(os.environ["OUT"])
-            out_path.write_text(template, encoding="utf-8")
-            os.chmod(out_path, 0o400)
-            PY
-          ''}
+              out_path = Path(os.environ["OUT"])
+              out_path.write_text(template, encoding="utf-8")
+              os.chmod(out_path, 0o400)
+              PY
+            ''}
 
-          exec ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl ${escapeShellArgs args}
-        '';
-      }))
+            exec ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl ${escapeShellArgs args}
+          '';
+        }))
       enabledInstances;
 
     systemd.timers = mapAttrs' (name: inst:
