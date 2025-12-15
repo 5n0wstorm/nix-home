@@ -59,6 +59,10 @@ in {
               Non-secret gallery-dl config as a Nix attrset. When set, it will be serialized to JSON
               and written to `<workingDir>/config.json` at runtime. Use placeholders like
               `@TG_API_ID@` and provide their values via `configSubstitutions` (from SOPS secrets).
+
+              IMPORTANT: The generated `<workingDir>/config.json` file is overwritten on every service run.
+              Manual edits to this file will NOT persist. To change the configuration, modify this option
+              in your NixOS configuration and redeploy.
             '';
           };
 
@@ -130,10 +134,26 @@ in {
             example = "/data/archive/gallery-dl/telegram";
           };
 
+          useDownloadArchiveFile = mkOption {
+            type = types.bool;
+            default = true;
+            description = ''
+              Whether to pass `--download-archive` to gallery-dl for this instance.
+
+              If enabled, this module will pass a file path (default: `<workingDir>/archive.txt`).
+              If disabled, this module will NOT pass `--download-archive`, so gallery-dl will rely on
+              whatever is configured via the gallery-dl config (e.g. `extractor.archive` pointing at Postgres).
+            '';
+          };
+
           downloadArchiveFile = mkOption {
             type = types.nullOr types.str;
             default = null;
-            description = "Optional --download-archive path (defaults to <workingDir>/archive.txt)";
+            description = ''
+              Optional `--download-archive` file path. Only used when `useDownloadArchiveFile = true`.
+
+              If null and `useDownloadArchiveFile = true`, defaults to `<workingDir>/archive.txt`.
+            '';
             example = "/data/archive/gallery-dl/telegram/archive.txt";
           };
         };
@@ -231,13 +251,18 @@ in {
           then renderedConfigFile
           else inst.configFile;
         archiveFile =
-          if inst.downloadArchiveFile != null
-          then inst.downloadArchiveFile
-          else "${instanceDir}/archive.txt";
+          if inst.useDownloadArchiveFile
+          then (
+            if inst.downloadArchiveFile != null
+            then inst.downloadArchiveFile
+            else "${instanceDir}/archive.txt"
+          )
+          else null;
         args =
           (optional (effectiveConfigFile != null) "--config")
           ++ (optional (effectiveConfigFile != null) (toString effectiveConfigFile))
-          ++ ["--download-archive" archiveFile]
+          ++ (optional (archiveFile != null) "--download-archive")
+          ++ (optional (archiveFile != null) archiveFile)
           ++ (optional (inst.urlFile != null) "--input-file")
           ++ (optional (inst.urlFile != null) inst.urlFile)
           ++ inst.args

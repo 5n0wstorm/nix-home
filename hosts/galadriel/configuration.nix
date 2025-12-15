@@ -112,12 +112,11 @@ in {
 
       # Render config from Nix attrset + sops secrets (no external template file)
       workingDir = "/data/archive/telegram";
+      # We use Postgres-backed archive via `extractor.archive` in config;
+      # do not override it with `--download-archive <file>`.
+      useDownloadArchiveFile = false;
       config = {
         extractor = {
-          # Use default gallery-dl layout:
-          # /data/archive/<category>/<subcategory>/...
-          # For telegram this becomes:
-          # /data/archive/telegram/<chat>/...
           "base-directory" = "/data/archive";
           archive = "@ARCHIVE_URL@";
           telegram = {
