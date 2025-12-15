@@ -41,37 +41,27 @@
         galleryDlCustom = prev.gallery-dl.overrideAttrs (oldAttrs: {
           src = gallery-dl-src;
           version = "custom-${gallery-dl-src.shortRev or "unknown"}";
+
+          # Some forks/patchsets include the telegram extractor raising
+          # `gallery_dl.exception.MissingDependencyError`, but the exception class
+          # isn't present. Patch it in at build time for robustness.
+          postPatch =
+            (oldAttrs.postPatch or "")
+            + ''
+              if [ -f gallery_dl/exception.py ] && ! grep -q "MissingDependencyError" gallery_dl/exception.py; then
+                cat >> gallery_dl/exception.py <<'EOF'
+
+
+class MissingDependencyError(ImportError):
+    """Raised when an optional runtime dependency is missing."""
+EOF
+              fi
+            '';
         });
-
-        # Fix for forks/patchsets where telegram extractor expects
-        # gallery_dl.exception.MissingDependencyError but it's absent.
-        galleryDlSitecustomize = prev.writeTextFile {
-          name = "gallery-dl-sitecustomize";
-          destination = "/${prev.python3.sitePackages}/sitecustomize.py";
-          text = ''
-            try:
-                import gallery_dl.exception as exc
-                if not hasattr(exc, "MissingDependencyError"):
-                    class MissingDependencyError(ImportError):
-                        pass
-                    exc.MissingDependencyError = MissingDependencyError
-            except Exception:
-                pass
-          '';
-        };
-
-        galleryDlCustomFixed = prev.symlinkJoin {
-          name = "gallery-dl-custom-fixed";
-          paths = [galleryDlCustom];
-          buildInputs = [prev.makeWrapper];
-          postBuild = ''
-            wrapProgram $out/bin/gallery-dl \
-              --prefix PYTHONPATH : ${galleryDlSitecustomize}/${prev.python3.sitePackages}
-          '';
-        };
       in {
         gallery-dl-custom = galleryDlCustom;
-        gallery-dl-custom-fixed = galleryDlCustomFixed;
+        # Backwards-compatible name (now just the patched build, no extra wrapping needed).
+        gallery-dl-custom-fixed = galleryDlCustom;
       })
     ];
     # For scaling up your homelab, you'd likely want automated host generation:
