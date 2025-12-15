@@ -344,43 +344,49 @@ in {
         allDatabases = fromRequests // cfg.databases;
 
         dbCommands = concatStringsSep "\n" (
-          mapAttrsToList (dbName: dbCfg: ''
-            # Ensure database exists: ${dbCfg.name}
-            mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root <<EOF
-            CREATE DATABASE IF NOT EXISTS \`${dbCfg.name}\`;
-            EOF
-
-            ${optionalString (dbCfg.schema != null) ''
-              if [ -f "${dbCfg.schema}" ]; then
-                echo "Applying schema for database ${dbCfg.name} from ${dbCfg.schema}"
-                mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root "${dbCfg.name}" < "${dbCfg.schema}"
-              else
-                echo "Warning: Schema file ${dbCfg.schema} not found for database ${dbCfg.name}"
-              fi
-            ''}
-          '')
+          mapAttrsToList (_dbName: dbCfg:
+            let
+              schemaBlock = optionalString (dbCfg.schema != null) (concatStringsSep "\n" [
+                "if [ -f \"${dbCfg.schema}\" ]; then"
+                "  echo \"Applying schema for database ${dbCfg.name} from ${dbCfg.schema}\""
+                "  mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root \"${dbCfg.name}\" < \"${dbCfg.schema}\""
+                "else"
+                "  echo \"Warning: Schema file ${dbCfg.schema} not found for database ${dbCfg.name}\""
+                "fi"
+              ]);
+            in
+              concatStringsSep "\n" ([
+                  "# Ensure database exists: ${dbCfg.name}"
+                  "mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root <<EOF"
+                  "CREATE DATABASE IF NOT EXISTS \\`${dbCfg.name}\\`;"
+                  "EOF"
+                ]
+                ++ optionals (dbCfg.schema != null) [schemaBlock])
+          )
           allDatabases
         );
 
         userCommands = concatStringsSep "\n" (
           flatten (
             mapAttrsToList (
-              dbName: dbCfg:
-                mapAttrsToList (userName: userCfg: ''
-                  # Setup user: ${userName} for database: ${dbCfg.name}
-                  if [ -f "${userCfg.passwordFile}" ]; then
-                    PASSWORD=$(cat "${userCfg.passwordFile}")
-                    mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root <<EOF
-                    CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
-                    ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';
-                    GRANT ${userCfg.permissions} ON \`${dbCfg.name}\`.* TO '${userName}'@'${userCfg.host}';
-                    FLUSH PRIVILEGES;
-                    EOF
-                    echo "User ${userName}@${userCfg.host} configured for ${dbCfg.name}"
-                  else
-                    echo "Warning: Password file ${userCfg.passwordFile} not found for ${userName}"
-                  fi
-                '')
+              _dbName: dbCfg:
+                mapAttrsToList (userName: userCfg:
+                  concatStringsSep "\n" [
+                    "# Setup user: ${userName} for database: ${dbCfg.name}"
+                    "if [ -f \"${userCfg.passwordFile}\" ]; then"
+                    "  PASSWORD=$(cat \"${userCfg.passwordFile}\")"
+                    "  mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root <<EOF"
+                    "CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';"
+                    "ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';"
+                    "GRANT ${userCfg.permissions} ON \\`${dbCfg.name}\\`.* TO '${userName}'@'${userCfg.host}';"
+                    "FLUSH PRIVILEGES;"
+                    "EOF"
+                    "  echo \"User ${userName}@${userCfg.host} configured for ${dbCfg.name}\""
+                    "else"
+                    "  echo \"Warning: Password file ${userCfg.passwordFile} not found for ${userName}\""
+                    "fi"
+                  ]
+                )
                 dbCfg.users
             )
             allDatabases
