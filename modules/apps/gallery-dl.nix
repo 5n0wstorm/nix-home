@@ -114,6 +114,15 @@ in {
             example = "*-*-* *:*:00";
           };
 
+          persistent = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              Whether the systemd timer should be persistent (catch up missed runs).
+              Disabled by default to avoid triggering a long gallery-dl run during `nixos-rebuild switch`.
+            '';
+          };
+
           workingDir = mkOption {
             type = types.nullOr types.str;
             default = null;
@@ -265,7 +274,7 @@ in {
         wantedBy = ["timers.target"];
         timerConfig = {
           OnCalendar = inst.onCalendar;
-          Persistent = true;
+          Persistent = inst.persistent;
           Unit = "gallery-dl-${name}.service";
         };
       })
