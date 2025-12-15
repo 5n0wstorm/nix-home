@@ -344,8 +344,8 @@ in {
         allDatabases = fromRequests // cfg.databases;
 
         dbCommands = concatStringsSep "\n" (
-          mapAttrsToList (_dbName: dbCfg:
-            let
+          mapAttrsToList (
+            _dbName: dbCfg: let
               schemaBlock = optionalString (dbCfg.schema != null) (concatStringsSep "\n" [
                 "if [ -f \"${dbCfg.schema}\" ]; then"
                 "  echo \"Applying schema for database ${dbCfg.name} from ${dbCfg.schema}\""
@@ -370,22 +370,23 @@ in {
           flatten (
             mapAttrsToList (
               _dbName: dbCfg:
-                mapAttrsToList (userName: userCfg:
-                  concatStringsSep "\n" [
-                    "# Setup user: ${userName} for database: ${dbCfg.name}"
-                    "if [ -f \"${userCfg.passwordFile}\" ]; then"
-                    "  PASSWORD=$(cat \"${userCfg.passwordFile}\")"
-                    "  mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root <<EOF"
-                    "CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';"
-                    "ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';"
-                    "GRANT ${userCfg.permissions} ON \\`${dbCfg.name}\\`.* TO '${userName}'@'${userCfg.host}';"
-                    "FLUSH PRIVILEGES;"
-                    "EOF"
-                    "  echo \"User ${userName}@${userCfg.host} configured for ${dbCfg.name}\""
-                    "else"
-                    "  echo \"Warning: Password file ${userCfg.passwordFile} not found for ${userName}\""
-                    "fi"
-                  ]
+                mapAttrsToList (
+                  userName: userCfg:
+                    concatStringsSep "\n" [
+                      "# Setup user: ${userName} for database: ${dbCfg.name}"
+                      "if [ -f \"${userCfg.passwordFile}\" ]; then"
+                      "  PASSWORD=$(cat \"${userCfg.passwordFile}\")"
+                      "  mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -u root <<EOF"
+                      "CREATE USER IF NOT EXISTS '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';"
+                      "ALTER USER '${userName}'@'${userCfg.host}' IDENTIFIED BY '$PASSWORD';"
+                      "GRANT ${userCfg.permissions} ON \\`${dbCfg.name}\\`.* TO '${userName}'@'${userCfg.host}';"
+                      "FLUSH PRIVILEGES;"
+                      "EOF"
+                      "  echo \"User ${userName}@${userCfg.host} configured for ${dbCfg.name}\""
+                      "else"
+                      "  echo \"Warning: Password file ${userCfg.passwordFile} not found for ${userName}\""
+                      "fi"
+                    ]
                 )
                 dbCfg.users
             )

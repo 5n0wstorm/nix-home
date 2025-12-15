@@ -321,10 +321,22 @@ in {
       database = let
         mysqlConn = attrByPath ["fleet" "apps" "mysql" "connections" "gitea"] null config;
         mysqlFromFleet = cfg.database.mysql.useFleetMysql && mysqlConn != null;
-        mysqlHost = if mysqlFromFleet then "${mysqlConn.host}:${toString mysqlConn.port}" else cfg.database.mysql.host;
-        mysqlName = if mysqlFromFleet then mysqlConn.database else cfg.database.mysql.name;
-        mysqlUser = if mysqlFromFleet then mysqlConn.user else cfg.database.mysql.user;
-        mysqlPasswordFile = if mysqlFromFleet then mysqlConn.passwordFile else cfg.database.mysql.passwordFile;
+        mysqlHost =
+          if mysqlFromFleet
+          then "${mysqlConn.host}:${toString mysqlConn.port}"
+          else cfg.database.mysql.host;
+        mysqlName =
+          if mysqlFromFleet
+          then mysqlConn.database
+          else cfg.database.mysql.name;
+        mysqlUser =
+          if mysqlFromFleet
+          then mysqlConn.user
+          else cfg.database.mysql.user;
+        mysqlPasswordFile =
+          if mysqlFromFleet
+          then mysqlConn.passwordFile
+          else cfg.database.mysql.passwordFile;
         sqlitePath =
           if cfg.database.sqlitePath != null
           then cfg.database.sqlitePath

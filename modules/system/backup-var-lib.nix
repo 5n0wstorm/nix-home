@@ -293,11 +293,11 @@ in {
     # Systemd service for backup
     systemd.services.backup-var-lib = {
       description = "Backup /var/lib to encrypted SMB share";
-      
+
       # Ensure network is available
       after = ["network-online.target"];
       wants = ["network-online.target"];
-      
+
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${backupScript}";
@@ -306,7 +306,7 @@ in {
 
         # Security hardening
         PrivateTmp = true;
-        
+
         # Resource limits
         CPUQuota = "80%";
         MemoryMax = "2G";
