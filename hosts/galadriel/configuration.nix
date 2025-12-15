@@ -112,7 +112,7 @@ in {
       # Render config from Nix attrset + sops secrets (no external template file)
       config = {
         extractor = {
-          "base-directory" = "./gallery-dl";
+          "base-directory" = "/data/archive/telegram";
           archive = "@ARCHIVE_URL@";
           telegram = {
             "api-id" = "@TG_API_ID@";
