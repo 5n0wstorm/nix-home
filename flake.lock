@@ -92,11 +92,11 @@
     "gallery-dl-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1765799313,
-        "narHash": "sha256-rTqcUETADPJugu8njXwBhG2zvSfQBEa+0/J7Fj9Tu0E=",
+        "lastModified": 1765898365,
+        "narHash": "sha256-nhfflEL9XHCZrGahvD6dsbrM5WtncisLLMsir3isPTQ=",
         "ref": "master",
-        "rev": "06ea2788fb100373e17ddef7ebb201f0651b6284",
-        "revCount": 7549,
+        "rev": "cf6f12f1730e92e223e5451f89efc42130a7b031",
+        "revCount": 7550,
         "type": "git",
         "url": "ssh://gitea@192.168.2.10/Dominik/gallery-dl.git"
       },
