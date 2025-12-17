@@ -223,7 +223,7 @@ in {
 
       from = mkOption {
         type = types.str;
-        default = "Backup <backups@sn0wstorm.com>";
+        default = "Backup <backup@sn0wstorm.com>";
         description = "Email sender address";
       };
 
