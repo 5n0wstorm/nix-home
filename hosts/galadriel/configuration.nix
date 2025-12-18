@@ -128,6 +128,8 @@ in {
               "messages"
               "stories"
               "text"
+              "posts"
+              "profile_pictures"
             ];
             "avatar-size" = [64 64];
             "media-mime-types" = [];
