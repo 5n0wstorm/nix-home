@@ -192,6 +192,29 @@ in {
       # Add your preferred args here:
       args = ["--write-metadata"];
     };
+
+    instances.boosty = {
+      enable = true;
+      onCalendar = "hourly";
+
+      workingDir = "/data/archive/boosty";
+      useDownloadArchiveFile = false;
+      config = {
+        extractor = {
+          "base-directory" = "/data/archive";
+          archive = "@ARCHIVE_URL@";
+        };
+      };
+      configSubstitutions = {
+        "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
+      };
+
+      # one URL per line
+      urlFile = "/data/archive/boosty/urls.txt";
+
+      # Add your preferred args here:
+      args = ["--cookies=/data/archive/boosty/cookies.txt" "--write-metadata"];
+    };
   };
 
   # --------------------------------------------------------------------------
@@ -976,6 +999,8 @@ in {
     "d /data/archive 0777 root root -"
     "d /data/archive/telegram 0777 root root -"
     "f /data/archive/telegram/urls.txt 0666 root root -"
+    "d /data/archive/boosty 0777 root root -"
+    "f /data/archive/boosty/urls.txt 0666 root root -"
 
     "d /home/dominik/.ssh 0700 dominik users"
     "d /home/dominik/.config 0755 dominik users -"
