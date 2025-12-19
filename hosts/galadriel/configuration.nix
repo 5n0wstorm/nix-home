@@ -152,6 +152,46 @@ in {
       # Add your preferred args here:
       args = ["--write-metadata"];
     };
+
+    instances.telegramReplies = {
+      enable = true;
+      onCalendar = "minutely";
+
+      workingDir = "/data/archive/telegram";
+      useDownloadArchiveFile = false;
+      config = {
+        extractor = {
+          "base-directory" = "/data/archive";
+          archive = "@ARCHIVE_URL@";
+          telegram = {
+            "api-id" = "@TG_API_ID@";
+            "api-hash" = "@TG_API_HASH@";
+            "session-type" = "string";
+            "session-string" = "@TG_SESSION_STRING@";
+            download = [
+              "replies"
+            ];
+            "avatar-size" = [64 64];
+            "media-mime-types" = [];
+            "batch-size" = 2000;
+            "order-messages" = "desc";
+            limit = null;
+          };
+        };
+      };
+      configSubstitutions = {
+        "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
+        "@TG_API_ID@" = config.sops.secrets."gallery-dl/telegram/api-id".path;
+        "@TG_API_HASH@" = config.sops.secrets."gallery-dl/telegram/api-hash".path;
+        "@TG_SESSION_STRING@" = config.sops.secrets."gallery-dl/telegram/session-string".path;
+      };
+
+      # one URL per line (same as main telegram instance)
+      urlFile = "/data/archive/telegram/urls.txt";
+
+      # Add your preferred args here:
+      args = ["--write-metadata"];
+    };
   };
 
   # --------------------------------------------------------------------------
