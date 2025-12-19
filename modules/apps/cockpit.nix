@@ -16,7 +16,7 @@ in {
 
     port = mkOption {
       type = types.port;
-      default = 9090;
+      default = 9095;
       description = "Port for Cockpit web interface";
     };
 
