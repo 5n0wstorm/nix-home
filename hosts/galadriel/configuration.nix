@@ -31,6 +31,7 @@ in {
     ../../modules/apps/postgresql.nix
     ../../modules/apps/vaultwarden.nix
     ../../modules/apps/gallery-dl.nix
+    ../../modules/apps/cockpit.nix
     # Media
     ../../modules/media/shared-media.nix
     ../../modules/media/jellyfin.nix
@@ -276,6 +277,12 @@ in {
         ];
       }
     ];
+  };
+
+  # Cockpit - Server management interface with 2FA
+  fleet.apps.cockpit = {
+    enable = true;
+    domain = "galadriel.sn0wstorm.com";
   };
 
   # ============================================================================

@@ -60,6 +60,7 @@ in {
               "fleet.reverse-proxy.enable" = "true";
               "fleet.reverse-proxy.domain" = "myapp.example.com";
               "fleet.reverse-proxy.ssl" = "true";
+              "fleet.reverse-proxy.scheme" = "http";
               "fleet.reverse-proxy.websockets" = "false";
               "fleet.reverse-proxy.extra-config" = "client_max_body_size 100M;";
               "fleet.authelia.bypass" = "true";
@@ -240,6 +241,7 @@ in {
       labels = serviceConfig.labels or {};
       target = labels."fleet.reverse-proxy.target" or "127.0.0.1";
       port = labels."fleet.reverse-proxy.port" or serviceConfig.port or 80;
+      scheme = labels."fleet.reverse-proxy.scheme" or "http";
       extraConfig = labels."fleet.reverse-proxy.extra-config" or "";
       enableSSL = (labels."fleet.reverse-proxy.ssl" or "true") != "false";
       bypassAuth = (labels."fleet.authelia.bypass" or "false") == "true";
@@ -254,10 +256,14 @@ in {
         (mkIf (useAuthelia && !bypassAuth) autheliaLocations)
         {
           "/" = {
-            proxyPass = "http://${target}:${toString port}";
+            proxyPass = "${scheme}://${target}:${toString port}";
             proxyWebsockets = (labels."fleet.reverse-proxy.websockets" or "false") == "true";
             extraConfig = ''
               ${optionalString (useAuthelia && !bypassAuth) autheliaAuthSnippet}
+              ${optionalString (scheme == "https") ''
+                proxy_ssl_verify off;
+                proxy_ssl_server_name on;
+              ''}
               ${extraConfig}
               ${labels."fleet.reverse-proxy.nginx-extra-config" or ""}
             '';
