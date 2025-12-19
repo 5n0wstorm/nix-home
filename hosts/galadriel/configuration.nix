@@ -170,7 +170,7 @@ in {
             "session-type" = "string";
             "session-string" = "@TG_SESSION_STRING@";
             download = [
-              "replies",
+              "replies"
               "text"
             ];
             "avatar-size" = [64 64];
