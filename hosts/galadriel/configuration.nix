@@ -217,6 +217,29 @@ in {
       # Add your preferred args here:
       args = ["--cookies=/data/archive/boosty/cookies.txt" "--write-metadata"];
     };
+
+    instances.twitter = {
+      enable = true;
+      onCalendar = "minutely";
+
+      workingDir = "/data/archive/twitter";
+      useDownloadArchiveFile = false;
+      config = {
+        extractor = {
+          "base-directory" = "/data/archive";
+          archive = "@ARCHIVE_URL@";
+        };
+      };
+      configSubstitutions = {
+        "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
+      };
+
+      # one URL per line
+      urlFile = "/data/archive/twitter/urls.txt";
+
+      # Add your preferred args here:
+      args = ["--cookies=/data/archive/twitter/cookies.txt" "--write-metadata"];
+    };
   };
 
   # --------------------------------------------------------------------------
