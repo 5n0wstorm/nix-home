@@ -198,6 +198,7 @@ in {
       enable = true;
       package = pkgs.nextcloud32;
       hostName = cfg.hostname;
+      datadir = cfg.dataDir;
       config = {
         adminuser = "admin";
         adminpassFile = "/run/secrets/nextcloud/admin-password";
