@@ -9,6 +9,10 @@
 #        ├─ lv_swap (8GB)
 #        └─ lv_root (remaining - ext4)
 #
+# HGST HDD added to LVM:
+#   /dev/disk/by-id/ata-HGST_HTS541010A9E680_JA10001F1DGNPN - LVM PV (100%)
+#     └─ vg_galadriel (extends existing volume group)
+#
 # Verified: UEFI boot via `ls /sys/firmware/efi`
 # Disk: /dev/nvme0n1 (476.9GB)
 # Network: enp3s0f1
@@ -35,6 +39,22 @@
             };
             # LVM physical volume - all remaining space
             root = {
+              size = "100%";
+              content = {
+                type = "lvm_pv";
+                vg = "vg_galadriel";
+              };
+            };
+          };
+        };
+      };
+      hgst = {
+        type = "disk";
+        device = "/dev/disk/by-id/ata-HGST_HTS541010A9E680_JA10001F1DGNPN";
+        content = {
+          type = "gpt";
+          partitions = {
+            lvm = {
               size = "100%";
               content = {
                 type = "lvm_pv";
