@@ -272,8 +272,20 @@ in {
     # generated file after activation and before php-fpm starts.
     systemd.services.nextcloud-fix-override-config = {
       description = "Patch Nextcloud override.config.php to drop non-existent store-apps apps_paths entry";
-      wantedBy = ["phpfpm-nextcloud.service"];
-      before = ["phpfpm-nextcloud.service"];
+      # Important: Nextcloud's initial config.php is created by nextcloud-setup.
+      # If setup runs before this patch, it can fail to generate config.php.
+      wantedBy = [
+        "phpfpm-nextcloud.service"
+        "nextcloud-setup.service"
+        "nextcloud-update-db.service"
+        "nextcloud-cron.service"
+      ];
+      before = [
+        "phpfpm-nextcloud.service"
+        "nextcloud-setup.service"
+        "nextcloud-update-db.service"
+        "nextcloud-cron.service"
+      ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
