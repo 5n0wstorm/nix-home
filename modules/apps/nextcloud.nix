@@ -208,24 +208,20 @@ in {
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
-
-        # Ensure Nextcloud uses stable, existing app directories.
-        #
-        # This prevents "App directory ... not found!" when Nextcloud points at a
-        # non-existent `${package}/store-apps` path.
-        appsPaths = [
-          {
-            path = "${cfg.dataDir}/apps";
-            url = "/apps";
-            writable = true;
-          }
-          {
-            path = "${config.services.nextcloud.package}/apps";
-            url = "/store-apps";
-            writable = false;
-          }
-        ];
       };
+
+      settings.apps_paths = mkForce [
+        {
+          path = "${config.services.nextcloud.package}/apps";
+          url = "/apps";
+          writable = false;
+        }
+        {
+          path = "${cfg.dataDir}/apps";
+          url = "/custom_apps";
+          writable = true;
+        }
+      ];
 
       https = true;
       maxUploadSize = "10G";
