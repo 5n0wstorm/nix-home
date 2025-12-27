@@ -196,7 +196,7 @@ in {
         else cfg.database.mysql.passwordFile;
     in {
       enable = true;
-      package = pkgs.nextcloud30;
+      package = pkgs.nextcloud31;
       hostName = cfg.hostname;
       config = {
         adminuser = "admin";
