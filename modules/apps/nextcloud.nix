@@ -210,9 +210,9 @@ in {
         dbpassFile = mysqlPasswordFile;
       };
 
-      settings.apps_paths = mkForce [
+      settings."apps_paths" = mkOverride 0 [
         {
-          path = "${config.services.nextcloud.package}/apps";
+          path = "${config.services.nextcloud.finalPackage}/apps";
           url = "/apps";
           writable = false;
         }
