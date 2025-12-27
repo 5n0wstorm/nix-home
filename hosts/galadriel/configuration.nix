@@ -1051,6 +1051,9 @@ in {
     "d /data/archive/boosty 0777 root root -"
     "f /data/archive/boosty/urls.txt 0666 root root -"
 
+    # Nextcloud data directory
+    "d /data/nextcloud 0750 nextcloud nextcloud -"
+
     "d /home/dominik/.ssh 0700 dominik users"
     "d /home/dominik/.config 0755 dominik users -"
     "d /home/dominik/.config/sops 0755 dominik users -"
