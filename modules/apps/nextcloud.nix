@@ -207,13 +207,6 @@ in {
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
-        apps_paths = [
-          {
-            path = "${cfg.dataDir}/apps";
-            url = "/apps";
-            writable = true;
-          }
-        ];
       };
       https = true;
       maxUploadSize = "10G";
