@@ -217,6 +217,16 @@ in {
           writable = false;
         }
         {
+          # NixOS places packaged (Nix) apps here (including services.nextcloud.extraApps).
+          # If this path is missing from apps_paths, `occ app:install <name>` will try
+          # to download from the app store and fail with messages like:
+          #   Could not download app calendar, it was not found on the appstore
+          path = "${config.services.nextcloud.finalPackage}/nix-apps";
+          url = "/nix-apps";
+          writable = false;
+        }
+        {
+          # Writable custom apps directory (kept under the persistent datadir).
           path = "${cfg.dataDir}/apps";
           url = "/custom_apps";
           writable = true;
