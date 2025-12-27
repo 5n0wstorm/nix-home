@@ -196,9 +196,10 @@ in {
         else cfg.database.mysql.passwordFile;
     in {
       enable = true;
-      package = pkgs.nextcloud32;
+      package = pkgs.nextcloud;
       hostName = cfg.hostname;
       datadir = cfg.dataDir;
+      appdir = "${cfg.dataDir}/apps";
       config = {
         adminuser = "admin";
         adminpassFile = "/run/secrets/nextcloud/admin-password";
