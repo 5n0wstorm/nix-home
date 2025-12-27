@@ -199,7 +199,6 @@ in {
       package = pkgs.nextcloud32;
       hostName = cfg.hostname;
       datadir = cfg.dataDir;
-      appsDir = "${cfg.dataDir}/apps";
       config = {
         adminuser = "admin";
         adminpassFile = "/run/secrets/nextcloud/admin-password";
