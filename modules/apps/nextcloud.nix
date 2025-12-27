@@ -257,6 +257,42 @@ in {
     ];
 
     # --------------------------------------------------------------------------
+    # WORKAROUND: nixpkgs emits a `store-apps` apps_paths entry
+    # --------------------------------------------------------------------------
+    #
+    # On some nixpkgs revisions, Nextcloud's generated `override.config.php`
+    # contains an apps_paths entry pointing at:
+    #   ${finalPackage}/store-apps
+    # but the directory does not exist in the produced package output, causing
+    # Nextcloud to hard-fail at runtime with:
+    #   App directory ".../store-apps" not found!
+    #
+    # `services.nextcloud.settings` cannot remove it because it is merged in
+    # afterwards (array_replace_recursive). As a practical workaround, patch the
+    # generated file after activation and before php-fpm starts.
+    systemd.services.nextcloud-fix-override-config = {
+      description = "Patch Nextcloud override.config.php to drop non-existent store-apps apps_paths entry";
+      wantedBy = ["phpfpm-nextcloud.service"];
+      before = ["phpfpm-nextcloud.service"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        set -euo pipefail
+
+        cfg="${cfg.dataDir}/config/override.config.php"
+        if [ ! -f "$cfg" ]; then
+          exit 0
+        fi
+
+        # Drop any apps_paths entries referencing store-apps.
+        # Each entry is on a single line in the generated file.
+        ${pkgs.gnused}/bin/sed -i "/store-apps/d" "$cfg"
+      '';
+    };
+
+    # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
 
