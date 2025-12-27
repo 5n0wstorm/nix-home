@@ -196,8 +196,8 @@ in {
         else cfg.database.mysql.passwordFile;
     in {
       enable = true;
-      hostname = cfg.hostname;
       package = pkgs.nextcloud28;
+      hostName = cfg.hostname;
       config = {
         adminuser = "admin";
         adminpassFile = "/run/secrets/nextcloud/admin-password";
@@ -206,6 +206,7 @@ in {
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
+        trustedDomains = [cfg.domain cfg.hostname];
       };
       https = true;
       maxUploadSize = "10G";
