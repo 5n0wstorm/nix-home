@@ -196,7 +196,7 @@ in {
         else cfg.database.mysql.passwordFile;
     in {
       enable = true;
-      package = pkgs.nextcloud;
+      package = pkgs.nextcloud32;
       hostName = cfg.hostname;
       datadir = cfg.dataDir;
       config = {
