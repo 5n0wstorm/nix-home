@@ -29,7 +29,7 @@ in {
 
     dataDir = mkOption {
       type = types.str;
-      default = "/var/lib/nextcloud";
+      default = "/data/nextcloud";
       description = "Data directory for Nextcloud";
     };
 
@@ -226,9 +226,8 @@ in {
     # DATA DIRECTORY
     # --------------------------------------------------------------------------
 
-    systemd.tmpfiles.rules = [
-      "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
-    ];
+    # Note: Add this to your galadriel configuration.nix systemd.tmpfiles.rules:
+    # "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
