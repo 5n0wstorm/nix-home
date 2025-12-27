@@ -7,6 +7,7 @@
 with lib; let
   cfg = config.fleet.apps.nextcloud;
   homepageCfg = config.fleet.apps.homepage;
+  acmeCfg = config.fleet.security.acme;
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -146,26 +147,29 @@ in {
     };
 
     # --------------------------------------------------------------------------
-    # REVERSE PROXY REGISTRATION
+    # NGINX (TLS + limits)
     # --------------------------------------------------------------------------
 
-    fleet.networking.reverseProxy.serviceRegistry.nextcloud = {
-      port = 80;
-      labels = {
-        "fleet.reverse-proxy.enable" = "true";
-        "fleet.reverse-proxy.domain" = cfg.domain;
-        "fleet.reverse-proxy.ssl" = "true";
-        "fleet.reverse-proxy.websockets" = "true";
-        "fleet.reverse-proxy.extra-config" = ''
+    # Nextcloud already configures an nginx vhost as part of services.nextcloud.
+    # Our fleet "reverseProxy" module is also nginx, so proxying Nextcloud to
+    # 127.0.0.1:80 creates an nginx->nginx loop (and can yield 400s/redirects).
+    #
+    # Instead, attach TLS + request limits directly to Nextcloud's nginx vhost.
+    services.nginx.virtualHosts.${cfg.hostname} = mkMerge [
+      {
+        extraConfig = ''
           client_max_body_size 10G;
           proxy_read_timeout 3600s;
           proxy_connect_timeout 3600s;
           proxy_send_timeout 3600s;
         '';
-        # Nextcloud handles its own authentication
-        "fleet.authelia.bypass" = "true";
-      };
-    };
+      }
+      (mkIf acmeCfg.enable {
+        sslCertificate = acmeCfg.certPath;
+        sslCertificateKey = acmeCfg.keyPath;
+        forceSSL = true;
+      })
+    ];
 
     # --------------------------------------------------------------------------
     # DATABASE CONFIGURATION
