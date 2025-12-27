@@ -219,9 +219,11 @@ in {
             proxyPass = "http://${hostConfig.target}:${toString hostConfig.port}";
             proxyWebsockets = true;
             extraConfig = ''
+              proxy_set_header Host $host;
               proxy_set_header X-Real-IP $remote_addr;
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
               proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_set_header X-Forwarded-Host $host;
               ${optionalString (useAuthelia && !hostConfig.bypassAuth) autheliaAuthSnippet}
               ${hostConfig.extraConfig}
             '';
@@ -259,6 +261,11 @@ in {
             proxyPass = "${scheme}://${target}:${toString port}";
             proxyWebsockets = (labels."fleet.reverse-proxy.websockets" or "false") == "true";
             extraConfig = ''
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_set_header X-Forwarded-Host $host;
               ${optionalString (useAuthelia && !bypassAuth) autheliaAuthSnippet}
               ${optionalString (scheme == "https") ''
                 proxy_ssl_verify off;
