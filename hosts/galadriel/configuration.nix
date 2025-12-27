@@ -955,6 +955,13 @@ in {
         mode = "0440";
       };
 
+      # Nextcloud admin password
+      "nextcloud/admin-password" = {
+        owner = "nextcloud";
+        group = "nextcloud";
+        mode = "0400";
+      };
+
       # Sonarr API key for Configarr
       "sonarr/api-key" = {
         owner = "root";

@@ -196,7 +196,7 @@ in {
         else cfg.database.mysql.passwordFile;
     in {
       enable = true;
-      package = pkgs.nextcloud31;
+      package = pkgs.nextcloud32;
       hostName = cfg.hostname;
       config = {
         adminuser = "admin";
@@ -215,11 +215,12 @@ in {
     # SOPS SECRET FOR ADMIN PASSWORD
     # --------------------------------------------------------------------------
 
-    sops.secrets."nextcloud/admin-password" = {
-      owner = "nextcloud";
-      group = "nextcloud";
-      mode = "0400";
-    };
+    # Note: Add this to your galadriel configuration.nix sops.secrets section:
+    # "nextcloud/admin-password" = {
+    #   owner = "nextcloud";
+    #   group = "nextcloud";
+    #   mode = "0400";
+    # };
 
     # --------------------------------------------------------------------------
     # DATA DIRECTORY
