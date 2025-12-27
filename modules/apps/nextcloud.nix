@@ -207,7 +207,6 @@ in {
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
-        trusted_domains = [cfg.domain];
       };
       https = true;
       maxUploadSize = "10G";
