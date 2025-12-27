@@ -207,9 +207,16 @@ in {
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
+        trusted_domains = [cfg.domain];
       };
       https = true;
       maxUploadSize = "10G";
+
+      # Install basic apps
+      extraApps = {
+        inherit (config.services.nextcloud.package.packages.apps) contacts calendar tasks;
+      };
+      extraAppsEnable = true;
     };
 
     # --------------------------------------------------------------------------
