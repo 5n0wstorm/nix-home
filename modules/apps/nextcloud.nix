@@ -210,6 +210,16 @@ in {
         dbpassFile = mysqlPasswordFile;
       };
 
+      # Reverse-proxy awareness (prevents login redirect loops behind nginx/TLS).
+      # Our fleet reverse proxy terminates TLS and forwards to Nextcloud via HTTP.
+      settings = {
+        trusted_domains = [cfg.domain];
+        trusted_proxies = ["127.0.0.1"];
+        overwriteprotocol = "https";
+        overwritehost = cfg.domain;
+        "overwrite.cli.url" = "https://${cfg.domain}";
+      };
+
       settings."apps_paths" = mkOverride 0 [
         {
           path = "${config.services.nextcloud.finalPackage}/apps";
