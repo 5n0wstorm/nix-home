@@ -72,8 +72,8 @@ in {
       openFirewall = cfg.openFirewall;
 
       # Ensure state directory exists
-      enableWinbindd = false;
-      enableNmbd = true;
+      nmbd.enable = true;
+      winbindd.enable = false;
 
       settings = {
         global = {
