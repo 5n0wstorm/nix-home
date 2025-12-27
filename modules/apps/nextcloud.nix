@@ -199,7 +199,6 @@ in {
       package = pkgs.nextcloud;
       hostName = cfg.hostname;
       datadir = cfg.dataDir;
-      appdir = "${cfg.dataDir}/apps";
       config = {
         adminuser = "admin";
         adminpassFile = "/run/secrets/nextcloud/admin-password";
@@ -208,6 +207,15 @@ in {
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
+      };
+      extraOptions = {
+        apps_paths = [
+          {
+            path = "${cfg.dataDir}/apps";
+            url = "/apps";
+            writable = true;
+          }
+        ];
       };
       https = true;
       maxUploadSize = "10G";
