@@ -213,7 +213,7 @@ in {
       settings = {
         "apps_paths" = [
           {
-            path = "/var/lib/nextcloud/apps";
+            path = "${cfg.dataDir}/apps";
             url = "/apps";
             writable = true;
           }
@@ -252,6 +252,11 @@ in {
 
     # Note: Add this to your galadriel configuration.nix systemd.tmpfiles.rules:
     # "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
+
+    systemd.tmpfiles.rules = [
+      "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
+      "d ${cfg.dataDir}/apps 0750 nextcloud nextcloud -"
+    ];
 
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
