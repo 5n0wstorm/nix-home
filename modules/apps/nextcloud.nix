@@ -194,9 +194,10 @@ in {
         if mysqlFromFleet
         then mysqlConn.passwordFile
         else cfg.database.mysql.passwordFile;
+      nextcloudPkg = pkgs.nextcloud32;
     in {
       enable = true;
-      package = pkgs.nextcloud32;
+      package = nextcloudPkg;
       hostName = cfg.hostname;
       datadir = cfg.dataDir;
       config = {
@@ -208,12 +209,28 @@ in {
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
       };
+
+      settings = {
+        "apps_paths" = [
+          {
+            path = "/var/lib/nextcloud/apps";
+            url = "/apps";
+            writable = true;
+          }
+          {
+            path = "${config.services.nextcloud.package}/apps";
+            url = "/store-apps";
+            writable = false;
+          }
+        ];
+      };
+
       https = true;
       maxUploadSize = "10G";
 
       # Install basic apps
       extraApps = {
-        inherit (config.services.nextcloud.package.packages.apps) contacts calendar tasks;
+        inherit (nextcloudPkg.packages.apps) contacts calendar tasks;
       };
       extraAppsEnable = true;
     };
