@@ -199,6 +199,7 @@ in {
       package = pkgs.nextcloud32;
       hostName = cfg.hostname;
       datadir = cfg.dataDir;
+      appsDir = "${cfg.dataDir}/apps";
       config = {
         adminuser = "admin";
         adminpassFile = "/run/secrets/nextcloud/admin-password";
@@ -207,8 +208,6 @@ in {
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
-      };
-      extraOptions = {
         apps_paths = [
           {
             path = "${cfg.dataDir}/apps";
