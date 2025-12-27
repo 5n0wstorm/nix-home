@@ -208,10 +208,12 @@ in {
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
-      };
 
-      settings = {
-        "apps_paths" = [
+        # Ensure Nextcloud uses stable, existing app directories.
+        #
+        # This prevents "App directory ... not found!" when Nextcloud points at a
+        # non-existent `${package}/store-apps` path.
+        appsPaths = [
           {
             path = "${cfg.dataDir}/apps";
             url = "/apps";
