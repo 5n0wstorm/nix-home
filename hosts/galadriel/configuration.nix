@@ -32,6 +32,7 @@ in {
     ../../modules/apps/vaultwarden.nix
     ../../modules/apps/gallery-dl.nix
     ../../modules/apps/cockpit.nix
+    ../../modules/apps/nextcloud.nix
     # Media
     ../../modules/media/shared-media.nix
     ../../modules/media/jellyfin.nix
@@ -100,6 +101,16 @@ in {
     invitationsAllowed = true;
     # To enable admin panel, create environment file with ADMIN_TOKEN:
     # environmentFile = "/run/secrets/vaultwarden-env";
+  };
+
+  # Nextcloud - File sync and sharing platform
+  fleet.apps.nextcloud = {
+    enable = true;
+    domain = "cloud.sn0wstorm.com";
+    database = {
+      type = "mysql";
+      mysql.useFleetMysql = true;
+    };
   };
 
   # Custom gallery-dl from Gitea fork
