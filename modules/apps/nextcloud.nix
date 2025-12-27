@@ -237,4 +237,3 @@ in {
     networking.firewall.allowedTCPPorts = [];
   };
 }
-
