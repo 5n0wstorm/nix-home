@@ -493,6 +493,43 @@ in {
         "f ${cfg.logging.file} 0644 nextcloud nextcloud -"
       ];
 
+    systemd.services.nextcloud-migrate-config-dir = {
+      description = "Migrate Nextcloud config dir from /data/nextcloud/config to /var/lib/nextcloud/config";
+      wantedBy = [
+        "nextcloud-setup.service"
+        "phpfpm-nextcloud.service"
+        "nextcloud-cron.service"
+        "nextcloud-update-db.service"
+      ];
+      before = [
+        "nextcloud-setup.service"
+        "phpfpm-nextcloud.service"
+        "nextcloud-cron.service"
+        "nextcloud-update-db.service"
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+      };
+      script = ''
+        set -euo pipefail
+
+        src="/data/nextcloud/config"
+        dst="/var/lib/nextcloud/config"
+
+        # If config already exists at the new location, do nothing.
+        if [ -f "$dst/config.php" ]; then
+          exit 0
+        fi
+
+        # If old config exists, copy it over preserving perms.
+        if [ -f "$src/config.php" ]; then
+          mkdir -p "/var/lib/nextcloud"
+          ${pkgs.coreutils}/bin/cp -a "$src" "/var/lib/nextcloud/"
+          ${pkgs.coreutils}/bin/chown -R nextcloud:nextcloud "/var/lib/nextcloud/config"
+        fi
+      '';
+    };
+
     # --------------------------------------------------------------------------
     # WORKAROUND: nixpkgs emits a `store-apps` apps_paths entry
     # --------------------------------------------------------------------------
