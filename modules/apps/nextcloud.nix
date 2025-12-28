@@ -541,6 +541,13 @@ in {
       '';
     };
 
+    # Ensure nextcloud-setup and other services use the correct config directory
+    systemd.services.nextcloud-setup = {
+      environment = {
+        NEXTCLOUD_CONFIG_DIR = "/var/lib/nextcloud/config";
+      };
+    };
+
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
