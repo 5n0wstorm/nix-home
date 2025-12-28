@@ -375,7 +375,8 @@ in {
       enable = true;
       package = nextcloudPkg;
       hostName = cfg.hostname;
-      datadir = cfg.dataDir;
+      home = "/var/lib/nextcloud";  # Config directory
+      datadir = cfg.dataDir;  # User data directory
       config = {
         adminuser = "admin";
         adminpassFile = "/run/secrets/nextcloud/admin-password";
