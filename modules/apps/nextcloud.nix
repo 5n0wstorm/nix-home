@@ -480,10 +480,10 @@ in {
     # DATA DIRECTORY
     # --------------------------------------------------------------------------
 
-    # Note: Data and config directories are automatically created via systemd.tmpfiles.rules
-
     systemd.tmpfiles.rules =
       [
+        "d /var/lib/nextcloud 0750 nextcloud nextcloud -"
+        # Data directory (user files)
         "d /data/nextcloud 0750 nextcloud nextcloud -"
         "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
         "d ${cfg.dataDir}/apps 0750 nextcloud nextcloud -"
