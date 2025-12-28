@@ -30,8 +30,8 @@ in {
 
     dataDir = mkOption {
       type = types.str;
-      default = "/data/nextcloud";
-      description = "Data directory for Nextcloud";
+      default = "/data/nextcloud/data";
+      description = "Data directory for Nextcloud user files";
     };
 
     database = {
@@ -404,11 +404,11 @@ in {
     # DATA DIRECTORY
     # --------------------------------------------------------------------------
 
-    # Note: Add this to your galadriel configuration.nix systemd.tmpfiles.rules:
-    # "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
+    # Note: Data and config directories are automatically created via systemd.tmpfiles.rules
 
     systemd.tmpfiles.rules =
       [
+        "d /data/nextcloud 0750 nextcloud nextcloud -"
         "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
         "d ${cfg.dataDir}/apps 0750 nextcloud nextcloud -"
       ]
