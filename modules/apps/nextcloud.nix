@@ -144,6 +144,26 @@ in {
         description = "Maximum log file size in bytes before rotation (only used when type = 'file')";
       };
     };
+
+    php = {
+      errorReporting = mkOption {
+        type = types.str;
+        default = "E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED";
+        description = "PHP error reporting level to suppress log noise";
+      };
+
+      displayErrors = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Whether to display PHP errors in the browser";
+      };
+
+      logErrors = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Whether to log PHP errors";
+      };
+    };
   };
 
   # ============================================================================
@@ -259,6 +279,12 @@ in {
         log_type = cfg.logging.type;
         logfile = cfg.logging.file;
         log_rotate_size = cfg.logging.rotateSize;
+      } // {
+        # PHP configuration to reduce log noise and suppress notices
+        # This addresses issues like "Undefined array key" errors in SystemTagManager
+        php_error_reporting = cfg.php.errorReporting;
+        php_display_errors = cfg.php.displayErrors;
+        php_log_errors = cfg.php.logErrors;
       };
 
       settings."apps_paths" = mkOverride 0 [
