@@ -482,14 +482,13 @@ in {
 
     systemd.tmpfiles.rules =
       [
+        # Config directory (Nextcloud installation)
         "d /var/lib/nextcloud 0750 nextcloud nextcloud -"
         # Data directory (user files)
         "d /data/nextcloud 0750 nextcloud nextcloud -"
         "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
-        "d ${cfg.dataDir}/apps 0750 nextcloud nextcloud -"
       ]
       ++ optionals cfg.logging.enable [
-        "d /var/log 0755 root root -"
         "f ${cfg.logging.file} 0644 nextcloud nextcloud -"
       ];
 
@@ -530,7 +529,7 @@ in {
       script = ''
         set -euo pipefail
 
-        cfg="${cfg.dataDir}/config/override.config.php"
+        cfg="/var/lib/nextcloud/config/override.config.php"
         if [ ! -f "$cfg" ]; then
           exit 0
         fi
