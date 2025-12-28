@@ -112,6 +112,38 @@ in {
         description = "Category on the homepage dashboard";
       };
     };
+
+    logging = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable Nextcloud logging";
+      };
+
+      level = mkOption {
+        type = types.enum [0 1 2 3 4];
+        default = 2;
+        description = "Log level: 0=debug, 1=info, 2=warning, 3=error, 4=fatal";
+      };
+
+      type = mkOption {
+        type = types.enum ["file" "syslog" "errorlog" "owncloud"];
+        default = "file";
+        description = "Log type: file=syslog, syslog=system syslog, errorlog=PHP error log, owncloud=Nextcloud's own log format";
+      };
+
+      file = mkOption {
+        type = types.str;
+        default = "/var/log/nextcloud.log";
+        description = "Path to log file (only used when type = 'file')";
+      };
+
+      rotateSize = mkOption {
+        type = types.int;
+        default = 104857600; # 100MB
+        description = "Maximum log file size in bytes before rotation (only used when type = 'file')";
+      };
+    };
   };
 
   # ============================================================================
@@ -221,6 +253,12 @@ in {
         overwriteprotocol = "https";
         overwritehost = cfg.domain;
         "overwrite.cli.url" = "https://${cfg.domain}";
+      } // optionalAttrs cfg.logging.enable {
+        # Logging configuration
+        loglevel = cfg.logging.level;
+        log_type = cfg.logging.type;
+        logfile = cfg.logging.file;
+        log_rotate_size = cfg.logging.rotateSize;
       };
 
       settings."apps_paths" = mkOverride 0 [
@@ -277,6 +315,9 @@ in {
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
       "d ${cfg.dataDir}/apps 0750 nextcloud nextcloud -"
+    ] ++ optional cfg.logging.enable [
+      "d /var/log 0755 root root -"
+      "f ${cfg.logging.file} 0644 nextcloud nextcloud -"
     ];
 
     # --------------------------------------------------------------------------
