@@ -192,12 +192,8 @@ in {
       videoProviders = mkOption {
         type = types.listOf types.str;
         default = [
-          "OC\\Preview\\MP4"
-          "OC\\Preview\\AVI"
-          "OC\\Preview\\MOV"
-          "OC\\Preview\\MKV"
-          "OC\\Preview\\OGG"
-          "OC\\Preview\\WebM"
+          # Nextcloud uses a single provider for video previews (requires ffmpeg).
+          "OC\\Preview\\Movie"
         ];
         description = "List of enabled video preview providers";
       };
