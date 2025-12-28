@@ -285,9 +285,9 @@ in {
         php_error_reporting = cfg.php.errorReporting;
         php_display_errors = cfg.php.displayErrors;
         php_log_errors = cfg.php.logErrors;
-      };
 
-      settings."apps_paths" = mkOverride 0 [
+        # Apps paths configuration
+        "apps_paths" = mkOverride 0 [
         {
           path = "${config.services.nextcloud.finalPackage}/apps";
           url = "/apps";
@@ -308,7 +308,8 @@ in {
           url = "/custom_apps";
           writable = true;
         }
-      ];
+        ];
+      };
 
       https = true;
       maxUploadSize = "10G";
