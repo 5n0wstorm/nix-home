@@ -164,14 +164,73 @@ in {
         description = "Whether to log PHP errors";
       };
     };
+
+    previews = {
+      enable = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable preview generation for files";
+      };
+
+      providers = mkOption {
+        type = types.listOf types.str;
+        default = [
+          "OC\\Preview\\PNG"
+          "OC\\Preview\\JPEG"
+          "OC\\Preview\\GIF"
+          "OC\\Preview\\BMP"
+          "OC\\Preview\\XBitmap"
+          "OC\\Preview\\Krita"
+          "OC\\Preview\\WebP"
+          "OC\\Preview\\MarkDown"
+          "OC\\Preview\\TXT"
+          "OC\\Preview\\OpenDocument"
+        ];
+        description = "List of enabled preview providers";
+      };
+
+      videoProviders = mkOption {
+        type = types.listOf types.str;
+        default = [
+          "OC\\Preview\\MP4"
+          "OC\\Preview\\AVI"
+          "OC\\Preview\\MOV"
+          "OC\\Preview\\MKV"
+          "OC\\Preview\\OGG"
+          "OC\\Preview\\WebM"
+        ];
+        description = "List of enabled video preview providers";
+      };
+
+      maxX = mkOption {
+        type = types.int;
+        default = 2048;
+        description = "Maximum width of previews";
+      };
+
+      maxY = mkOption {
+        type = types.int;
+        default = 2048;
+        description = "Maximum height of previews";
+      };
+    };
   };
 
   # ============================================================================
   # MODULE IMPLEMENTATION
   # ============================================================================
 
-  config = mkIf cfg.enable {
-    # --------------------------------------------------------------------------
+    config = mkIf cfg.enable {
+      # --------------------------------------------------------------------------
+      # SYSTEM PACKAGES FOR PREVIEWS
+      # --------------------------------------------------------------------------
+
+      # Video previews require ffmpeg
+      environment.systemPackages = mkIf cfg.previews.enable (
+        with pkgs; [ ffmpeg ]
+      );
+
+      # --------------------------------------------------------------------------
     # ASSERTIONS
     # --------------------------------------------------------------------------
 
@@ -267,52 +326,54 @@ in {
 
       # Reverse-proxy awareness (prevents login redirect loops behind nginx/TLS).
       # Our fleet reverse proxy terminates TLS and forwards to Nextcloud via HTTP.
-      settings =
-        {
-          trusted_domains = [cfg.domain];
-          trusted_proxies = ["127.0.0.1"];
-          overwriteprotocol = "https";
-          overwritehost = cfg.domain;
-          "overwrite.cli.url" = "https://${cfg.domain}";
-        }
-        // optionalAttrs cfg.logging.enable {
-          # Logging configuration
-          loglevel = cfg.logging.level;
-          log_type = cfg.logging.type;
-          logfile = cfg.logging.file;
-          log_rotate_size = cfg.logging.rotateSize;
-        }
-        // {
-          # PHP configuration to reduce log noise and suppress notices
-          # This addresses issues like "Undefined array key" errors in SystemTagManager
-          php_error_reporting = cfg.php.errorReporting;
-          php_display_errors = cfg.php.displayErrors;
-          php_log_errors = cfg.php.logErrors;
+      settings = {
+        trusted_domains = [cfg.domain];
+        trusted_proxies = ["127.0.0.1"];
+        overwriteprotocol = "https";
+        overwritehost = cfg.domain;
+        "overwrite.cli.url" = "https://${cfg.domain}";
+      } // optionalAttrs cfg.logging.enable {
+        # Logging configuration
+        loglevel = cfg.logging.level;
+        log_type = cfg.logging.type;
+        logfile = cfg.logging.file;
+        log_rotate_size = cfg.logging.rotateSize;
+      } // optionalAttrs cfg.previews.enable {
+        # Preview configuration
+        enabledPreviewProviders = cfg.previews.providers ++ cfg.previews.videoProviders;
+        preview_max_x = cfg.previews.maxX;
+        preview_max_y = cfg.previews.maxY;
+      } // {
+        # PHP configuration to reduce log noise and suppress notices
+        # This addresses issues like "Undefined array key" errors in SystemTagManager
+        php_error_reporting = cfg.php.errorReporting;
+        php_display_errors = cfg.php.displayErrors;
+        php_log_errors = cfg.php.logErrors;
 
-          # Apps paths configuration
-          "apps_paths" = mkOverride 0 [
-            {
-              path = "${config.services.nextcloud.finalPackage}/apps";
-              url = "/apps";
-              writable = false;
-            }
-            {
-              # NixOS places packaged (Nix) apps here (including services.nextcloud.extraApps).
-              # If this path is missing from apps_paths, `occ app:install <name>` will try
-              # to download from the app store and fail with messages like:
-              #   Could not download app calendar, it was not found on the appstore
-              path = "${config.services.nextcloud.finalPackage}/nix-apps";
-              url = "/nix-apps";
-              writable = false;
-            }
-            {
-              # Writable custom apps directory (kept under the persistent datadir).
-              path = "${cfg.dataDir}/apps";
-              url = "/custom_apps";
-              writable = true;
-            }
-          ];
-        };
+        # Apps paths configuration
+        "apps_paths" = mkOverride 0 [
+          {
+            path = "${config.services.nextcloud.finalPackage}/apps";
+            url = "/apps";
+            writable = false;
+          }
+          {
+            # NixOS places packaged (Nix) apps here (including services.nextcloud.extraApps).
+            # If this path is missing from apps_paths, `occ app:install <name>` will try
+            # to download from the app store and fail with messages like:
+            #   Could not download app calendar, it was not found on the appstore
+            path = "${config.services.nextcloud.finalPackage}/nix-apps";
+            url = "/nix-apps";
+            writable = false;
+          }
+          {
+            # Writable custom apps directory (kept under the persistent datadir).
+            path = "${cfg.dataDir}/apps";
+            url = "/custom_apps";
+            writable = true;
+          }
+        ];
+      };
 
       https = true;
       maxUploadSize = "10G";
