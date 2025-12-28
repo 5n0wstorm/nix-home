@@ -342,7 +342,7 @@ in {
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
       "d ${cfg.dataDir}/apps 0750 nextcloud nextcloud -"
-    ] ++ optional cfg.logging.enable [
+    ] ++ optionals cfg.logging.enable [
       "d /var/log 0755 root root -"
       "f ${cfg.logging.file} 0644 nextcloud nextcloud -"
     ];
