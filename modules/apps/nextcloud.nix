@@ -459,7 +459,7 @@ in {
 
       # Install basic apps
       extraApps = {
-        inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator duplicatefinder;
+        inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator;
       };
       extraAppsEnable = true;
     };
