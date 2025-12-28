@@ -376,7 +376,7 @@ in {
       package = nextcloudPkg;
       hostName = cfg.hostname;
       home = "/var/lib/nextcloud";  # Config directory
-      datadir = cfg.dataDir;  # User data directory
+      datadir = "/var/lib/nextcloud";
       config = {
         adminuser = "admin";
         adminpassFile = "/run/secrets/nextcloud/admin-password";
@@ -396,6 +396,8 @@ in {
           overwriteprotocol = "https";
           overwritehost = cfg.domain;
           "overwrite.cli.url" = "https://${cfg.domain}";
+          # User data directory (files). Keep Nextcloud config/state under /var/lib.
+          datadirectory = cfg.dataDir;
         }
         // optionalAttrs cfg.logging.enable {
           # Logging configuration
@@ -488,6 +490,8 @@ in {
         # Data directory (user files)
         "d /data/nextcloud 0750 nextcloud nextcloud -"
         "d ${cfg.dataDir} 0750 nextcloud nextcloud -"
+        # Custom apps directory (referenced by settings.apps_paths)
+        "d ${cfg.dataDir}/apps 0750 nextcloud nextcloud -"
       ]
       ++ optionals cfg.logging.enable [
         "f ${cfg.logging.file} 0644 nextcloud nextcloud -"
@@ -576,13 +580,6 @@ in {
         # Each entry is on a single line in the generated file.
         ${pkgs.gnused}/bin/sed -i "/store-apps/d" "$cfg"
       '';
-    };
-
-    # Ensure nextcloud-setup and other services use the correct config directory
-    systemd.services.nextcloud-setup = {
-      environment = {
-        NEXTCLOUD_CONFIG_DIR = "/var/lib/nextcloud/config";
-      };
     };
 
     # --------------------------------------------------------------------------
