@@ -214,6 +214,68 @@ in {
         description = "Maximum height of previews";
       };
     };
+
+    mail = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Enable SMTP mail configuration";
+      };
+
+      smtpmode = mkOption {
+        type = types.enum ["smtp" "sendmail" "qmail"];
+        default = "smtp";
+        description = "Mail sending mode";
+      };
+
+      smtpsecure = mkOption {
+        type = types.enum ["ssl" "tls" ""];
+        default = "tls";
+        description = "SMTP encryption: ssl, tls, or empty for none";
+      };
+
+      smtphost = mkOption {
+        type = types.str;
+        default = "mail.sn0wstorm.com";
+        description = "SMTP server hostname";
+      };
+
+      smtpport = mkOption {
+        type = types.port;
+        default = 587;
+        description = "SMTP server port";
+      };
+
+      smtpauthtype = mkOption {
+        type = types.enum ["LOGIN" "PLAIN" "NTLM" "CRAM-MD5"];
+        default = "LOGIN";
+        description = "SMTP authentication type";
+      };
+
+      smtpname = mkOption {
+        type = types.str;
+        default = "";
+        description = "SMTP authentication username";
+      };
+
+      smtppasswordFile = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        description = "Path to file containing SMTP password";
+      };
+
+      fromAddress = mkOption {
+        type = types.str;
+        default = "nextcloud@sn0wstorm.com";
+        description = "From address for sent emails";
+      };
+
+      domain = mkOption {
+        type = types.str;
+        default = "sn0wstorm.com";
+        description = "Domain for email addresses";
+      };
+    };
   };
 
   # ============================================================================
@@ -346,6 +408,20 @@ in {
           enabledPreviewProviders = cfg.previews.providers ++ cfg.previews.videoProviders;
           preview_max_x = cfg.previews.maxX;
           preview_max_y = cfg.previews.maxY;
+        }
+        // optionalAttrs cfg.mail.enable {
+          # Mail/SMTP configuration
+          mail_smtpmode = cfg.mail.smtpmode;
+          mail_smtpsecure = cfg.mail.smtpsecure;
+          mail_smtphost = cfg.mail.smtphost;
+          mail_smtpport = cfg.mail.smtpport;
+          mail_smtpauthtype = cfg.mail.smtpauthtype;
+          mail_smtpname = cfg.mail.smtpname;
+          mail_from_address = cfg.mail.fromAddress;
+          mail_domain = cfg.mail.domain;
+        }
+        // optionalAttrs (cfg.mail.enable && cfg.mail.smtppasswordFile != null) {
+          mail_smtppassword = cfg.mail.smtppasswordFile;
         }
         // {
           # PHP configuration to reduce log noise and suppress notices
