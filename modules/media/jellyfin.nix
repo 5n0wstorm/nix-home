@@ -156,6 +156,13 @@ in {
         "fleet.reverse-proxy.domain" = cfg.domain;
         "fleet.reverse-proxy.ssl" = "true";
         "fleet.reverse-proxy.websockets" = "true";
+        "fleet.reverse-proxy.extra-config" = ''
+          client_max_body_size 20G;
+          proxy_buffering off;
+          proxy_read_timeout 3600s;
+          proxy_send_timeout 3600s;
+          proxy_set_header X-Forwarded-Protocol $scheme;
+        '';
         "fleet.authelia.bypass" =
           if cfg.bypassAuth
           then "true"
