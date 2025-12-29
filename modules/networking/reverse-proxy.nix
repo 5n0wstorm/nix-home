@@ -209,9 +209,6 @@ in {
       # Use wildcard certificate from ACME module
       sslCertificate = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.certPath;
       sslCertificateKey = mkIf (useAcmeTLS && hostConfig.ssl) acmeCfg.keyPath;
-      # Ensure the vhost actually listens on 443 when TLS is enabled.
-      # (forceSSL alone only redirects HTTP -> HTTPS; it doesn't necessarily add an SSL listener.)
-      addSSL = useAcmeTLS && hostConfig.ssl;
       forceSSL = useAcmeTLS && hostConfig.ssl;
 
       # Add Authelia location if enabled and not bypassed
@@ -254,8 +251,6 @@ in {
       # Use wildcard certificate from ACME module
       sslCertificate = mkIf (useAcmeTLS && enableSSL) acmeCfg.certPath;
       sslCertificateKey = mkIf (useAcmeTLS && enableSSL) acmeCfg.keyPath;
-      # Ensure the service vhost listens on 443 when TLS is enabled.
-      addSSL = useAcmeTLS && enableSSL;
       forceSSL = useAcmeTLS && enableSSL;
 
       # Add Authelia location if enabled and not bypassed
