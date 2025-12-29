@@ -332,6 +332,14 @@ in {
         #   could not build optimal proxy_headers_hash ...
         # These are harmless but indicate nginx is close to the default hash limits.
         appendHttpConfig = ''
+          # Websocket upgrade helper (used by NixOS' proxyWebsockets implementation).
+          # Without this, nginx can forward an invalid/empty Connection header to some
+          # upstreams (e.g. Kestrel/Go) and trigger 400 responses.
+          map $http_upgrade $connection_upgrade {
+            default upgrade;
+            "" close;
+          }
+
           proxy_headers_hash_max_size 1024;
           proxy_headers_hash_bucket_size 128;
         '';
