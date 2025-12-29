@@ -154,6 +154,7 @@ in {
       labels = {
         "fleet.reverse-proxy.enable" = "true";
         "fleet.reverse-proxy.domain" = cfg.domain;
+        "fleet.reverse-proxy.target" = "127.0.0.1";
         "fleet.reverse-proxy.ssl" = "true";
         "fleet.reverse-proxy.websockets" = "true";
         "fleet.reverse-proxy.extra-config" = ''
@@ -161,7 +162,18 @@ in {
           proxy_buffering off;
           proxy_read_timeout 3600s;
           proxy_send_timeout 3600s;
-          proxy_set_header X-Forwarded-Protocol $scheme;
+          
+          # Force WebSocket support
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection $connection_upgrade;
+          
+          # Explicit headers for Jellyfin
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_set_header Host $host;
         '';
         "fleet.authelia.bypass" =
           if cfg.bypassAuth
