@@ -510,6 +510,8 @@ in {
         memories = memoriesAppDir;
       };
       extraAppsEnable = true;
+      # Allow installing apps from the Nextcloud app store via the web UI (disabled by default when extraApps is set).
+      appstoreEnable = true;
     };
 
     # --------------------------------------------------------------------------
