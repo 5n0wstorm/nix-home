@@ -497,15 +497,18 @@ in {
           script = ''
             set -euo pipefail
             out=${escapeShellArg urlFile}
+            raw=$(mktemp)
+            trap 'rm -f "$raw"' EXIT
             ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl \
               --cookies ${escapeShellArg cookiesPath} \
               -g \
               -o "users={legacy[name]}" \
               ${escapeShellArg followingUrl} \
-              2>/dev/null | while IFS= read -r name; do
+              > "$raw" 2>/dev/stderr || true
+            while IFS= read -r name; do
               name="''${name%%[[:space:]]*}"
               [[ -n "$name" ]] && echo "https://x.com/$name/media"
-            done | sort -u > "$out.tmp"
+            done < "$raw" | sort -u > "$out.tmp"
             chmod 666 "$out.tmp"
             mv "$out.tmp" "$out"
           '';
