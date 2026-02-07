@@ -339,10 +339,11 @@ in {
     systemd.services.nextcloud-setup.environment."NIXOS_NEXTCLOUD_SETTINGS_JSON" = settingsJsonPath;
 
     # Memories (exiftool/ffmpeg): ensure PATH so proc_open() can run exiftool when occ or cron runs.
-    systemd.services.nextcloud-setup.environment.PATH = nextcloudPath;
-    systemd.services.phpfpm-nextcloud.environment.PATH = nextcloudPath;
-    systemd.services.nextcloud-cron.environment.PATH = nextcloudPath;
-    systemd.services.nextcloud-update-db.environment.PATH = nextcloudPath;
+    # mkForce overrides the systemd module's default PATH for these services.
+    systemd.services.nextcloud-setup.environment.PATH = mkForce nextcloudPath;
+    systemd.services.phpfpm-nextcloud.environment.PATH = mkForce nextcloudPath;
+    systemd.services.nextcloud-cron.environment.PATH = mkForce nextcloudPath;
+    systemd.services.nextcloud-update-db.environment.PATH = mkForce nextcloudPath;
     # Transient units (e.g. occ via systemd-run) inherit DefaultEnvironment so exiftool is findable.
     systemd.settings.Manager.DefaultEnvironment = [ "PATH=${nextcloudPath}" ];
 
