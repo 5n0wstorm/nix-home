@@ -559,6 +559,30 @@ in {
       '';
     };
 
+    # One-time cleanup: remove the old Nix-installed Memories app dir so the user
+    # can install Memories from the app store. Leaves a marker so we don't remove
+    # a future store-installed copy.
+    systemd.services.nextcloud-remove-nix-memories = {
+      description = "Remove old Nix-installed Memories app directory (one-time)";
+      after = ["nextcloud-setup.service"];
+      requiredBy = ["phpfpm-nextcloud.service"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "nextcloud";
+        Group = "nextcloud";
+      };
+      script = ''
+        mem_dir="${cfg.dataDir}/apps/memories"
+        marker="/var/lib/nextcloud/.memories-nix-removed"
+        if [ -d "$mem_dir" ] && [ ! -f "$marker" ]; then
+          ${config.services.nextcloud.occ} app:disable memories || true
+          ${pkgs.coreutils}/bin/rm -rf "$mem_dir"
+          touch "$marker"
+        fi
+      '';
+    };
+
     # Disable AppAPI (Ex-Apps / deploy daemon) so the Apps page shows only the
     # classic app store and the "default deploy daemon" banner is removed.
     systemd.services.nextcloud-disable-app-api = {
