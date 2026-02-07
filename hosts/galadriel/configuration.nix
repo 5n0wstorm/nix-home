@@ -260,6 +260,13 @@ in {
       # Add your preferred args here:
       args = ["--cookies=/data/archive/twitter/cookies.txt" "--write-metadata"];
     };
+
+    twitterFollowingList = {
+      urlFile = "/data/archive/twitter/urls.txt";
+      cookiesPath = "/data/archive/twitter/cookies.txt";
+      twitterUsername = "Siad0n";
+      onCalendar = "daily";
+    };
   };
 
   # --------------------------------------------------------------------------
@@ -1059,6 +1066,8 @@ in {
     "f /data/archive/telegram/urls.txt 0666 root root -"
     "d /data/archive/boosty 0777 root root -"
     "f /data/archive/boosty/urls.txt 0666 root root -"
+    "d /data/archive/twitter 0777 root root -"
+    "f /data/archive/twitter/urls.txt 0666 root root -"
 
     # Nextcloud data directory
     "d /data/nextcloud 0770 nextcloud users -"
