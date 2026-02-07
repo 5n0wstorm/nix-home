@@ -280,6 +280,25 @@ in {
 
   config = mkIf cfg.enable (let
     settingsJsonPath = (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
+    # Memories: fetch and normalize layout so Nextcloud sees appinfo/ at root (store install often fails).
+    memoriesUnpacked = pkgs.fetchNextcloudApp {
+      url = "https://github.com/pulsejet/memories/releases/download/v7.8.2/memories.tar.gz";
+      hash = "sha256-2inyllJ00BgoQV5SaZkweSy87BPENonOLaEpm1sz5no=";
+      license = "agpl3Only";
+      unpack = true;
+    };
+    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" { inherit memoriesUnpacked; } ''
+      mkdir -p "$out"
+      if [ -f "$memoriesUnpacked/appinfo/info.xml" ]; then
+        cp -r "$memoriesUnpacked"/* "$out"/
+      elif [ -d "$memoriesUnpacked/memories" ] && [ -f "$memoriesUnpacked/memories/appinfo/info.xml" ]; then
+        cp -r "$memoriesUnpacked/memories"/* "$out"/
+      else
+        echo "Unexpected memories tarball layout:" >&2
+        ls -laR "$memoriesUnpacked" >&2
+        exit 1
+      fi
+    '';
   in {
     # --------------------------------------------------------------------------
     # SYSTEM PACKAGES FOR PREVIEWS AND APPS
@@ -488,9 +507,10 @@ in {
       https = true;
       maxUploadSize = "10G";
 
-      # Install basic apps; Memories can be installed from the app store via the web UI.
+      # Install basic apps; Memories via Nix (app store install often fails: "not found on the appstore").
       extraApps = {
         inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator;
+        memories = memoriesAppDir;
       };
       extraAppsEnable = true;
       # Allow installing apps from the Nextcloud app store via the web UI (disabled by default when extraApps is set).
@@ -525,6 +545,22 @@ in {
       ++ optionals cfg.logging.enable [
         "f ${cfg.logging.file} 0644 nextcloud nextcloud -"
       ];
+
+    # Copy Nix-built Memories into writable apps dir so Nextcloud finds it (e.g. remote deploy).
+    systemd.services.nextcloud-install-memories = {
+      description = "Copy Memories app to writable apps directory";
+      wantedBy = ["nextcloud-setup.service"];
+      before = ["nextcloud-setup.service"];
+      serviceConfig.Type = "oneshot";
+      environment.MEMORIES_APP_SRC = memoriesAppDir;
+      script = ''
+        set -euo pipefail
+        dst="${cfg.dataDir}/apps/memories"
+        mkdir -p "$(dirname "$dst")"
+        ${pkgs.coreutils}/bin/cp -rT "$MEMORIES_APP_SRC" "$dst"
+        chown -R nextcloud:nextcloud "$dst"
+      '';
+    };
 
     systemd.services.nextcloud-migrate-config-dir = {
       description = "Migrate Nextcloud config dir from /data/nextcloud/config to /var/lib/nextcloud/config";
