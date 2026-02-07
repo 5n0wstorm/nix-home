@@ -502,16 +502,19 @@ in {
             ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl \
               --cookies ${escapeShellArg cookiesPath} \
               -g \
-              -o "users={legacy[name]}" \
               ${escapeShellArg followingUrl} \
               > "$raw" 2>&1 || true
-            while IFS= read -r name; do
-              name="''${name%%[[:space:]]*}"
-              # Only accept lines that look like a Twitter username (alphanumeric + underscore, 1–15 chars)
-              if [[ -n "$name" && "$name" =~ ^[a-zA-Z0-9_]{1,15}$ ]]; then
-                echo "https://x.com/$name/media"
+            # Parse output: extract usernames from URLs (twitter.com/USER/... or x.com/USER/...) or plain usernames
+            while IFS= read -r line; do
+              line="''${line%%[[:space:]]*}"
+              if [[ "$line" =~ (twitter\.com|x\.com)/+([a-zA-Z0-9_]{1,15})(/|$) ]]; then
+                echo "''${BASH_REMATCH[2]}"
+              elif [[ "$line" =~ ^[a-zA-Z0-9_]{1,15}$ ]]; then
+                echo "$line"
               fi
-            done < "$raw" | sort -u > "$out.tmp"
+            done < "$raw" | sort -u | while IFS= read -r name; do
+              echo "https://x.com/$name/media"
+            done > "$out.tmp"
             chmod 666 "$out.tmp"
             mv "$out.tmp" "$out"
           '';
