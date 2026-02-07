@@ -165,6 +165,15 @@ in {
       args = ["--write-metadata"];
     };
 
+    # Update urls.txt with all Telegram channels the account is part of (every 10 minutes).
+    telegramChannelList = {
+      urlFile = "/data/archive/telegram/urls.txt";
+      apiIdPath = config.sops.secrets."gallery-dl/telegram/api-id".path;
+      apiHashPath = config.sops.secrets."gallery-dl/telegram/api-hash".path;
+      sessionStringPath = config.sops.secrets."gallery-dl/telegram/session-string".path;
+      onCalendar = "*-*-* *:0/10:00";
+    };
+
     instances.telegramReplies = {
       enable = true;
       onCalendar = "minutely";

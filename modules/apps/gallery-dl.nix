@@ -169,6 +169,52 @@ in {
         };
       };
     };
+
+    telegramChannelList = mkOption {
+      type = types.nullOr (types.submodule {
+        options = {
+          enable = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Whether to run the Telegram channel-list updater.";
+          };
+          urlFile = mkOption {
+            type = types.str;
+            description = "Path to the file to write channel URLs (one per line), e.g. the urlFile used by gallery-dl telegram instance.";
+            example = "/data/archive/telegram/urls.txt";
+          };
+          apiIdPath = mkOption {
+            type = types.str;
+            description = "Path to file containing Telegram API ID (same as gallery-dl telegram config).";
+          };
+          apiHashPath = mkOption {
+            type = types.str;
+            description = "Path to file containing Telegram API hash.";
+          };
+          sessionStringPath = mkOption {
+            type = types.str;
+            description = "Path to file containing Telegram session string (StringSession).";
+          };
+          onCalendar = mkOption {
+            type = types.str;
+            default = "daily";
+            description = "systemd OnCalendar for the channel-list updater timer.";
+            example = "*-*-* 03:00:00";
+          };
+        };
+      });
+      default = null;
+      description = ''
+        If set, a systemd service and timer will update the given url file with all Telegram
+        channels the logged-in user is part of (using the same API credentials as gallery-dl).
+        Run this before or alongside gallery-dl so urls.txt stays in sync with your channel list.
+
+        Sanity check (on the host): run the updater once, then test gallery-dl with one URL:
+          systemctl start gallery-dl-telegram-channel-list.service
+          cat /data/archive/telegram/urls.txt
+          head -n 1 /data/archive/telegram/urls.txt | xargs gallery-dl --config /data/archive/telegram/config.json --simulate
+      '';
+    };
   };
 
   # ============================================================================
@@ -334,6 +380,80 @@ in {
         };
       })
     enabledInstances;
+
+    # --------------------------------------------------------------------------
+    # TELEGRAM CHANNEL LIST UPDATER (optional)
+    # --------------------------------------------------------------------------
+
+    systemd.services.gallery-dl-telegram-channel-list = mkIf
+      (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable)
+      (let
+        tcl = cfg.telegramChannelList;
+        urlFile = tcl.urlFile;
+        apiIdPath = tcl.apiIdPath;
+        apiHashPath = tcl.apiHashPath;
+        sessionPath = tcl.sessionStringPath;
+        pythonScript = ''
+          import asyncio
+          from pathlib import Path
+
+          from telethon import TelegramClient
+          from telethon.sessions import StringSession
+
+          async def main():
+              api_id = int(Path("${apiIdPath}").read_text(encoding="utf-8").strip())
+              api_hash = Path("${apiHashPath}").read_text(encoding="utf-8").strip()
+              session_str = Path("${sessionPath}").read_text(encoding="utf-8").strip()
+              out_path = Path("${urlFile}")
+
+              client = TelegramClient(StringSession(session_str), api_id, api_hash)
+              await client.start()
+              urls = []
+              try:
+                  async for dialog in client.iter_dialogs():
+                      if not dialog.is_channel:
+                          continue
+                      entity = dialog.entity
+                      if entity.username:
+                          urls.append(f"https://t.me/{entity.username}")
+                      else:
+                          # Private channel/supergroup: t.me/c/<id> (strip -100 prefix)
+                          cid = str(entity.id).replace("-100", "")
+                          urls.append(f"https://t.me/c/{cid}")
+              finally:
+                  await client.disconnect()
+
+              out_path.write_text("\n".join(sorted(urls)) + "\n", encoding="utf-8")
+              out_path.chmod(0o666)
+
+          asyncio.run(main())
+        '';
+      in {
+        description = "Update Telegram channel list for gallery-dl urls.txt";
+
+        restartIfChanged = false;
+        serviceConfig = {
+          Type = "oneshot";
+          User = cfg.user;
+          Group = cfg.group;
+          SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+        };
+
+        script = ''
+          exec ${pkgs.python3.withPackages (ps: [ ps.telethon ])}/bin/python -c ${escapeShellArg pythonScript}
+        '';
+      });
+
+    systemd.timers.gallery-dl-telegram-channel-list =
+      mkIf (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable) {
+        description = "Timer: update Telegram channel list for gallery-dl";
+        wantedBy = ["timers.target"];
+        timerConfig = {
+          OnCalendar = cfg.telegramChannelList.onCalendar;
+          Persistent = true;
+          Unit = "gallery-dl-telegram-channel-list.service";
+        };
+      };
 
     # --------------------------------------------------------------------------
     # PACKAGE INSTALLATION
