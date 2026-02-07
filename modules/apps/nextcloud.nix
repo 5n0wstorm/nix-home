@@ -304,6 +304,17 @@ in {
     ];
 
     # --------------------------------------------------------------------------
+    # CLOSURE: ensure nextcloud-settings.json is deployed
+    # --------------------------------------------------------------------------
+    # The nextcloud module bakes the path to nextcloud-settings.json into the PHP
+    # config. When building remotely (e.g. Colmena from another host), that path
+    # can be missing on the target, causing "decoding generated settings file ...
+    # failed". Referencing the same derivation here pulls it into the system
+    # closure so it is present on deploy.
+    environment.etc."nextcloud-settings.json".source =
+      (pkgs.formats.json { }).generate "nextcloud-settings.json" config.services.nextcloud.settings;
+
+    # --------------------------------------------------------------------------
     # HOMEPAGE DASHBOARD REGISTRATION
     # --------------------------------------------------------------------------
 
