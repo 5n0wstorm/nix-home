@@ -504,7 +504,7 @@ in {
               -g \
               -o "users={legacy[name]}" \
               ${escapeShellArg followingUrl} \
-              > "$raw" 2>/dev/stderr || true
+              > "$raw" 2>&1 || true
             while IFS= read -r name; do
               name="''${name%%[[:space:]]*}"
               [[ -n "$name" ]] && echo "https://x.com/$name/media"
