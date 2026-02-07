@@ -195,6 +195,12 @@ in {
             type = types.str;
             description = "Path to file containing Telegram session string (StringSession).";
           };
+          urlLogFile = mkOption {
+            type = types.str;
+            default = "/data/archive/telegram/url-logs.txt";
+            description = "Path to append added/deleted URL diffs when the channel list changes.";
+            example = "/data/archive/telegram/url-logs.txt";
+          };
           onCalendar = mkOption {
             type = types.str;
             default = "daily";
@@ -207,7 +213,7 @@ in {
       description = ''
         If set, a systemd service and timer will update the given url file with all Telegram
         channels the logged-in user is part of (using the same API credentials as gallery-dl).
-        Run this before or alongside gallery-dl so urls.txt stays in sync with your channel list.
+        Only updates the file when the list changes; added/deleted URLs are appended to urlLogFile.
 
         Sanity check (on the host): run the updater once, then test gallery-dl with one URL:
           systemctl start gallery-dl-telegram-channel-list.service
@@ -238,6 +244,12 @@ in {
             type = types.str;
             description = "Twitter username of the logged-in account (used to fetch https://twitter.com/<username>/following).";
             example = "Siad0n";
+          };
+          urlLogFile = mkOption {
+            type = types.str;
+            default = "/data/archive/twitter/url-logs.txt";
+            description = "Path to append added/deleted URL diffs when the following list changes.";
+            example = "/data/archive/twitter/url-logs.txt";
           };
           onCalendar = mkOption {
             type = types.str;
@@ -417,11 +429,13 @@ in {
       (optionalAttrs (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable) (let
         tcl = cfg.telegramChannelList;
         urlFile = tcl.urlFile;
+        urlLogFile = tcl.urlLogFile;
         apiIdPath = tcl.apiIdPath;
         apiHashPath = tcl.apiHashPath;
         sessionPath = tcl.sessionStringPath;
         pythonScript = ''
           import asyncio
+          from datetime import datetime, timezone
           from pathlib import Path
 
           from telethon import TelegramClient
@@ -432,6 +446,7 @@ in {
               api_hash = Path("${apiHashPath}").read_text(encoding="utf-8").strip()
               session_str = Path("${sessionPath}").read_text(encoding="utf-8").strip()
               out_path = Path("${urlFile}")
+              log_path = Path("${urlLogFile}")
 
               client = TelegramClient(StringSession(session_str), api_id, api_hash)
               await client.start()
@@ -443,17 +458,41 @@ in {
                           if entity.username:
                               urls.append(f"https://t.me/{entity.username}")
                           else:
-                              # Private channel/supergroup: t.me/c/<id> (strip -100 prefix)
                               cid = str(entity.id).replace("-100", "")
                               urls.append(f"https://t.me/c/{cid}")
                       elif dialog.is_user and getattr(entity, "username", None):
-                          # Private (direct) chat with a user who has a username
                           urls.append(f"https://t.me/{entity.username}")
               finally:
                   await client.disconnect()
 
+              new_set = set(sorted(urls))
+              old_lines = out_path.read_text(encoding="utf-8").strip().splitlines() if out_path.exists() else []
+              old_set = set(line.strip() for line in old_lines if line.strip())
+
+              if new_set == old_set:
+                  return
+
+              added = new_set - old_set
+              deleted = old_set - new_set
+              ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+              with log_path.open("a", encoding="utf-8") as f:
+                  f.write(f"--- {ts} ---\n")
+                  if added:
+                      f.write("added:\n")
+                      for u in sorted(added):
+                          f.write(f"  {u}\n")
+                  if deleted:
+                      f.write("deleted:\n")
+                      for u in sorted(deleted):
+                          f.write(f"  {u}\n")
+                  f.write("\n")
+
               out_path.write_text("\n".join(sorted(urls)) + "\n", encoding="utf-8")
               out_path.chmod(0o666)
+              try:
+                  log_path.chmod(0o666)
+              except OSError:
+                  pass
 
           asyncio.run(main())
         '';
@@ -479,6 +518,7 @@ in {
       (optionalAttrs (cfg.enable && cfg.twitterFollowingList != null && cfg.twitterFollowingList.enable) (let
         tfl = cfg.twitterFollowingList;
         urlFile = tfl.urlFile;
+        urlLogFile = tfl.urlLogFile;
         cookiesPath = tfl.cookiesPath;
         twitterUsername = tfl.twitterUsername;
         followingUrl = "https://twitter.com/${twitterUsername}/following";
@@ -497,8 +537,10 @@ in {
           script = ''
             set -euo pipefail
             out=${escapeShellArg urlFile}
+            logfile=${escapeShellArg urlLogFile}
             raw=$(mktemp)
-            trap 'rm -f "$raw"' EXIT
+            newlist=$(mktemp)
+            trap 'rm -f "$raw" "$newlist"' EXIT
             ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl \
               --cookies ${escapeShellArg cookiesPath} \
               -g \
@@ -510,9 +552,30 @@ in {
               if [[ "$line" =~ ^https?://(twitter\.com|x\.com)/i/user/[0-9]+$ ]]; then
                 echo "$line/media"
               fi
-            done < "$raw" | sort -u > "$out.tmp"
-            chmod 666 "$out.tmp"
-            mv "$out.tmp" "$out"
+            done < "$raw" | sort -u > "$newlist"
+            # Only update urlFile if the list changed
+            if [[ -f "$out" ]] && cmp -s "$newlist" "$out"; then
+              exit 0
+            fi
+            # Log added and deleted URLs
+            ts=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+            added=$(comm -23 "$newlist" <(sort "$out" 2>/dev/null || true))
+            deleted=$(comm -13 "$newlist" <(sort "$out" 2>/dev/null || true))
+            {
+              echo "--- $ts ---"
+              if [[ -n "$added" ]]; then
+                echo "added:"
+                echo "$added" | sed 's/^/  /'
+              fi
+              if [[ -n "$deleted" ]]; then
+                echo "deleted:"
+                echo "$deleted" | sed 's/^/  /'
+              fi
+              echo ""
+            } >> "$logfile"
+            chmod 666 "$logfile" 2>/dev/null || true
+            chmod 666 "$newlist"
+            mv "$newlist" "$out"
           '';
         };
       }));

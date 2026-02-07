@@ -270,7 +270,7 @@ in {
   };
 
   # --------------------------------------------------------------------------
-  # /data/archive permissions (requested)
+  # /data/archive permissions (requested)ist 
   # WARNING: this makes everything under /data/archive world-readable + writable.
   # --------------------------------------------------------------------------
 
@@ -1064,10 +1064,12 @@ in {
     "d /data/archive 0777 root root -"
     "d /data/archive/telegram 0777 root root -"
     "f /data/archive/telegram/urls.txt 0666 root root -"
+    "f /data/archive/telegram/url-logs.txt 0666 root root -"
     "d /data/archive/boosty 0777 root root -"
     "f /data/archive/boosty/urls.txt 0666 root root -"
     "d /data/archive/twitter 0777 root root -"
     "f /data/archive/twitter/urls.txt 0666 root root -"
+    "f /data/archive/twitter/url-logs.txt 0666 root root -"
 
     # Nextcloud data directory
     "d /data/nextcloud 0770 nextcloud users -"
