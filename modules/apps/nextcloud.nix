@@ -299,6 +299,7 @@ in {
         exit 1
       fi
     '';
+    nextcloudPath = "${pkgs.exiftool}/bin:${pkgs.ffmpeg}/bin:/run/current-system/sw/bin";
   in {
     # --------------------------------------------------------------------------
     # SYSTEM PACKAGES FOR PREVIEWS AND APPS
@@ -336,6 +337,14 @@ in {
 
     # Force the settings JSON path into nextcloud-setup's closure (unit references it).
     systemd.services.nextcloud-setup.environment."NIXOS_NEXTCLOUD_SETTINGS_JSON" = settingsJsonPath;
+
+    # Memories (exiftool/ffmpeg): ensure PATH so proc_open() can run exiftool when occ or cron runs.
+    systemd.services.nextcloud-setup.environment.PATH = nextcloudPath;
+    systemd.services.phpfpm-nextcloud.environment.PATH = nextcloudPath;
+    systemd.services.nextcloud-cron.environment.PATH = nextcloudPath;
+    systemd.services.nextcloud-update-db.environment.PATH = nextcloudPath;
+    # Transient units (e.g. occ via systemd-run) inherit DefaultEnvironment so exiftool is findable.
+    systemd.extraConfig = "DefaultEnvironment=PATH=${nextcloudPath}";
 
     # --------------------------------------------------------------------------
     # HOMEPAGE DASHBOARD REGISTRATION
