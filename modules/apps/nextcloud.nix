@@ -287,7 +287,7 @@ in {
       license = "agpl3Only";
       unpack = true;
     };
-    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" { inherit memoriesUnpacked; } ''
+    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" {inherit memoriesUnpacked;} ''
       mkdir -p "$out"
       if [ -f "$memoriesUnpacked/appinfo/info.xml" ]; then
         cp -r "$memoriesUnpacked"/* "$out"/
