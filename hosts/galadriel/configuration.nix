@@ -265,7 +265,7 @@ in {
       urlFile = "/data/archive/twitter/urls.txt";
       cookiesPath = "/data/archive/twitter/cookies.txt";
       twitterUsername = "Siad0n";
-      onCalendar = "daily";
+      onCalendar = "*-*-* *:0/10:00";  # same interval as telegram channel list (every 10 min)
     };
   };
 
