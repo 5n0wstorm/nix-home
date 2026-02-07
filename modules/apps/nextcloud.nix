@@ -458,12 +458,14 @@ in {
           # Must be a string for JSON settings file; path types can break decoding
           mail_smtppassword = toString cfg.mail.smtppasswordFile;
         }
-        # Memories app: paths to exiftool and ffmpeg (php-fpm has no PATH to Nix store).
+        # Memories app: explicit paths so php-fpm can run exiftool/ffmpeg (no PATH to Nix store).
+        # Paths must be strings for the generated settings JSON.
         // {
+          "memories.exiftool" = toString "${pkgs.exiftool}/bin/exiftool";
           "memories.exiftool_no_local" = true;
-          "memories.vod.ffmpeg" = "${pkgs.ffmpeg}/bin/ffmpeg";
-          "memories.vod.ffprobe" = "${pkgs.ffmpeg}/bin/ffprobe";
-          preview_ffmpeg_path = "${pkgs.ffmpeg}/bin/ffmpeg";
+          "memories.vod.ffmpeg" = toString "${pkgs.ffmpeg}/bin/ffmpeg";
+          "memories.vod.ffprobe" = toString "${pkgs.ffmpeg}/bin/ffprobe";
+          preview_ffmpeg_path = toString "${pkgs.ffmpeg}/bin/ffmpeg";
         }
         // {
           # PHP configuration to reduce log noise and suppress notices
