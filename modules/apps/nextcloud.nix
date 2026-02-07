@@ -447,6 +447,10 @@ in {
           "memories.vod.ffprobe" = toString "${pkgs.ffmpeg}/bin/ffprobe";
           preview_ffmpeg_path = toString "${pkgs.ffmpeg}/bin/ffmpeg";
         }
+        # Force app store enabled (NixOS may use 'appstoreenabled'; Nextcloud expects 'appstore_enabled').
+        // {
+          appstore_enabled = true;
+        }
         // {
           # PHP configuration to reduce log noise and suppress notices
           # This addresses issues like "Undefined array key" errors in SystemTagManager
@@ -559,30 +563,6 @@ in {
       '';
     };
 
-    # One-time cleanup: remove the old Nix-installed Memories app dir so the user
-    # can install Memories from the app store. Leaves a marker so we don't remove
-    # a future store-installed copy.
-    systemd.services.nextcloud-remove-nix-memories = {
-      description = "Remove old Nix-installed Memories app directory (one-time)";
-      after = ["nextcloud-setup.service"];
-      requiredBy = ["phpfpm-nextcloud.service"];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        User = "nextcloud";
-        Group = "nextcloud";
-      };
-      script = ''
-        mem_dir="${cfg.dataDir}/apps/memories"
-        marker="/var/lib/nextcloud/.memories-nix-removed"
-        if [ -d "$mem_dir" ] && [ ! -f "$marker" ]; then
-          ${config.services.nextcloud.occ} app:disable memories || true
-          ${pkgs.coreutils}/bin/rm -rf "$mem_dir"
-          touch "$marker"
-        fi
-      '';
-    };
-
     # Disable AppAPI (Ex-Apps / deploy daemon) so the Apps page shows only the
     # classic app store and the "default deploy daemon" banner is removed.
     systemd.services.nextcloud-disable-app-api = {
@@ -614,7 +594,7 @@ in {
     #    any nextcloud-settings.json path with the path from our etc symlink
     #    so the file that exists is used.
     systemd.services.nextcloud-fix-override-config = {
-      description = "Patch Nextcloud override.config.php (store-apps, settings path)";
+      description = "Patch Nextcloud override.config.php (store-apps, settings path, one-time Memories cleanup)";
       wantedBy = [
         "phpfpm-nextcloud.service"
         "nextcloud-setup.service"
@@ -633,6 +613,15 @@ in {
       };
       script = ''
         set -euo pipefail
+
+        # One-time: remove old Nix-installed Memories app dir so user can install from store.
+        mem_dir="${cfg.dataDir}/apps/memories"
+        marker="/var/lib/nextcloud/.memories-nix-removed"
+        if [ -d "$mem_dir" ] && [ ! -f "$marker" ]; then
+          ${pkgs.util-linux}/bin/runuser -u nextcloud -- ${config.services.nextcloud.occ} app:disable memories 2>/dev/null || true
+          ${pkgs.coreutils}/bin/rm -rf "$mem_dir"
+          touch "$marker"
+        fi
 
         cfg="/var/lib/nextcloud/config/override.config.php"
         if [ ! -f "$cfg" ]; then
