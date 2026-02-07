@@ -287,12 +287,13 @@ in {
       unpack = true;
     };
     # Ensure app dir has appinfo/ at root (Nextcloud expects nix-apps/memories/appinfo/info.xml).
+    # $out must be created before cp (runCommand does not guarantee it exists).
     memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" { inherit memoriesUnpacked; } ''
+      mkdir -p "$out"
       if [ -f "$memoriesUnpacked/appinfo/info.xml" ]; then
-        cp -r "$memoriesUnpacked"/* "$out"
+        cp -r "$memoriesUnpacked"/* "$out"/
       elif [ -d "$memoriesUnpacked/memories" ] && [ -f "$memoriesUnpacked/memories/appinfo/info.xml" ]; then
-        mkdir -p "$out"
-        cp -r "$memoriesUnpacked/memories"/* "$out"
+        cp -r "$memoriesUnpacked/memories"/* "$out"/
       else
         echo "Unexpected memories tarball layout:" >&2
         ls -laR "$memoriesUnpacked" >&2

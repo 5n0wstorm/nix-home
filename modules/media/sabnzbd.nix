@@ -149,8 +149,10 @@ in {
       package = cfg.package;
       user = cfg.user;
       group = cfg.group;
-      configFile = "${cfg.configDir}/sabnzbd.ini";
       openFirewall = cfg.openFirewall;
+      settings = {
+        misc.port = cfg.port;
+      };
     };
 
     # --------------------------------------------------------------------------
