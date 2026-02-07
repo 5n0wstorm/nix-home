@@ -477,7 +477,7 @@ in {
 
       # Install basic apps
       extraApps = {
-        inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator;
+        inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator memories;
       };
       extraAppsEnable = true;
     };
