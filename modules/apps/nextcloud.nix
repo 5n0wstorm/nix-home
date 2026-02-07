@@ -280,6 +280,25 @@ in {
 
   config = mkIf cfg.enable (let
     settingsJsonPath = (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
+    memoriesUnpacked = pkgs.fetchNextcloudApp {
+      url = "https://github.com/pulsejet/memories/releases/download/v7.8.2/memories.tar.gz";
+      hash = "sha256-2inyllJ00BgoQV5SaZkweSy87BPENonOLaEpm1sz5no=";
+      license = "agpl3Only";
+      unpack = true;
+    };
+    # Ensure app dir has appinfo/ at root (Nextcloud expects nix-apps/memories/appinfo/info.xml).
+    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" { inherit memoriesUnpacked; } ''
+      if [ -f "$memoriesUnpacked/appinfo/info.xml" ]; then
+        cp -r "$memoriesUnpacked"/* "$out"
+      elif [ -d "$memoriesUnpacked/memories" ] && [ -f "$memoriesUnpacked/memories/appinfo/info.xml" ]; then
+        mkdir -p "$out"
+        cp -r "$memoriesUnpacked/memories"/* "$out"
+      else
+        echo "Unexpected memories tarball layout:" >&2
+        ls -laR "$memoriesUnpacked" >&2
+        exit 1
+      fi
+    '';
   in {
     # --------------------------------------------------------------------------
     # SYSTEM PACKAGES FOR PREVIEWS AND APPS
@@ -475,16 +494,10 @@ in {
       https = true;
       maxUploadSize = "10G";
 
-      # Install basic apps (memories via fetchNextcloudApp so it is always in the Nix
-      # build; the packaged memories in nixpkgs may be missing on some channels)
+      # Install basic apps (memories via fetchNextcloudApp; layout fixed so Nextcloud finds nix-apps/memories/appinfo/info.xml).
       extraApps = {
         inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator;
-        memories = pkgs.fetchNextcloudApp {
-          url = "https://github.com/pulsejet/memories/releases/download/v7.8.2/memories.tar.gz";
-          hash = "sha256-2inyllJ00BgoQV5SaZkweSy87BPENonOLaEpm1sz5no=";
-          license = "agpl3Only";
-          unpack = true; # extract tarball so Nextcloud sees app dir with appinfo/info.xml
-        };
+        memories = memoriesAppDir;
       };
       extraAppsEnable = true;
     };
