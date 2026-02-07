@@ -481,7 +481,7 @@ in {
         inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator;
         memories = pkgs.fetchNextcloudApp {
           url = "https://github.com/pulsejet/memories/releases/download/v7.8.2/memories.tar.gz";
-          hash = "sha256-O59G5kUkYlYxr8p/vEqs3LqLRKJZbeEgDhdY5eHfnZg=";
+          hash = "sha256-2inyllJ00BgoQV5SaZkweSy87BPENonOLaEpm1sz5no=";
           license = "agpl3Only";
           unpack = true; # extract tarball so Nextcloud sees app dir with appinfo/info.xml
         };
