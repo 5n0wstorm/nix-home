@@ -287,7 +287,7 @@ in {
       license = "agpl3Only";
       unpack = true;
     };
-    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" {inherit memoriesUnpacked;} ''
+    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" { inherit memoriesUnpacked; } ''
       mkdir -p "$out"
       if [ -f "$memoriesUnpacked/appinfo/info.xml" ]; then
         cp -r "$memoriesUnpacked"/* "$out"/
@@ -297,6 +297,11 @@ in {
         echo "Unexpected memories tarball layout:" >&2
         ls -laR "$memoriesUnpacked" >&2
         exit 1
+      fi
+      # Release tarball may omit img/; ensure img/app.svg exists to fix 404 for custom_apps/memories/img/app.svg
+      if [ ! -f "$out/img/app.svg" ]; then
+        mkdir -p "$out/img"
+        echo '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#1a1a2e"/><text x="50" y="55" text-anchor="middle" fill="white" font-size="40">M</text></svg>' > "$out/img/app.svg"
       fi
     '';
     nextcloudPath = "${pkgs.exiftool}/bin:${pkgs.ffmpeg}/bin:/run/current-system/sw/bin";
