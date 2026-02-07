@@ -280,26 +280,6 @@ in {
 
   config = mkIf cfg.enable (let
     settingsJsonPath = (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
-    memoriesUnpacked = pkgs.fetchNextcloudApp {
-      url = "https://github.com/pulsejet/memories/releases/download/v7.8.2/memories.tar.gz";
-      hash = "sha256-2inyllJ00BgoQV5SaZkweSy87BPENonOLaEpm1sz5no=";
-      license = "agpl3Only";
-      unpack = true;
-    };
-    # Ensure app dir has appinfo/ at root (Nextcloud expects nix-apps/memories/appinfo/info.xml).
-    # $out must be created before cp (runCommand does not guarantee it exists).
-    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" {inherit memoriesUnpacked;} ''
-      mkdir -p "$out"
-      if [ -f "$memoriesUnpacked/appinfo/info.xml" ]; then
-        cp -r "$memoriesUnpacked"/* "$out"/
-      elif [ -d "$memoriesUnpacked/memories" ] && [ -f "$memoriesUnpacked/memories/appinfo/info.xml" ]; then
-        cp -r "$memoriesUnpacked/memories"/* "$out"/
-      else
-        echo "Unexpected memories tarball layout:" >&2
-        ls -laR "$memoriesUnpacked" >&2
-        exit 1
-      fi
-    '';
   in {
     # --------------------------------------------------------------------------
     # SYSTEM PACKAGES FOR PREVIEWS AND APPS
@@ -504,10 +484,9 @@ in {
       https = true;
       maxUploadSize = "10G";
 
-      # Install basic apps (memories via fetchNextcloudApp; layout fixed so Nextcloud finds nix-apps/memories/appinfo/info.xml).
+      # Install basic apps; Memories can be installed from the app store via the web UI.
       extraApps = {
         inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator;
-        memories = memoriesAppDir;
       };
       extraAppsEnable = true;
       # Allow installing apps from the Nextcloud app store via the web UI (disabled by default when extraApps is set).
@@ -542,23 +521,6 @@ in {
       ++ optionals cfg.logging.enable [
         "f ${cfg.logging.file} 0644 nextcloud nextcloud -"
       ];
-
-    # Copy Memories app into writable apps dir so Nextcloud finds it even when
-    # nix-apps path is not in the runtime closure (e.g. remote deploy).
-    systemd.services.nextcloud-install-memories = {
-      description = "Copy Memories app to writable apps directory";
-      wantedBy = ["nextcloud-setup.service"];
-      before = ["nextcloud-setup.service"];
-      serviceConfig.Type = "oneshot";
-      environment.MEMORIES_APP_SRC = memoriesAppDir;
-      script = ''
-        set -euo pipefail
-        dst="${cfg.dataDir}/apps/memories"
-        mkdir -p "$(dirname "$dst")"
-        ${pkgs.coreutils}/bin/cp -rT "$MEMORIES_APP_SRC" "$dst"
-        chown -R nextcloud:nextcloud "$dst"
-      '';
-    };
 
     systemd.services.nextcloud-migrate-config-dir = {
       description = "Migrate Nextcloud config dir from /data/nextcloud/config to /var/lib/nextcloud/config";
