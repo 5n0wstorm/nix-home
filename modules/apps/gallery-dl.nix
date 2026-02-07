@@ -507,7 +507,10 @@ in {
               > "$raw" 2>&1 || true
             while IFS= read -r name; do
               name="''${name%%[[:space:]]*}"
-              [[ -n "$name" ]] && echo "https://x.com/$name/media"
+              # Only accept lines that look like a Twitter username (alphanumeric + underscore, 1–15 chars)
+              if [[ -n "$name" && "$name" =~ ^[a-zA-Z0-9_]{1,15}$ ]]; then
+                echo "https://x.com/$name/media"
+              fi
             done < "$raw" | sort -u > "$out.tmp"
             chmod 666 "$out.tmp"
             mv "$out.tmp" "$out"
