@@ -278,7 +278,9 @@ in {
   # MODULE IMPLEMENTATION
   # ============================================================================
 
-  config = mkIf cfg.enable {
+  config = mkIf cfg.enable (let
+    settingsJsonPath = (pkgs.formats.json { }).generate "nextcloud-settings.json" config.services.nextcloud.settings;
+  in {
     # --------------------------------------------------------------------------
     # SYSTEM PACKAGES FOR PREVIEWS
     # --------------------------------------------------------------------------
@@ -311,8 +313,10 @@ in {
     # can be missing on the target, causing "decoding generated settings file ...
     # failed". Referencing the same derivation here pulls it into the system
     # closure so it is present on deploy.
-    environment.etc."nextcloud-settings.json".source =
-      (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
+    environment.etc."nextcloud-settings.json".source = settingsJsonPath;
+
+    # Force the settings JSON path into nextcloud-setup's closure (unit references it).
+    systemd.services.nextcloud-setup.environment."NIXOS_NEXTCLOUD_SETTINGS_JSON" = settingsJsonPath;
 
     # --------------------------------------------------------------------------
     # HOMEPAGE DASHBOARD REGISTRATION
@@ -545,23 +549,20 @@ in {
     };
 
     # --------------------------------------------------------------------------
-    # WORKAROUND: nixpkgs emits a `store-apps` apps_paths entry
+    # WORKAROUND: nixpkgs store-apps + stale nextcloud-settings.json path
     # --------------------------------------------------------------------------
     #
-    # On some nixpkgs revisions, Nextcloud's generated `override.config.php`
-    # contains an apps_paths entry pointing at:
-    #   ${finalPackage}/store-apps
-    # but the directory does not exist in the produced package output, causing
-    # Nextcloud to hard-fail at runtime with:
-    #   App directory ".../store-apps" not found!
+    # 1) On some nixpkgs revisions, override.config.php contains an apps_paths
+    #    entry for ${finalPackage}/store-apps which does not exist, causing
+    #    "App directory .../store-apps not found!". We drop that line.
     #
-    # `services.nextcloud.settings` cannot remove it because it is merged in
-    # afterwards (array_replace_recursive). As a practical workaround, patch the
-    # generated file after activation and before php-fpm starts.
+    # 2) The path to nextcloud-settings.json is baked in at build time. After
+    #    a remote deploy the override config in /var/lib can reference an old
+    #    store path that is not on the target ("decoding ... failed"). Replace
+    #    any nextcloud-settings.json path with the path from our etc symlink
+    #    so the file that exists is used.
     systemd.services.nextcloud-fix-override-config = {
-      description = "Patch Nextcloud override.config.php to drop non-existent store-apps apps_paths entry";
-      # Important: Nextcloud's initial config.php is created by nextcloud-setup.
-      # If setup runs before this patch, it can fail to generate config.php.
+      description = "Patch Nextcloud override.config.php (store-apps, settings path)";
       wantedBy = [
         "phpfpm-nextcloud.service"
         "nextcloud-setup.service"
@@ -587,8 +588,17 @@ in {
         fi
 
         # Drop any apps_paths entries referencing store-apps.
-        # Each entry is on a single line in the generated file.
         ${pkgs.gnused}/bin/sed -i "/store-apps/d" "$cfg"
+
+        # If the override config references a nextcloud-settings.json path that
+        # does not exist (e.g. stale path after remote deploy), replace it with
+        # the path from our /etc symlink so decoding succeeds.
+        if [ -e /etc/nextcloud-settings.json ]; then
+          good_path="$(${pkgs.coreutils}/bin/readlink -f /etc/nextcloud-settings.json)"
+          if [ -n "$good_path" ] && [ -f "$good_path" ]; then
+            ${pkgs.gnused}/bin/sed -i "s|/nix/store/[a-z0-9]*-nextcloud-settings\.json|$good_path|g" "$cfg"
+          fi
+        fi
       '';
     };
 
@@ -598,5 +608,5 @@ in {
 
     # Nextcloud runs behind reverse proxy, so no direct firewall access needed
     networking.firewall.allowedTCPPorts = [];
-  };
+  });
 }
