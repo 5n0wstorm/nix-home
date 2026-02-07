@@ -270,7 +270,7 @@ in {
   };
 
   # --------------------------------------------------------------------------
-  # /data/archive permissions (requested)ist 
+  # /data/archive permissions (requested)ist
   # WARNING: this makes everything under /data/archive world-readable + writable.
   # --------------------------------------------------------------------------
 
