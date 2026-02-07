@@ -279,7 +279,7 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable (let
-    settingsJsonPath = (pkgs.formats.json { }).generate "nextcloud-settings.json" config.services.nextcloud.settings;
+    settingsJsonPath = (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
   in {
     # --------------------------------------------------------------------------
     # SYSTEM PACKAGES FOR PREVIEWS
