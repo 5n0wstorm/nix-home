@@ -559,6 +559,23 @@ in {
       '';
     };
 
+    # Disable AppAPI (Ex-Apps / deploy daemon) so the Apps page shows only the
+    # classic app store and the "default deploy daemon" banner is removed.
+    systemd.services.nextcloud-disable-app-api = {
+      description = "Disable Nextcloud AppAPI (Ex-Apps) to use classic app store only";
+      after = ["nextcloud-setup.service"];
+      requiredBy = ["phpfpm-nextcloud.service"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "nextcloud";
+        Group = "nextcloud";
+      };
+      script = ''
+        ${config.services.nextcloud.occ} app:disable app_api || true
+      '';
+    };
+
     # --------------------------------------------------------------------------
     # WORKAROUND: nixpkgs store-apps + stale nextcloud-settings.json path
     # --------------------------------------------------------------------------
