@@ -366,7 +366,7 @@ in {
 
             exec ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl ${escapeShellArgs args}
           '';
-        }))
+        })
       enabledInstances)
       //
       # Telegram channel list updater (optional)
