@@ -394,15 +394,17 @@ in {
               urls = []
               try:
                   async for dialog in client.iter_dialogs():
-                      if not dialog.is_channel:
-                          continue
                       entity = dialog.entity
-                      if entity.username:
+                      if dialog.is_channel:
+                          if entity.username:
+                              urls.append(f"https://t.me/{entity.username}")
+                          else:
+                              # Private channel/supergroup: t.me/c/<id> (strip -100 prefix)
+                              cid = str(entity.id).replace("-100", "")
+                              urls.append(f"https://t.me/c/{cid}")
+                      elif dialog.is_user and getattr(entity, "username", None):
+                          # Private (direct) chat with a user who has a username
                           urls.append(f"https://t.me/{entity.username}")
-                      else:
-                          # Private channel/supergroup: t.me/c/<id> (strip -100 prefix)
-                          cid = str(entity.id).replace("-100", "")
-                          urls.append(f"https://t.me/c/{cid}")
               finally:
                   await client.disconnect()
 
