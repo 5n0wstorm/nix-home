@@ -420,7 +420,8 @@ in {
           mail_domain = cfg.mail.domain;
         }
         // optionalAttrs (cfg.mail.enable && cfg.mail.smtppasswordFile != null) {
-          mail_smtppassword = cfg.mail.smtppasswordFile;
+          # Must be a string for JSON settings file; path types can break decoding
+          mail_smtppassword = toString cfg.mail.smtppasswordFile;
         }
         // {
           # PHP configuration to reduce log noise and suppress notices
@@ -429,10 +430,12 @@ in {
           php_display_errors = cfg.php.displayErrors;
           php_log_errors = cfg.php.logErrors;
 
-          # Apps paths configuration
-          "apps_paths" = mkOverride 0 [
+          # Apps paths configuration. All path values must be strings so the generated
+          # nextcloud-settings.json is valid and decodable by PHP (path types can cause
+          # "decoding generated settings file ... failed").
+          "apps_paths" = [
             {
-              path = "${config.services.nextcloud.finalPackage}/apps";
+              path = "${toString config.services.nextcloud.finalPackage}/apps";
               url = "/apps";
               writable = false;
             }
@@ -441,7 +444,7 @@ in {
               # If this path is missing from apps_paths, `occ app:install <name>` will try
               # to download from the app store and fail with messages like:
               #   Could not download app calendar, it was not found on the appstore
-              path = "${config.services.nextcloud.finalPackage}/nix-apps";
+              path = "${toString config.services.nextcloud.finalPackage}/nix-apps";
               url = "/nix-apps";
               writable = false;
             }
