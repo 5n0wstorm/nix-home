@@ -367,27 +367,10 @@ in {
             exec ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl ${escapeShellArgs args}
           '';
         }))
-      enabledInstances;
-
-    systemd.timers = mapAttrs' (name: inst:
-      nameValuePair "gallery-dl-${name}" {
-        description = "gallery-dl timer: ${name}";
-        wantedBy = ["timers.target"];
-        timerConfig = {
-          OnCalendar = inst.onCalendar;
-          Persistent = inst.persistent;
-          Unit = "gallery-dl-${name}.service";
-        };
-      })
-    enabledInstances;
-
-    # --------------------------------------------------------------------------
-    # TELEGRAM CHANNEL LIST UPDATER (optional)
-    # --------------------------------------------------------------------------
-
-    systemd.services.gallery-dl-telegram-channel-list = mkIf
-      (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable)
-      (let
+      enabledInstances)
+      //
+      # Telegram channel list updater (optional)
+      (optionalAttrs (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable) (let
         tcl = cfg.telegramChannelList;
         urlFile = tcl.urlFile;
         apiIdPath = tcl.apiIdPath;
@@ -429,31 +412,47 @@ in {
           asyncio.run(main())
         '';
       in {
-        description = "Update Telegram channel list for gallery-dl urls.txt";
+        gallery-dl-telegram-channel-list = {
+          description = "Update Telegram channel list for gallery-dl urls.txt";
 
-        restartIfChanged = false;
-        serviceConfig = {
-          Type = "oneshot";
-          User = cfg.user;
-          Group = cfg.group;
-          SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+          restartIfChanged = false;
+          serviceConfig = {
+            Type = "oneshot";
+            User = cfg.user;
+            Group = cfg.group;
+            SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+          };
+
+          script = ''
+            exec ${pkgs.python3.withPackages (ps: [ ps.telethon ])}/bin/python -c ${escapeShellArg pythonScript}
+          '';
         };
+      }));
 
-        script = ''
-          exec ${pkgs.python3.withPackages (ps: [ ps.telethon ])}/bin/python -c ${escapeShellArg pythonScript}
-        '';
+    systemd.timers =
+      (mapAttrs' (name: inst:
+        nameValuePair "gallery-dl-${name}" {
+          description = "gallery-dl timer: ${name}";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnCalendar = inst.onCalendar;
+            Persistent = inst.persistent;
+            Unit = "gallery-dl-${name}.service";
+          };
+        })
+      enabledInstances)
+      //
+      (optionalAttrs (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable) {
+        gallery-dl-telegram-channel-list = {
+          description = "Timer: update Telegram channel list for gallery-dl";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnCalendar = cfg.telegramChannelList.onCalendar;
+            Persistent = true;
+            Unit = "gallery-dl-telegram-channel-list.service";
+          };
+        };
       });
-
-    systemd.timers.gallery-dl-telegram-channel-list =
-      mkIf (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable) {
-        description = "Timer: update Telegram channel list for gallery-dl";
-        wantedBy = ["timers.target"];
-        timerConfig = {
-          OnCalendar = cfg.telegramChannelList.onCalendar;
-          Persistent = true;
-          Unit = "gallery-dl-telegram-channel-list.service";
-        };
-      };
 
     # --------------------------------------------------------------------------
     # PACKAGE INSTALLATION
