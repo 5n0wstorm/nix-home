@@ -532,6 +532,23 @@ in {
         "f ${cfg.logging.file} 0644 nextcloud nextcloud -"
       ];
 
+    # Copy Memories app into writable apps dir so Nextcloud finds it even when
+    # nix-apps path is not in the runtime closure (e.g. remote deploy).
+    systemd.services.nextcloud-install-memories = {
+      description = "Copy Memories app to writable apps directory";
+      wantedBy = [ "nextcloud-setup.service" ];
+      before = [ "nextcloud-setup.service" ];
+      serviceConfig.Type = "oneshot";
+      environment.MEMORIES_APP_SRC = memoriesAppDir;
+      script = ''
+        set -euo pipefail
+        dst="${cfg.dataDir}/apps/memories"
+        mkdir -p "$(dirname "$dst")"
+        ${pkgs.coreutils}/bin/cp -rT "$MEMORIES_APP_SRC" "$dst"
+        chown -R nextcloud:nextcloud "$dst"
+      '';
+    };
+
     systemd.services.nextcloud-migrate-config-dir = {
       description = "Migrate Nextcloud config dir from /data/nextcloud/config to /var/lib/nextcloud/config";
       wantedBy = [
