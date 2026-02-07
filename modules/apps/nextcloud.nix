@@ -288,7 +288,7 @@ in {
     };
     # Ensure app dir has appinfo/ at root (Nextcloud expects nix-apps/memories/appinfo/info.xml).
     # $out must be created before cp (runCommand does not guarantee it exists).
-    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" { inherit memoriesUnpacked; } ''
+    memoriesAppDir = pkgs.runCommand "nextcloud-app-memories" {inherit memoriesUnpacked;} ''
       mkdir -p "$out"
       if [ -f "$memoriesUnpacked/appinfo/info.xml" ]; then
         cp -r "$memoriesUnpacked"/* "$out"/
@@ -536,8 +536,8 @@ in {
     # nix-apps path is not in the runtime closure (e.g. remote deploy).
     systemd.services.nextcloud-install-memories = {
       description = "Copy Memories app to writable apps directory";
-      wantedBy = [ "nextcloud-setup.service" ];
-      before = [ "nextcloud-setup.service" ];
+      wantedBy = ["nextcloud-setup.service"];
+      before = ["nextcloud-setup.service"];
       serviceConfig.Type = "oneshot";
       environment.MEMORIES_APP_SRC = memoriesAppDir;
       script = ''
