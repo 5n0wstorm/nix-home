@@ -345,7 +345,7 @@ in {
     systemd.services.nextcloud-cron.environment.PATH = mkForce nextcloudPath;
     systemd.services.nextcloud-update-db.environment.PATH = mkForce nextcloudPath;
     # Transient units (e.g. occ via systemd-run) inherit DefaultEnvironment so exiftool is findable.
-    systemd.settings.Manager.DefaultEnvironment = [ "PATH=${nextcloudPath}" ];
+    systemd.settings.Manager.DefaultEnvironment = ["PATH=${nextcloudPath}"];
 
     # --------------------------------------------------------------------------
     # HOMEPAGE DASHBOARD REGISTRATION
