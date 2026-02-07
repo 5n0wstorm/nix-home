@@ -504,17 +504,13 @@ in {
               -g \
               ${escapeShellArg followingUrl} \
               > "$raw" 2>&1 || true
-            # Parse output: extract usernames from URLs (twitter.com/USER/... or x.com/USER/...) or plain usernames
+            # Keep only lines that are x.com/i/user/<id> or twitter.com/i/user/<id>, append /media
             while IFS= read -r line; do
               line="''${line%%[[:space:]]*}"
-              if [[ "$line" =~ (twitter\.com|x\.com)/+([a-zA-Z0-9_]{1,15})(/|$) ]]; then
-                echo "''${BASH_REMATCH[2]}"
-              elif [[ "$line" =~ ^[a-zA-Z0-9_]{1,15}$ ]]; then
-                echo "$line"
+              if [[ "$line" =~ ^https?://(twitter\.com|x\.com)/i/user/[0-9]+$ ]]; then
+                echo "$line/media"
               fi
-            done < "$raw" | sort -u | while IFS= read -r name; do
-              echo "https://x.com/$name/media"
-            done > "$out.tmp"
+            done < "$raw" | sort -u > "$out.tmp"
             chmod 666 "$out.tmp"
             mv "$out.tmp" "$out"
           '';
