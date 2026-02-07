@@ -458,6 +458,13 @@ in {
           # Must be a string for JSON settings file; path types can break decoding
           mail_smtppassword = toString cfg.mail.smtppasswordFile;
         }
+        # Memories app: paths to exiftool and ffmpeg (php-fpm has no PATH to Nix store).
+        // {
+          "memories.exiftool_no_local" = true;
+          "memories.vod.ffmpeg" = "${pkgs.ffmpeg}/bin/ffmpeg";
+          "memories.vod.ffprobe" = "${pkgs.ffmpeg}/bin/ffprobe";
+          preview_ffmpeg_path = "${pkgs.ffmpeg}/bin/ffmpeg";
+        }
         // {
           # PHP configuration to reduce log noise and suppress notices
           # This addresses issues like "Undefined array key" errors in SystemTagManager
