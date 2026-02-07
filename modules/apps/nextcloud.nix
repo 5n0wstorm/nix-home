@@ -312,7 +312,7 @@ in {
     # failed". Referencing the same derivation here pulls it into the system
     # closure so it is present on deploy.
     environment.etc."nextcloud-settings.json".source =
-      (pkgs.formats.json { }).generate "nextcloud-settings.json" config.services.nextcloud.settings;
+      (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
 
     # --------------------------------------------------------------------------
     # HOMEPAGE DASHBOARD REGISTRATION
