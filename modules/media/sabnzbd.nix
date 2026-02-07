@@ -150,6 +150,7 @@ in {
       user = cfg.user;
       group = cfg.group;
       openFirewall = cfg.openFirewall;
+      configFile = null; # use settings instead (configFile is deprecated)
       settings = {
         misc.port = cfg.port;
       };
