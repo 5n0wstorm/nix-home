@@ -424,7 +424,7 @@ in {
           };
 
           script = ''
-            exec ${pkgs.python3.withPackages (ps: [ ps.telethon ])}/bin/python -c ${escapeShellArg pythonScript}
+            exec ${pkgs.python3.withPackages (ps: [ps.telethon])}/bin/python -c ${escapeShellArg pythonScript}
           '';
         };
       }));
@@ -441,8 +441,7 @@ in {
           };
         })
       enabledInstances)
-      //
-      (optionalAttrs (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable) {
+      // (optionalAttrs (cfg.enable && cfg.telegramChannelList != null && cfg.telegramChannelList.enable) {
         gallery-dl-telegram-channel-list = {
           description = "Timer: update Telegram channel list for gallery-dl";
           wantedBy = ["timers.target"];
