@@ -282,12 +282,12 @@ in {
     settingsJsonPath = (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
   in {
     # --------------------------------------------------------------------------
-    # SYSTEM PACKAGES FOR PREVIEWS
+    # SYSTEM PACKAGES FOR PREVIEWS AND APPS
     # --------------------------------------------------------------------------
 
-    # Video previews require ffmpeg
-    environment.systemPackages = mkIf cfg.previews.enable (
-      with pkgs; [ffmpeg]
+    # Video previews require ffmpeg; Memories app requires ffmpeg and exiftool
+    environment.systemPackages = mkIf cfg.enable (
+      with pkgs; [ffmpeg exiftool]
     );
 
     # --------------------------------------------------------------------------
@@ -475,9 +475,15 @@ in {
       https = true;
       maxUploadSize = "10G";
 
-      # Install basic apps
+      # Install basic apps (memories via fetchNextcloudApp so it is always in the Nix
+      # build; the packaged memories in nixpkgs may be missing on some channels)
       extraApps = {
-        inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator memories;
+        inherit (nextcloudPkg.packages.apps) contacts calendar tasks previewgenerator;
+        memories = pkgs.fetchNextcloudApp {
+          url = "https://github.com/pulsejet/memories/releases/download/v7.8.2/memories.tar.gz";
+          hash = "sha256-O59G5kUkYlYxr8p/vEqs3LqLRKJZbeEgDhdY5eHfnZg=";
+          license = "agpl3Only";
+        };
       };
       extraAppsEnable = true;
     };
