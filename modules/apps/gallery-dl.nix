@@ -451,7 +451,7 @@ in {
               client = TelegramClient(StringSession(session_str), api_id, api_hash)
               await client.start()
               urls = []
-                  try:
+              try:
                   async for dialog in client.iter_dialogs():
                       entity = dialog.entity
                       if dialog.is_channel:
