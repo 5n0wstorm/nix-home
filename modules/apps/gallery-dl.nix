@@ -451,15 +451,14 @@ in {
               client = TelegramClient(StringSession(session_str), api_id, api_hash)
               await client.start()
               urls = []
-              try:
+                  try:
                   async for dialog in client.iter_dialogs():
                       entity = dialog.entity
                       if dialog.is_channel:
-                          if entity.username:
-                              urls.append(f"https://t.me/{entity.username}")
-                          else:
-                              cid = str(entity.id).replace("-100", "")
-                              urls.append(f"https://t.me/c/{cid}")
+                          # Always use /c/<id> for channels so gallery-dl never has to resolve
+                          # usernames (ResolveUsernameRequest can fail with NotFoundError/rate limits).
+                          cid = str(entity.id).replace("-100", "")
+                          urls.append(f"https://t.me/c/{cid}")
                       elif dialog.is_user and getattr(entity, "username", None):
                           urls.append(f"https://t.me/{entity.username}")
               finally:
