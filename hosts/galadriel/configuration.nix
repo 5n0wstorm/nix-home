@@ -1060,11 +1060,11 @@ in {
 
   # Ensure dominik's directories (and /data/archive paths) exist
   systemd.tmpfiles.rules = [
-    # gallery-dl base
+    # gallery-dl base (telegram dir and files owned by gallery-dl so the service can chmod/write)
     "d /data/archive 0777 root root -"
-    "d /data/archive/telegram 0777 root root -"
-    "f /data/archive/telegram/urls.txt 0666 root root -"
-    "f /data/archive/telegram/url-logs.txt 0666 root root -"
+    "d /data/archive/telegram 0775 gallery-dl gallery-dl -"
+    "f /data/archive/telegram/urls.txt 0664 gallery-dl gallery-dl -"
+    "f /data/archive/telegram/url-logs.txt 0664 gallery-dl gallery-dl -"
     "d /data/archive/boosty 0777 root root -"
     "f /data/archive/boosty/urls.txt 0666 root root -"
     "d /data/archive/twitter 0777 root root -"

@@ -414,9 +414,10 @@ in {
 
               out_path = Path(os.environ["OUT"])
               out_path.write_text(template, encoding="utf-8")
-              # User requested /data to be 0777 recursively.
-              # Keep file writable so future runs can update it without errors.
-              os.chmod(out_path, 0o666)
+              try:
+                  os.chmod(out_path, 0o666)
+              except OSError:
+                  pass
               PY
             ''}
 
@@ -487,7 +488,10 @@ in {
                   f.write("\n")
 
               out_path.write_text("\n".join(sorted(urls)) + "\n", encoding="utf-8")
-              out_path.chmod(0o666)
+              try:
+                  out_path.chmod(0o666)
+              except OSError:
+                  pass
               try:
                   log_path.chmod(0o666)
               except OSError:
