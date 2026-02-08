@@ -60,7 +60,7 @@ with lib; let
 
       # Send email
       echo -e "Subject: ''${subject}\n\n''${body}" | \
-        ${pkgs.msmtp}/bin/msmtp --file=/tmp/msmtprc.''$$ -t "${cfg.email.to}"
+        msmtp --file=/tmp/msmtprc.''$$ -t "${cfg.email.to}"
 
       rm -f /tmp/msmtprc.''$$
     }
@@ -81,7 +81,7 @@ with lib; let
 
     # Mount the SMB share with seal (encryption)
     log "Mounting SMB share with encryption..."
-    ${pkgs.cifs-utils}/bin/mount.cifs \
+    mount.cifs \
       "''${SMB_SHARE}" \
       ${cfg.mountPoint} \
       -o "vers=3.1.1,seal,nosuid,nodev,noexec,uid=0,gid=0,dir_mode=0700,file_mode=0600,username=''${SMB_USERNAME},password=''${SMB_PASSWORD}"
@@ -94,14 +94,14 @@ with lib; let
     export RESTIC_PASSWORD_FILE=${cfg.secrets.resticPasswordFile}
     export RESTIC_REPOSITORY=${cfg.repoPath}
 
-    if ! ${pkgs.restic}/bin/restic snapshots &>/dev/null; then
+    if ! restic snapshots &>/dev/null; then
       log "Initializing new restic repository..."
-      ${pkgs.restic}/bin/restic init
+      restic init
     fi
 
     # Run backup
     log "Running restic backup..."
-    BACKUP_OUTPUT=$(${pkgs.restic}/bin/restic backup /var/lib \
+    BACKUP_OUTPUT=$(restic backup /var/lib \
       --exclude='/var/lib/docker/overlay2' \
       --exclude='/var/lib/systemd/coredump' \
       --exclude='*.tmp' \
@@ -116,7 +116,7 @@ with lib; let
 
     # Apply retention policy
     log "Applying retention policy..."
-    FORGET_OUTPUT=$(${pkgs.restic}/bin/restic forget --prune \
+    FORGET_OUTPUT=$(restic forget --prune \
       --keep-daily ${toString cfg.retention.keepDaily} \
       --keep-weekly ${toString cfg.retention.keepWeekly} \
       --keep-monthly ${toString cfg.retention.keepMonthly} \
@@ -124,7 +124,7 @@ with lib; let
 
     # Get repository stats
     log "Gathering repository statistics..."
-    STATS_OUTPUT=$(${pkgs.restic}/bin/restic stats --mode raw-data 2>&1 || echo "Stats unavailable")
+    STATS_OUTPUT=$(restic stats --mode raw-data 2>&1 || echo "Stats unavailable")
 
     END_TIME=$(date +%s)
     DURATION=$((END_TIME - START_TIME))
@@ -157,7 +157,7 @@ with lib; let
     ''${STATS_OUTPUT}
 
     === Recent Snapshots ===
-    $(${pkgs.restic}/bin/restic snapshots --compact | tail -10)
+    $(restic snapshots --compact | tail -10)
 
     Check full logs: journalctl -u backup-var-lib.service
     "
@@ -314,6 +314,10 @@ in {
       # Ensure network is available
       after = ["network-online.target"];
       wants = ["network-online.target"];
+
+      # Put mount.cifs, restic, msmtp in PATH so the script finds them;
+      # these packages are in the service closure and stay available at runtime.
+      path = with pkgs; [ cifs-utils restic msmtp ];
 
       serviceConfig = {
         Type = "oneshot";
