@@ -317,7 +317,7 @@ in {
 
       # Put mount.cifs, restic, msmtp in PATH so the script finds them;
       # these packages are in the service closure and stay available at runtime.
-      path = with pkgs; [ cifs-utils restic msmtp ];
+      path = with pkgs; [cifs-utils restic msmtp];
 
       serviceConfig = {
         Type = "oneshot";
