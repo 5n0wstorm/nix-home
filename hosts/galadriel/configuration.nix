@@ -248,6 +248,7 @@ in {
         extractor = {
           "base-directory" = "/data/archive";
           archive = "@ARCHIVE_URL@";
+          skip = "abort:10";
         };
       };
       configSubstitutions = {
