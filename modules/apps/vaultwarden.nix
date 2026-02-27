@@ -214,7 +214,11 @@ in {
         SMTP_PASSWORD=$(cat "${cfg.smtp.passwordFile}" | tr -d '\n')
 
         # Vaultwarden requires both SMTP_USERNAME and SMTP_PASSWORD when using auth
-        SMTP_USER="${if cfg.smtp.username != null then cfg.smtp.username else cfg.smtp.from}"
+        SMTP_USER="${
+          if cfg.smtp.username != null
+          then cfg.smtp.username
+          else cfg.smtp.from
+        }"
 
         # No leading spaces: systemd EnvironmentFile keys must not have whitespace
         {
@@ -235,7 +239,8 @@ in {
       environmentFile = let
         base = optional (cfg.environmentFile != null) cfg.environmentFile;
         smtpEnv = optional (cfg.smtp.enable && cfg.smtp.hostFile != null && cfg.smtp.passwordFile != null) "/run/vaultwarden/smtp.env";
-      in base ++ smtpEnv;
+      in
+        base ++ smtpEnv;
 
       config = {
         DOMAIN = "https://${cfg.domain}";
