@@ -208,22 +208,26 @@ in {
         mkdir -p /run/vaultwarden
         chmod 755 /run/vaultwarden
 
-        ${if cfg.smtp.host != null then ''
-        SMTP_HOST="${cfg.smtp.host}"
-        SMTP_PORT="${toString cfg.smtp.port}"
-        '' else ''
-        # Trim whitespace so hostname resolves (stray spaces cause "Name or service not known")
-        SMTP_ADDR=$(cat "${cfg.smtp.hostFile}" | tr -d '\n\r' | xargs)
-        if echo "$SMTP_ADDR" | grep -q ':'; then
-          SMTP_HOST="''${SMTP_ADDR%%:*}"
-          SMTP_PORT="''${SMTP_ADDR#*:}"
-        else
-          SMTP_HOST="$SMTP_ADDR"
-          SMTP_PORT="${toString cfg.smtp.port}"
-        fi
-        SMTP_HOST=$(echo "$SMTP_HOST" | xargs)
-        SMTP_PORT=$(echo "$SMTP_PORT" | xargs)
-        ''}
+        ${
+          if cfg.smtp.host != null
+          then ''
+            SMTP_HOST="${cfg.smtp.host}"
+            SMTP_PORT="${toString cfg.smtp.port}"
+          ''
+          else ''
+            # Trim whitespace so hostname resolves (stray spaces cause "Name or service not known")
+            SMTP_ADDR=$(cat "${cfg.smtp.hostFile}" | tr -d '\n\r' | xargs)
+            if echo "$SMTP_ADDR" | grep -q ':'; then
+              SMTP_HOST="''${SMTP_ADDR%%:*}"
+              SMTP_PORT="''${SMTP_ADDR#*:}"
+            else
+              SMTP_HOST="$SMTP_ADDR"
+              SMTP_PORT="${toString cfg.smtp.port}"
+            fi
+            SMTP_HOST=$(echo "$SMTP_HOST" | xargs)
+            SMTP_PORT=$(echo "$SMTP_PORT" | xargs)
+          ''
+        }
 
         SMTP_PASSWORD=$(cat "${cfg.smtp.passwordFile}" | tr -d '\n')
 
