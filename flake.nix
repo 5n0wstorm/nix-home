@@ -95,6 +95,12 @@
     #   imports = [ ./hosts/${name}/configuration.nix ];
     # };
     # hostConfigs = builtins.mapAttrs mkHost hosts;
+
+    openclawPkgs = system:
+      import nixpkgs {
+        inherit system;
+        overlays = [nix-openclaw.overlays.default];
+      };
   in {
     # ==========================================================================
     # DEVELOPMENT SHELL - Local development environment
@@ -210,12 +216,6 @@
     # ==========================================================================
     # HOME CONFIGURATIONS - User-level config (e.g. OpenClaw) via Home Manager
     # ==========================================================================
-
-    openclawPkgs = system:
-      import nixpkgs {
-        inherit system;
-        overlays = [nix-openclaw.overlays.default];
-      };
 
     homeConfigurations.openclaw = home-manager.lib.homeManagerConfiguration {
       pkgs = openclawPkgs "x86_64-linux";
