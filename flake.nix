@@ -12,7 +12,6 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    nix-openclaw.url = "github:openclaw/nix-openclaw";
     gallery-dl-src = {
       url = "git+ssh://gitea@192.168.2.10/Dominik/gallery-dl.git?ref=master";
       flake = false;
@@ -37,7 +36,6 @@
     sops-nix,
     disko,
     home-manager,
-    nix-openclaw,
     gallery-dl-src,
     ...
   }: let
@@ -83,7 +81,6 @@
         # Backwards-compatible name (now just the patched build, no extra wrapping needed).
         gallery-dl-custom-fixed = galleryDlCustom;
       })
-      nix-openclaw.overlays.default
     ];
     # For scaling up your homelab, you'd likely want automated host generation:
     # mkHost = name: hostConfig: {
@@ -95,12 +92,6 @@
     #   imports = [ ./hosts/${name}/configuration.nix ];
     # };
     # hostConfigs = builtins.mapAttrs mkHost hosts;
-
-    openclawPkgs = system:
-      import nixpkgs {
-        inherit system;
-        overlays = [nix-openclaw.overlays.default];
-      };
   in {
     # ==========================================================================
     # DEVELOPMENT SHELL - Local development environment
@@ -134,7 +125,6 @@
         ./hosts/galadriel/disko.nix
         disko.nixosModules.disko
         sops-nix.nixosModules.sops
-        nix-openclaw.nixosModules.openclaw-gateway
       ];
     };
 
@@ -170,7 +160,6 @@
           ./hosts/galadriel/disko.nix
           disko.nixosModules.disko
           sops-nix.nixosModules.sops
-          nix-openclaw.nixosModules.openclaw-gateway
         ];
       };
 
@@ -213,24 +202,5 @@
       };
     };
 
-    # ==========================================================================
-    # HOME CONFIGURATIONS - User-level config (e.g. OpenClaw) via Home Manager
-    # ==========================================================================
-
-    homeConfigurations.openclaw = home-manager.lib.homeManagerConfiguration {
-      pkgs = openclawPkgs "x86_64-linux";
-      modules = [
-        nix-openclaw.homeManagerModules.openclaw
-        ./openclaw/home.nix
-      ];
-    };
-
-    homeConfigurations.openclaw-darwin = home-manager.lib.homeManagerConfiguration {
-      pkgs = openclawPkgs "aarch64-darwin";
-      modules = [
-        nix-openclaw.homeManagerModules.openclaw
-        ./openclaw/home.nix
-      ];
-    };
   };
 }

@@ -5,8 +5,6 @@
   ...
 }: let
   hosts = import ../../hosts.nix;
-  # Set to true after adding openclaw.gateway_env and openclaw.telegram_bot_token to secrets.yaml
-  openclawGatewayEnabled = false;
 in {
   # ============================================================================
   # IMPORTS
@@ -721,21 +719,20 @@ in {
     ];
 
     # Domains requiring two-factor authentication
-    twoFactorDomains =
-      (lib.optional openclawGatewayEnabled "claw.sn0wstorm.com")
-      ++ [
-        "grafana.sn0wstorm.com"
-        "prometheus.sn0wstorm.com"
-        "stash.sn0wstorm.com"
-        "guac.sn0wstorm.com"
-        "emby.sn0wstorm.com"
-        "dozzle.sn0wstorm.com"
-        "code.sn0wstorm.com"
-        "heimdall.sn0wstorm.com"
-        "adminer.sn0wstorm.com"
-        "pmox.sn0wstorm.com"
-        "headscale-admin.sn0wstorm.com"
-      ];
+    twoFactorDomains = [
+      "claw.sn0wstorm.com"
+      "grafana.sn0wstorm.com"
+      "prometheus.sn0wstorm.com"
+      "stash.sn0wstorm.com"
+      "guac.sn0wstorm.com"
+      "emby.sn0wstorm.com"
+      "dozzle.sn0wstorm.com"
+      "code.sn0wstorm.com"
+      "heimdall.sn0wstorm.com"
+      "adminer.sn0wstorm.com"
+      "pmox.sn0wstorm.com"
+      "headscale-admin.sn0wstorm.com"
+    ];
 
     # Domains where /api/* bypasses auth (for *arr apps)
     apiBypassDomains = [
@@ -813,59 +810,15 @@ in {
     enableTLS = true;
     enableAuthelia = true; # Enable Authelia protection for all services
 
-    # OpenClaw gateway Control UI (when openclawGatewayEnabled)
-    routes = lib.mkIf openclawGatewayEnabled {
+    routes = {
       "claw.sn0wstorm.com" = {
-        target = "127.0.0.1";
+        target = "192.168.2.12";
         port = 18789;
-        description = "OpenClaw gateway Control UI";
+        description = "Claw UI";
         ssl = true;
         bypassAuth = false;
-        extraConfig = ''
-          proxy_http_version 1.1;
-          proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection "upgrade";
-          proxy_read_timeout 86400;
-        '';
       };
     };
-  };
-
-  # ============================================================================
-  # OPENCLAW GATEWAY (Control UI at claw.sn0wstorm.com, behind Authelia 2FA)
-  # ============================================================================
-  # Set openclawGatewayEnabled = true in the let block above after adding to
-  # secrets.yaml: openclaw.gateway_env and openclaw.telegram_bot_token (see SECRETS.md).
-  # ============================================================================
-
-  services.openclaw-gateway = lib.mkIf openclawGatewayEnabled {
-    enable = true;
-    port = 18789;
-    environmentFiles = ["-/run/secrets/openclaw/gateway-env"];
-
-    config = {
-      gateway = {
-        mode = "local";
-        auth.token = ""; # Use OPENCLAW_GATEWAY_TOKEN from gateway-env instead
-      };
-      channels.telegram = {
-        tokenFile = "/run/secrets/openclaw/telegram-bot-token";
-        allowFrom = ["8367764225"];
-        groups."*" = {requireMention = true;};
-      };
-    };
-  };
-
-  # Ensure log dir exists and use journal for stdout/stderr (avoids "No such file" at start)
-  systemd.services.openclaw-gateway = lib.mkIf openclawGatewayEnabled {
-    serviceConfig = {
-      StandardOutput = "journal";
-      StandardError = "journal";
-    };
-    preStart = ''
-      mkdir -p /var/lib/openclaw/logs
-      chown openclaw:openclaw /var/lib/openclaw/logs
-    '';
   };
 
   # ============================================================================
@@ -993,18 +946,6 @@ in {
       "authelia/database/password" = {
         owner = "authelia-main";
         group = "authelia-main";
-        mode = "0400";
-      };
-
-      # OpenClaw gateway (claw.sn0wstorm.com) — only when openclawGatewayEnabled
-      "openclaw/telegram-bot-token" = lib.mkIf openclawGatewayEnabled {
-        owner = "openclaw";
-        group = "openclaw";
-        mode = "0400";
-      };
-      "openclaw/gateway-env" = lib.mkIf openclawGatewayEnabled {
-        owner = "openclaw";
-        group = "openclaw";
         mode = "0400";
       };
 
