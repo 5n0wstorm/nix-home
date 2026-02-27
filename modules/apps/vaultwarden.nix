@@ -68,6 +68,51 @@ in {
       description = "Environment file containing secrets (ADMIN_TOKEN, SMTP_PASSWORD, etc.)";
     };
 
+    # SMTP (mail) configuration; credentials from sops secrets
+    smtp = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Enable SMTP for verification emails and invitations";
+      };
+
+      from = mkOption {
+        type = types.str;
+        default = "";
+        description = "Sender email address (e.g. vaultwarden@example.com)";
+      };
+
+      hostFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Path to file containing SMTP host (e.g. from sops secret bitwarden/smtp-address)";
+      };
+
+      passwordFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Path to file containing SMTP password (e.g. from sops secret bitwarden/smtp-password)";
+      };
+
+      port = mkOption {
+        type = types.port;
+        default = 587;
+        description = "SMTP port (used when host file does not contain ':port')";
+      };
+
+      security = mkOption {
+        type = types.enum ["starttls" "force_tls" "off"];
+        default = "starttls";
+        description = "SMTP encryption: starttls (587), force_tls (465), or off (25)";
+      };
+
+      username = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "SMTP username (optional; omit if same as from or no auth)";
+      };
+    };
+
     # Homepage dashboard integration
     homepage = {
       enable = mkOption {
@@ -142,10 +187,51 @@ in {
     # VAULTWARDEN SERVICE
     # --------------------------------------------------------------------------
 
+    # Build SMTP env file from sops secrets (host + password files)
+    systemd.services.vaultwarden-smtp-secrets = mkIf (cfg.smtp.enable && cfg.smtp.hostFile != null && cfg.smtp.passwordFile != null) {
+      description = "Prepare Vaultwarden SMTP environment file from secrets";
+      before = ["vaultwarden.service"];
+      requiredBy = ["vaultwarden.service"];
+      after = ["sops-nix.service"];
+      wants = ["sops-nix.service"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        mkdir -p /run/vaultwarden
+        chmod 755 /run/vaultwarden
+
+        SMTP_ADDR=$(cat "${cfg.smtp.hostFile}" | tr -d '\n')
+        if echo "$SMTP_ADDR" | grep -q ':'; then
+          SMTP_HOST="''${SMTP_ADDR%%:*}"
+          SMTP_PORT="''${SMTP_ADDR#*:}"
+        else
+          SMTP_HOST="$SMTP_ADDR"
+          SMTP_PORT="${toString cfg.smtp.port}"
+        fi
+
+        SMTP_PASSWORD=$(cat "${cfg.smtp.passwordFile}" | tr -d '\n')
+
+        cat > /run/vaultwarden/smtp.env << EOF
+        SMTP_HOST=$SMTP_HOST
+        SMTP_PORT=$SMTP_PORT
+        SMTP_FROM=${cfg.smtp.from}
+        SMTP_SECURITY=${cfg.smtp.security}
+        SMTP_PASSWORD=$SMTP_PASSWORD
+        ${optionalString (cfg.smtp.username != null) "SMTP_USERNAME=${cfg.smtp.username}"}
+        EOF
+        chmod 600 /run/vaultwarden/smtp.env
+      '';
+    };
+
     services.vaultwarden = {
       enable = true;
       backupDir = cfg.backupDir;
-      environmentFile = mkIf (cfg.environmentFile != null) cfg.environmentFile;
+      environmentFile = let
+        base = optional (cfg.environmentFile != null) cfg.environmentFile;
+        smtpEnv = optional (cfg.smtp.enable && cfg.smtp.hostFile != null && cfg.smtp.passwordFile != null) "/run/vaultwarden/smtp.env";
+      in base ++ smtpEnv;
 
       config = {
         DOMAIN = "https://${cfg.domain}";
