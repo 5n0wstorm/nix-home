@@ -202,7 +202,8 @@ in {
         mkdir -p /run/vaultwarden
         chmod 755 /run/vaultwarden
 
-        SMTP_ADDR=$(cat "${cfg.smtp.hostFile}" | tr -d '\n')
+        # Trim whitespace so hostname resolves (stray spaces cause "Name or service not known")
+        SMTP_ADDR=$(cat "${cfg.smtp.hostFile}" | tr -d '\n\r' | xargs)
         if echo "$SMTP_ADDR" | grep -q ':'; then
           SMTP_HOST="''${SMTP_ADDR%%:*}"
           SMTP_PORT="''${SMTP_ADDR#*:}"
@@ -210,6 +211,9 @@ in {
           SMTP_HOST="$SMTP_ADDR"
           SMTP_PORT="${toString cfg.smtp.port}"
         fi
+        # Trim host/port (in case secret had "host : 587")
+        SMTP_HOST=$(echo "$SMTP_HOST" | xargs)
+        SMTP_PORT=$(echo "$SMTP_PORT" | xargs)
 
         SMTP_PASSWORD=$(cat "${cfg.smtp.passwordFile}" | tr -d '\n')
 

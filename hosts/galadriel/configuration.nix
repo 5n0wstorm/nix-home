@@ -99,7 +99,7 @@ in {
     domain = "bitwarden.sn0wstorm.com";
     signupsAllowed = true;
     invitationsAllowed = true;
-    # SMTP from secrets: bitwarden.smtp-address, bitwarden.smtp-password
+    # SMTP from secrets: bitwarden.smtp-address (e.g. mail.sn0wstorm.com:587), bitwarden.smtp-password
     smtp = {
       enable = true;
       from = "bitwarden@sn0wstorm.com";
