@@ -213,14 +213,17 @@ in {
 
         SMTP_PASSWORD=$(cat "${cfg.smtp.passwordFile}" | tr -d '\n')
 
+        # Vaultwarden requires both SMTP_USERNAME and SMTP_PASSWORD when using auth
+        SMTP_USER="${if cfg.smtp.username != null then cfg.smtp.username else cfg.smtp.from}"
+
         # No leading spaces: systemd EnvironmentFile keys must not have whitespace
         {
           echo "SMTP_HOST=$SMTP_HOST"
           echo "SMTP_PORT=$SMTP_PORT"
           echo "SMTP_FROM=${cfg.smtp.from}"
           echo "SMTP_SECURITY=${cfg.smtp.security}"
+          echo "SMTP_USERNAME=$SMTP_USER"
           printf 'SMTP_PASSWORD=%s\n' "$SMTP_PASSWORD"
-          ${optionalString (cfg.smtp.username != null) ''echo "SMTP_USERNAME=${cfg.smtp.username}"''}
         } > /run/vaultwarden/smtp.env
         chmod 600 /run/vaultwarden/smtp.env
       '';
