@@ -97,7 +97,7 @@ in {
   fleet.apps.vaultwarden = {
     enable = true;
     domain = "bitwarden.sn0wstorm.com";
-    signupsAllowed = false;
+    signupsAllowed = true;
     invitationsAllowed = true;
     # To enable admin panel, create environment file with ADMIN_TOKEN:
     # environmentFile = "/run/secrets/vaultwarden-env";
