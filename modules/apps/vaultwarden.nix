@@ -44,6 +44,12 @@ in {
       description = "Allow new user signups";
     };
 
+    signupsVerify = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Require email verification before new users can log in. When true, register/finish expects a token from the verification email.";
+    };
+
     invitationsAllowed = mkOption {
       type = types.bool;
       default = true;
@@ -266,6 +272,7 @@ in {
         ROCKET_PORT = cfg.port;
 
         SIGNUPS_ALLOWED = cfg.signupsAllowed;
+        SIGNUPS_VERIFY = cfg.signupsVerify;
         INVITATIONS_ALLOWED = cfg.invitationsAllowed;
 
         WEBSOCKET_ENABLED = cfg.websocketEnabled;
