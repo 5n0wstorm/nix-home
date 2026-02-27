@@ -724,18 +724,18 @@ in {
     twoFactorDomains =
       (lib.optional openclawGatewayEnabled "claw.sn0wstorm.com")
       ++ [
-      "grafana.sn0wstorm.com"
-      "prometheus.sn0wstorm.com"
-      "stash.sn0wstorm.com"
-      "guac.sn0wstorm.com"
-      "emby.sn0wstorm.com"
-      "dozzle.sn0wstorm.com"
-      "code.sn0wstorm.com"
-      "heimdall.sn0wstorm.com"
-      "adminer.sn0wstorm.com"
-      "pmox.sn0wstorm.com"
-      "headscale-admin.sn0wstorm.com"
-    ];
+        "grafana.sn0wstorm.com"
+        "prometheus.sn0wstorm.com"
+        "stash.sn0wstorm.com"
+        "guac.sn0wstorm.com"
+        "emby.sn0wstorm.com"
+        "dozzle.sn0wstorm.com"
+        "code.sn0wstorm.com"
+        "heimdall.sn0wstorm.com"
+        "adminer.sn0wstorm.com"
+        "pmox.sn0wstorm.com"
+        "headscale-admin.sn0wstorm.com"
+      ];
 
     # Domains where /api/* bypasses auth (for *arr apps)
     apiBypassDomains = [
