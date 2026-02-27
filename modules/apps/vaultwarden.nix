@@ -213,14 +213,15 @@ in {
 
         SMTP_PASSWORD=$(cat "${cfg.smtp.passwordFile}" | tr -d '\n')
 
-        cat > /run/vaultwarden/smtp.env << EOF
-        SMTP_HOST=$SMTP_HOST
-        SMTP_PORT=$SMTP_PORT
-        SMTP_FROM=${cfg.smtp.from}
-        SMTP_SECURITY=${cfg.smtp.security}
-        SMTP_PASSWORD=$SMTP_PASSWORD
-        ${optionalString (cfg.smtp.username != null) "SMTP_USERNAME=${cfg.smtp.username}"}
-        EOF
+        # No leading spaces: systemd EnvironmentFile keys must not have whitespace
+        {
+          echo "SMTP_HOST=$SMTP_HOST"
+          echo "SMTP_PORT=$SMTP_PORT"
+          echo "SMTP_FROM=${cfg.smtp.from}"
+          echo "SMTP_SECURITY=${cfg.smtp.security}"
+          printf 'SMTP_PASSWORD=%s\n' "$SMTP_PASSWORD"
+          ${optionalString (cfg.smtp.username != null) ''echo "SMTP_USERNAME=${cfg.smtp.username}"''}
+        } > /run/vaultwarden/smtp.env
         chmod 600 /run/vaultwarden/smtp.env
       '';
     };
