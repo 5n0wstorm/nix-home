@@ -74,6 +74,12 @@ in {
       description = "Environment file containing secrets (ADMIN_TOKEN, SMTP_PASSWORD, etc.)";
     };
 
+    adminTokenFile = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Path to file containing ADMIN_TOKEN for the admin panel (e.g. sops secret bitwarden/admin_token)";
+    };
+
     # SMTP (mail) configuration; credentials from sops secrets
     smtp = {
       enable = mkOption {
@@ -257,14 +263,35 @@ in {
       '';
     };
 
+    # Admin panel: write ADMIN_TOKEN from secret so /admin is accessible
+    systemd.services.vaultwarden-admin-secrets = mkIf (cfg.adminTokenFile != null) {
+      description = "Prepare Vaultwarden admin panel token from secret";
+      before = ["vaultwarden.service"];
+      requiredBy = ["vaultwarden.service"];
+      after = ["sops-nix.service"];
+      wants = ["sops-nix.service"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        mkdir -p /run/vaultwarden
+        chmod 755 /run/vaultwarden
+        ADMIN_TOKEN=$(cat "${cfg.adminTokenFile}" | tr -d '\n\r' | xargs)
+        printf 'ADMIN_TOKEN=%s\n' "$ADMIN_TOKEN" > /run/vaultwarden/admin.env
+        chmod 600 /run/vaultwarden/admin.env
+      '';
+    };
+
     services.vaultwarden = {
       enable = true;
       backupDir = cfg.backupDir;
       environmentFile = let
         base = optional (cfg.environmentFile != null) cfg.environmentFile;
         smtpEnv = optional (cfg.smtp.enable && (cfg.smtp.host != null || cfg.smtp.hostFile != null) && cfg.smtp.passwordFile != null) "/run/vaultwarden/smtp.env";
+        adminEnv = optional (cfg.adminTokenFile != null) "/run/vaultwarden/admin.env";
       in
-        base ++ smtpEnv;
+        base ++ smtpEnv ++ adminEnv;
 
       config = {
         DOMAIN = "https://${cfg.domain}";

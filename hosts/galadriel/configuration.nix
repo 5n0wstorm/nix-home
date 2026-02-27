@@ -108,8 +108,7 @@ in {
       port = 587;
       security = "starttls";
     };
-    # To enable admin panel, create environment file with ADMIN_TOKEN:
-    # environmentFile = "/run/secrets/vaultwarden-env";
+    adminTokenFile = config.sops.secrets."bitwarden/admin_token".path;
   };
 
   # Nextcloud - File sync and sharing platform
@@ -945,6 +944,11 @@ in {
         mode = "0400";
       };
       "bitwarden/smtp-password" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "bitwarden/admin_token" = {
         owner = "root";
         group = "root";
         mode = "0400";
