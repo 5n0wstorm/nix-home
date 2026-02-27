@@ -118,6 +118,21 @@ users:
       - users
 ```
 
+### OpenClaw (claw.sn0wstorm.com, galadriel)
+Used by the OpenClaw gateway on galadriel (Control UI behind Authelia 2FA).
+
+- `openclaw/telegram_bot_token`: Telegram bot token from [@BotFather](https://t.me/BotFather). Deployed at `/run/secrets/openclaw/telegram-bot-token`.
+- `openclaw/gateway_env`: File content for gateway env: exactly one line `OPENCLAW_GATEWAY_TOKEN=<token>` (e.g. `openssl rand -hex 32`). Deployed at `/run/secrets/openclaw/gateway-env`.
+
+In `secrets.yaml` add under `openclaw:`:
+```yaml
+openclaw:
+  telegram_bot_token: ENC[...]   # Your Telegram bot token
+  gateway_env: ENC[...]         # OPENCLAW_GATEWAY_TOKEN=<your-hex-token>
+```
+
+In `hosts/galadriel/configuration.nix`, set `services.openclaw-gateway.config.channels.telegram.allowFrom = [ "YOUR_TELEGRAM_USER_ID" ];` (get ID from [@userinfobot](https://t.me/userinfobot)).
+
 ## 🛠️ Commands
 
 ```bash

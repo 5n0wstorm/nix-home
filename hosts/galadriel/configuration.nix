@@ -719,6 +719,7 @@ in {
 
     # Domains requiring two-factor authentication
     twoFactorDomains = [
+      "claw.sn0wstorm.com"
       "grafana.sn0wstorm.com"
       "prometheus.sn0wstorm.com"
       "stash.sn0wstorm.com"
@@ -807,6 +808,49 @@ in {
     enable = true;
     enableTLS = true;
     enableAuthelia = true; # Enable Authelia protection for all services
+
+    # OpenClaw gateway Control UI (dashboard + HTTP API on port 18789)
+    routes = {
+      "claw.sn0wstorm.com" = {
+        target = "127.0.0.1";
+        port = 18789;
+        description = "OpenClaw gateway Control UI";
+        ssl = true;
+        bypassAuth = false;
+        extraConfig = ''
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_read_timeout 86400;
+        '';
+      };
+    };
+  };
+
+  # ============================================================================
+  # OPENCLAW GATEWAY (Control UI at claw.sn0wstorm.com, behind Authelia 2FA)
+  # ============================================================================
+  # Secrets: add openclaw.telegram_bot_token and openclaw.gateway_env to secrets.yaml.
+  # gateway_env content: OPENCLAW_GATEWAY_TOKEN=<your-token>
+  # Set your Telegram user ID in allowFrom below (get from @userinfobot).
+  # ============================================================================
+
+  services.openclaw-gateway = {
+    enable = true;
+    port = 18789;
+    environmentFiles = ["-/run/secrets/openclaw/gateway-env"];
+
+    config = {
+      gateway = {
+        mode = "local";
+        auth.token = ""; # Use OPENCLAW_GATEWAY_TOKEN from gateway-env instead
+      };
+      channels.telegram = {
+        tokenFile = "/run/secrets/openclaw/telegram-bot-token";
+        allowFrom = ["8367764225"];
+        groups."*" = {requireMention = true;};
+      };
+    };
   };
 
   # ============================================================================
@@ -934,6 +978,18 @@ in {
       "authelia/database/password" = {
         owner = "authelia-main";
         group = "authelia-main";
+        mode = "0400";
+      };
+
+      # OpenClaw gateway (claw.sn0wstorm.com)
+      "openclaw/telegram-bot-token" = {
+        owner = "openclaw";
+        group = "openclaw";
+        mode = "0400";
+      };
+      "openclaw/gateway-env" = {
+        owner = "openclaw";
+        group = "openclaw";
         mode = "0400";
       };
 
