@@ -856,6 +856,18 @@ in {
     };
   };
 
+  # Ensure log dir exists and use journal for stdout/stderr (avoids "No such file" at start)
+  systemd.services.openclaw-gateway = lib.mkIf openclawGatewayEnabled {
+    serviceConfig = {
+      StandardOutput = "journal";
+      StandardError = "journal";
+    };
+    preStart = ''
+      mkdir -p /var/lib/openclaw/logs
+      chown openclaw:openclaw /var/lib/openclaw/logs
+    '';
+  };
+
   # ============================================================================
   # BACKUP CONFIGURATION
   # ============================================================================
