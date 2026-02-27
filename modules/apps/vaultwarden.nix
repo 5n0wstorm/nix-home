@@ -82,10 +82,16 @@ in {
         description = "Sender email address (e.g. vaultwarden@example.com)";
       };
 
+      host = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "SMTP server hostname (e.g. mail.example.com). Prefer this over hostFile to avoid secret encoding issues.";
+      };
+
       hostFile = mkOption {
         type = types.nullOr types.str;
         default = null;
-        description = "Path to file containing SMTP host (e.g. from sops secret bitwarden/smtp-address)";
+        description = "Path to file containing SMTP host (or host:port). Ignored when smtp.host is set.";
       };
 
       passwordFile = mkOption {
@@ -187,8 +193,8 @@ in {
     # VAULTWARDEN SERVICE
     # --------------------------------------------------------------------------
 
-    # Build SMTP env file from sops secrets (host + password files)
-    systemd.services.vaultwarden-smtp-secrets = mkIf (cfg.smtp.enable && cfg.smtp.hostFile != null && cfg.smtp.passwordFile != null) {
+    # Build SMTP env file (host from config or secret, password from secret)
+    systemd.services.vaultwarden-smtp-secrets = mkIf (cfg.smtp.enable && (cfg.smtp.host != null || cfg.smtp.hostFile != null) && cfg.smtp.passwordFile != null) {
       description = "Prepare Vaultwarden SMTP environment file from secrets";
       before = ["vaultwarden.service"];
       requiredBy = ["vaultwarden.service"];
@@ -202,6 +208,10 @@ in {
         mkdir -p /run/vaultwarden
         chmod 755 /run/vaultwarden
 
+        ${if cfg.smtp.host != null then ''
+        SMTP_HOST="${cfg.smtp.host}"
+        SMTP_PORT="${toString cfg.smtp.port}"
+        '' else ''
         # Trim whitespace so hostname resolves (stray spaces cause "Name or service not known")
         SMTP_ADDR=$(cat "${cfg.smtp.hostFile}" | tr -d '\n\r' | xargs)
         if echo "$SMTP_ADDR" | grep -q ':'; then
@@ -211,9 +221,9 @@ in {
           SMTP_HOST="$SMTP_ADDR"
           SMTP_PORT="${toString cfg.smtp.port}"
         fi
-        # Trim host/port (in case secret had "host : 587")
         SMTP_HOST=$(echo "$SMTP_HOST" | xargs)
         SMTP_PORT=$(echo "$SMTP_PORT" | xargs)
+        ''}
 
         SMTP_PASSWORD=$(cat "${cfg.smtp.passwordFile}" | tr -d '\n')
 
@@ -242,7 +252,7 @@ in {
       backupDir = cfg.backupDir;
       environmentFile = let
         base = optional (cfg.environmentFile != null) cfg.environmentFile;
-        smtpEnv = optional (cfg.smtp.enable && cfg.smtp.hostFile != null && cfg.smtp.passwordFile != null) "/run/vaultwarden/smtp.env";
+        smtpEnv = optional (cfg.smtp.enable && (cfg.smtp.host != null || cfg.smtp.hostFile != null) && cfg.smtp.passwordFile != null) "/run/vaultwarden/smtp.env";
       in
         base ++ smtpEnv;
 

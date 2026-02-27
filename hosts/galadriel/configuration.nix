@@ -99,11 +99,11 @@ in {
     domain = "bitwarden.sn0wstorm.com";
     signupsAllowed = true;
     invitationsAllowed = true;
-    # SMTP from secrets: bitwarden.smtp-address (e.g. mail.sn0wstorm.com:587), bitwarden.smtp-password
+    # SMTP: host in config (avoids secret encoding), password from secret
     smtp = {
       enable = true;
       from = "bitwarden@sn0wstorm.com";
-      hostFile = config.sops.secrets."bitwarden/smtp-address".path;
+      host = "mail.sn0wstorm.com";
       passwordFile = config.sops.secrets."bitwarden/smtp-password".path;
       port = 587;
       security = "starttls";
