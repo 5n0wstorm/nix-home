@@ -99,6 +99,15 @@ in {
     domain = "bitwarden.sn0wstorm.com";
     signupsAllowed = true;
     invitationsAllowed = true;
+    # SMTP: host in config (avoids secret encoding), password from secret
+    smtp = {
+      enable = true;
+      from = "bitwarden@sn0wstorm.com";
+      host = "mail.sn0wstorm.com";
+      passwordFile = config.sops.secrets."bitwarden/smtp-password".path;
+      port = 587;
+      security = "starttls";
+    };
     # To enable admin panel, create environment file with ADMIN_TOKEN:
     # environmentFile = "/run/secrets/vaultwarden-env";
   };
@@ -926,6 +935,18 @@ in {
       "authelia/database/password" = {
         owner = "authelia-main";
         group = "authelia-main";
+        mode = "0400";
+      };
+
+      # Vaultwarden SMTP (bitwarden.smtp-address, bitwarden.smtp-password in secrets.yaml)
+      "bitwarden/smtp-address" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "bitwarden/smtp-password" = {
+        owner = "root";
+        group = "root";
         mode = "0400";
       };
 
