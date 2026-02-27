@@ -1,9 +1,12 @@
 {
   config,
+  lib,
   pkgs,
   ...
 }: let
   hosts = import ../../hosts.nix;
+  # Set to true after adding openclaw.gateway_env and openclaw.telegram_bot_token to secrets.yaml
+  openclawGatewayEnabled = false;
 in {
   # ============================================================================
   # IMPORTS
@@ -718,8 +721,9 @@ in {
     ];
 
     # Domains requiring two-factor authentication
-    twoFactorDomains = [
-      "claw.sn0wstorm.com"
+    twoFactorDomains =
+      (lib.optional openclawGatewayEnabled "claw.sn0wstorm.com")
+      ++ [
       "grafana.sn0wstorm.com"
       "prometheus.sn0wstorm.com"
       "stash.sn0wstorm.com"
@@ -809,8 +813,8 @@ in {
     enableTLS = true;
     enableAuthelia = true; # Enable Authelia protection for all services
 
-    # OpenClaw gateway Control UI (dashboard + HTTP API on port 18789)
-    routes = {
+    # OpenClaw gateway Control UI (when openclawGatewayEnabled)
+    routes = lib.mkIf openclawGatewayEnabled {
       "claw.sn0wstorm.com" = {
         target = "127.0.0.1";
         port = 18789;
@@ -830,12 +834,11 @@ in {
   # ============================================================================
   # OPENCLAW GATEWAY (Control UI at claw.sn0wstorm.com, behind Authelia 2FA)
   # ============================================================================
-  # Secrets: add openclaw.telegram_bot_token and openclaw.gateway_env to secrets.yaml.
-  # gateway_env content: OPENCLAW_GATEWAY_TOKEN=<your-token>
-  # Set your Telegram user ID in allowFrom below (get from @userinfobot).
+  # Set openclawGatewayEnabled = true in the let block above after adding to
+  # secrets.yaml: openclaw.gateway_env and openclaw.telegram_bot_token (see SECRETS.md).
   # ============================================================================
 
-  services.openclaw-gateway = {
+  services.openclaw-gateway = lib.mkIf openclawGatewayEnabled {
     enable = true;
     port = 18789;
     environmentFiles = ["-/run/secrets/openclaw/gateway-env"];
@@ -981,13 +984,13 @@ in {
         mode = "0400";
       };
 
-      # OpenClaw gateway (claw.sn0wstorm.com)
-      "openclaw/telegram-bot-token" = {
+      # OpenClaw gateway (claw.sn0wstorm.com) — only when openclawGatewayEnabled
+      "openclaw/telegram-bot-token" = lib.mkIf openclawGatewayEnabled {
         owner = "openclaw";
         group = "openclaw";
         mode = "0400";
       };
-      "openclaw/gateway-env" = {
+      "openclaw/gateway-env" = lib.mkIf openclawGatewayEnabled {
         owner = "openclaw";
         group = "openclaw";
         mode = "0400";
