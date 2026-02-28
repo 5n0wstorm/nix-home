@@ -812,7 +812,7 @@ in {
 
     routes = {
       "claw.sn0wstorm.com" = {
-        target = "192.168.2.12";
+        target = "192.168.2.143";
         port = 18789;
         description = "Claw UI";
         ssl = true;
