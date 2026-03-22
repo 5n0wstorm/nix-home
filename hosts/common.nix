@@ -118,7 +118,7 @@
     git
     wget
     htop
-    neofetch
+    fastfetch
     ncdu
     powertop
     bmon
