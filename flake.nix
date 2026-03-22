@@ -49,11 +49,16 @@
     overlays = [
       (final: prev: let
         inherit (prev) lib;
-        # nixpkgs still ships fix_async_test.patch; Telethon v1.42.0+ already contains it, so patchPhase fails.
-        telethonFixed = prev.python3Packages.telethon.overrideAttrs (oldAttrs: {
-          patches = builtins.filter (
-            p: !(lib.strings.hasInfix "fix_async_test" (toString p))
-          ) (oldAttrs.patches or []);
+        # Use upstream Telethon source directly; nixpkgs patch list can lag behind upstream tags.
+        telethonFixed = prev.python3Packages.telethon.overrideAttrs (_oldAttrs: rec {
+          version = "1.42.0";
+          src = prev.fetchFromCodeberg {
+            owner = "Lonami";
+            repo = "Telethon";
+            tag = "v${version}";
+            hash = "sha256-NMHJkSTGR3/tck0k97EfVN9f85PAWst+EZ6G7Tgrt5s=";
+          };
+          patches = [];
         });
         galleryDlCustom = prev.gallery-dl.overrideAttrs (oldAttrs: {
           src = gallery-dl-src;
