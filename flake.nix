@@ -50,8 +50,8 @@
       (final: prev: let
         inherit (prev) lib;
         # nixpkgs still ships fix_async_test.patch; Telethon v1.42.0+ already contains it, so patchPhase fails.
-        python3 = prev.python3.override {
-          packageOverrides = _: super: {
+        python3Packages = prev.python3Packages.override {
+          overrides = _: super: {
             telethon = super.telethon.overrideAttrs (oldAttrs: {
               patches = builtins.filter (
                 p: !(lib.strings.hasInfix "fix_async_test" (toString p))
@@ -59,7 +59,6 @@
             });
           };
         };
-        python3Packages = python3.pkgs;
         galleryDlCustom = prev.gallery-dl.overrideAttrs (oldAttrs: {
           src = gallery-dl-src;
           version = "custom-${gallery-dl-src.shortRev or "unknown"}";
@@ -89,7 +88,7 @@
             ];
         });
       in {
-        inherit python3 python3Packages;
+        inherit python3Packages;
         gallery-dl-custom = galleryDlCustom;
         # Backwards-compatible name (now just the patched build, no extra wrapping needed).
         gallery-dl-custom-fixed = galleryDlCustom;

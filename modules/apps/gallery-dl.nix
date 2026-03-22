@@ -512,7 +512,7 @@ in {
           };
 
           script = ''
-            exec ${pkgs.python3.withPackages (ps: [ps.telethon])}/bin/python -c ${escapeShellArg pythonScript}
+            exec ${pkgs.python3Packages.python.withPackages (ps: [ps.telethon])}/bin/python -c ${escapeShellArg pythonScript}
           '';
         };
       }))
@@ -638,7 +638,7 @@ in {
     environment.systemPackages = [
       pkgs.gallery-dl-custom-fixed
       # Telegram exporter dependency (python Telethon)
-      (pkgs.python3.withPackages (ps: [
+      (pkgs.python3Packages.python.withPackages (ps: [
         ps.telethon
       ]))
     ];
