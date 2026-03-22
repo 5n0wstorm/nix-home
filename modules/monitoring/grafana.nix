@@ -39,6 +39,20 @@ in {
       description = "Bypass Authelia authentication (uses Grafana's built-in auth)";
     };
 
+    secretKeyFile = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Path to a file containing Grafana's `security.secret_key` (single line, no newline).
+        When set, the value is passed with Grafana's `$__file{…}` provider so the key is not
+        stored in the Nix store.
+
+        When null, the pre-26.05 NixOS default key is used so existing SQLite state keeps
+        working; prefer a random key in a root-owned file for new setups or after rotation.
+      '';
+      example = "/run/secrets/grafana/secret_key";
+    };
+
     # Homepage dashboard integration
     homepage = {
       enable = mkOption {
@@ -133,6 +147,11 @@ in {
         security = {
           admin_user = "admin";
           admin_password = "admin";
+          # Required since NixOS 26.05 (no default). $__file keeps secrets out of the store.
+          secret_key =
+            if cfg.secretKeyFile != null
+            then "$__file{${cfg.secretKeyFile}}"
+            else "SW2YcwTIb9zpOOhoPsMm";
         };
 
         "auth.anonymous" = {
