@@ -248,7 +248,7 @@ in {
       image = "qmcgaw/gluetun:latest";
 
       # Environment configuration for PIA
-      environment = mkIf (cfg.provider == "private_internet_access") {
+      environment = mkIf (cfg.provider == "private_internet_access") ({
         # VPN provider
         VPN_SERVICE_PROVIDER = "private internet access";
         VPN_TYPE = "openvpn"; # PIA works best with OpenVPN for port forwarding
@@ -271,13 +271,13 @@ in {
         # Kill switch
         FIREWALL_VPN_INPUT_PORTS = ""; # Will be set by port forwarding
 
-        # Health check
-        HEALTH_VPN_DURATION_INITIAL = "30s";
-        HEALTH_VPN_DURATION_ADDITION = "10s";
-
         # Timezone
         TZ = "America/New_York";
-      };
+      } // optionalAttrs cfg.healthCheck.enable {
+        # Gluetun internal health timings (only when health checks are enabled)
+        HEALTH_VPN_DURATION_INITIAL = "30s";
+        HEALTH_VPN_DURATION_ADDITION = "10s";
+      });
 
       # Credentials from generated environment file
       environmentFiles = ["/var/lib/gluetun/credentials.env"];
@@ -292,7 +292,9 @@ in {
         "--device=/dev/net/tun:/dev/net/tun"
         "--sysctl=net.ipv4.conf.all.src_valid_mark=1"
         "--pull=always"
-        # Health check
+      ] ++ optionals cfg.healthCheck.enable [
+        # Podman health checks create transient systemd units; keep optional so
+        # unhealthy probes don't break NixOS activation when disabled.
         "--health-cmd=/gluetun-entrypoint healthcheck"
         "--health-interval=30s"
         "--health-retries=3"

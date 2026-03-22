@@ -421,7 +421,14 @@ in {
               PY
             ''}
 
-            exec ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl ${escapeShellArgs args}
+            # Don't fail the unit hard on extractor/runtime errors. These jobs are
+            # periodic best-effort tasks and a failed run should not block
+            # `nixos-rebuild switch` activation.
+            if ! ${pkgs.gallery-dl-custom-fixed}/bin/gallery-dl ${escapeShellArgs args}; then
+              rc=$?
+              echo "gallery-dl instance '${name}' failed (exit $rc); keeping unit successful to avoid deployment failure"
+              exit 0
+            fi
           '';
         })
       enabledInstances)
