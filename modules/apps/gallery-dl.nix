@@ -549,15 +549,28 @@ in {
               -g \
               ${escapeShellArg followingUrl} \
               > "$raw" 2>&1 || true
-            # Keep only lines that are x.com/i/user/<id> or twitter.com/i/user/<id>, append /media
+            # Keep only profile-like lines and normalize to .../media.
+            # gallery-dl output format has changed over time; support both
+            # /i/user/<id> and /<username> style profile URLs.
             while IFS= read -r line; do
               line="''${line%%[[:space:]]*}"
+              line="''${line%$'\r'}"
+              line="''${line%/}"
               if [[ "$line" =~ ^https?://(twitter\.com|x\.com)/i/user/[0-9]+$ ]]; then
                 echo "$line/media"
+              elif [[ "$line" =~ ^https?://(twitter\.com|x\.com)/[A-Za-z0-9_]+$ ]]; then
+                userpart="''${line##*/}"
+                if [[ ! "$userpart" =~ ^(home|explore|notifications|messages|search|settings|compose|login|signup|hashtag|share|intent|i)$ ]]; then
+                  echo "https://x.com/$userpart/media"
+                fi
+              elif [[ "$line" =~ ^https?://(twitter\.com|x\.com)/[A-Za-z0-9_]+/media$ ]]; then
+                base="''${line%/media}"
+                userpart="''${base##*/}"
+                echo "https://x.com/$userpart/media"
               fi
             done < "$raw" | sort -u > "$newlist"
             # Only update urlFile if the list changed
-            if [[ -f "$out" ]] && cmp -s "$newlist" "$out"; then
+            if [[ -f "$out" ]] && ${pkgs.diffutils}/bin/cmp -s "$newlist" "$out"; then
               exit 0
             fi
             # Log added and deleted URLs
