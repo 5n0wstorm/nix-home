@@ -112,6 +112,12 @@ in {
       allowed-origins = ["https://${cfg.domain}"];
     };
 
+    # Work around a systemd ordering cycle seen with Cockpit wsinstance units:
+    # sockets.target -> cockpit-wsinstance-*.socket -> cockpit-wsinstance-socket-user.service
+    # -> basic.target -> sockets.target.
+    # Keep the helper service early in boot instead of ordering it after basic.target.
+    systemd.services."cockpit-wsinstance-socket-user".after = mkForce ["sysinit.target"];
+
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
