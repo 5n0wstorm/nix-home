@@ -249,35 +249,36 @@ in {
 
       # Environment configuration for PIA
       environment = mkIf (cfg.provider == "private_internet_access") ({
-        # VPN provider
-        VPN_SERVICE_PROVIDER = "private internet access";
-        VPN_TYPE = "openvpn"; # PIA works best with OpenVPN for port forwarding
+          # VPN provider
+          VPN_SERVICE_PROVIDER = "private internet access";
+          VPN_TYPE = "openvpn"; # PIA works best with OpenVPN for port forwarding
 
-        # Server selection
-        SERVER_REGIONS = concatStringsSep "," cfg.pia.serverRegions;
+          # Server selection
+          SERVER_REGIONS = concatStringsSep "," cfg.pia.serverRegions;
 
-        # Port forwarding
-        VPN_PORT_FORWARDING =
-          if cfg.pia.portForwarding
-          then "on"
-          else "off";
-        VPN_PORT_FORWARDING_PROVIDER = "private internet access";
-        VPN_PORT_FORWARDING_STATUS_FILE = "/gluetun/forwarded_port";
+          # Port forwarding
+          VPN_PORT_FORWARDING =
+            if cfg.pia.portForwarding
+            then "on"
+            else "off";
+          VPN_PORT_FORWARDING_PROVIDER = "private internet access";
+          VPN_PORT_FORWARDING_STATUS_FILE = "/gluetun/forwarded_port";
 
-        # DNS
-        DOT = "off"; # Use custom DNS
-        DNS_ADDRESS = builtins.elemAt cfg.dnsServers 0;
+          # DNS
+          DOT = "off"; # Use custom DNS
+          DNS_ADDRESS = builtins.elemAt cfg.dnsServers 0;
 
-        # Kill switch
-        FIREWALL_VPN_INPUT_PORTS = ""; # Will be set by port forwarding
+          # Kill switch
+          FIREWALL_VPN_INPUT_PORTS = ""; # Will be set by port forwarding
 
-        # Timezone
-        TZ = "America/New_York";
-      } // optionalAttrs cfg.healthCheck.enable {
-        # Gluetun internal health timings (only when health checks are enabled)
-        HEALTH_VPN_DURATION_INITIAL = "30s";
-        HEALTH_VPN_DURATION_ADDITION = "10s";
-      });
+          # Timezone
+          TZ = "America/New_York";
+        }
+        // optionalAttrs cfg.healthCheck.enable {
+          # Gluetun internal health timings (only when health checks are enabled)
+          HEALTH_VPN_DURATION_INITIAL = "30s";
+          HEALTH_VPN_DURATION_ADDITION = "10s";
+        });
 
       # Credentials from generated environment file
       environmentFiles = ["/var/lib/gluetun/credentials.env"];
@@ -287,20 +288,22 @@ in {
       ];
 
       # Required capabilities for VPN
-      extraOptions = [
-        "--cap-add=NET_ADMIN"
-        "--device=/dev/net/tun:/dev/net/tun"
-        "--sysctl=net.ipv4.conf.all.src_valid_mark=1"
-        "--pull=always"
-      ] ++ optionals cfg.healthCheck.enable [
-        # Podman health checks create transient systemd units; keep optional so
-        # unhealthy probes don't break NixOS activation when disabled.
-        "--health-cmd=/gluetun-entrypoint healthcheck"
-        "--health-interval=30s"
-        "--health-retries=3"
-        "--health-start-period=60s"
-        "--health-timeout=10s"
-      ];
+      extraOptions =
+        [
+          "--cap-add=NET_ADMIN"
+          "--device=/dev/net/tun:/dev/net/tun"
+          "--sysctl=net.ipv4.conf.all.src_valid_mark=1"
+          "--pull=always"
+        ]
+        ++ optionals cfg.healthCheck.enable [
+          # Podman health checks create transient systemd units; keep optional so
+          # unhealthy probes don't break NixOS activation when disabled.
+          "--health-cmd=/gluetun-entrypoint healthcheck"
+          "--health-interval=30s"
+          "--health-retries=3"
+          "--health-start-period=60s"
+          "--health-timeout=10s"
+        ];
 
       # Expose ports for services that will route through VPN
       # qBittorrent web UI and BitTorrent ports
