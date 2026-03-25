@@ -160,219 +160,220 @@ in {
         collationDbNames
       );
     in {
-    assertions = [
-      {
-        assertion = (!cfg.ssl.enable) || (cfg.ssl.certFile != null && cfg.ssl.keyFile != null);
-        message = "fleet.apps.postgresql.ssl.enable requires fleet.apps.postgresql.ssl.certFile and fleet.apps.postgresql.ssl.keyFile to be set.";
-      }
-    ];
-
-    # --------------------------------------------------------------------------
-    # POSTGRESQL SERVICE CONFIGURATION
-    # --------------------------------------------------------------------------
-
-    services.postgresql = {
-      enable = true;
-      package = cfg.package;
-      dataDir = cfg.dataDir;
-      # NixOS sets `services.postgresql.settings.listen_addresses = "localhost"` in
-      # its module. If we set a different value at the same priority it causes a
-      # conflict, so we force our desired listen address and keep the rest merged.
-      settings = let
-        listenAddr = cfg.settings.listen_addresses or "127.0.0.1";
-        otherSettings = removeAttrs cfg.settings ["listen_addresses"];
-      in
-        otherSettings
-        // {
-          listen_addresses = mkForce listenAddr;
+      assertions = [
+        {
+          assertion = (!cfg.ssl.enable) || (cfg.ssl.certFile != null && cfg.ssl.keyFile != null);
+          message = "fleet.apps.postgresql.ssl.enable requires fleet.apps.postgresql.ssl.certFile and fleet.apps.postgresql.ssl.keyFile to be set.";
         }
-        // (optionalAttrs cfg.ssl.enable {
-          ssl = mkForce true;
-          ssl_cert_file = mkForce cfg.ssl.certFile;
-          ssl_key_file = mkForce cfg.ssl.keyFile;
-        });
-
-      # Enable peer authentication for local postgres user
-      authentication = let
-        hostType =
-          if cfg.ssl.enable
-          then "hostssl"
-          else "host";
-
-        extraAllowed =
-          concatStringsSep "\n" (map (cidr: "${hostType} all all ${cidr} scram-sha-256") cfg.allowedCIDRs);
-
-        extraReject =
-          optionalString (cfg.ssl.enable && cfg.ssl.require && cfg.allowedCIDRs != [])
-          (concatStringsSep "\n" (map (cidr: "hostnossl all all ${cidr} reject") cfg.allowedCIDRs));
-      in
-        mkOverride 10 ''
-          # TYPE  DATABASE        USER            ADDRESS                 METHOD
-          local   all             postgres                                peer
-          local   all             all                                     peer
-          ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all 127.0.0.1/32 reject\n"}
-          ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all ::1/128 reject\n"}
-          ${extraReject}
-          ${hostType} all             all             127.0.0.1/32            scram-sha-256
-          ${hostType} all             all             ::1/128                 scram-sha-256
-          ${extraAllowed}
-        '';
-    };
-
-    # --------------------------------------------------------------------------
-    # DATABASE AND USER PROVISIONING SERVICE
-    # --------------------------------------------------------------------------
-    # Creates roles and databases after PostgreSQL starts, reading credentials
-    # from secret files rendered by sops-nix
-
-    systemd.services.postgresql-provision = let
-      # Build the provisioning script for each database entry
-      provisionCommands = concatStringsSep "\n\n" (
-        mapAttrsToList (
-          key: dbCfg: let
-            usernameFile = "/run/secrets/${dbCfg.secretPrefix}/username";
-            passwordFile = "/run/secrets/${dbCfg.secretPrefix}/password";
-            dbName = dbCfg.dbName;
-          in ''
-            echo "=== Provisioning database: ${dbName} (${key}) ==="
-
-            # Check if secret files exist
-            if [ ! -f "${usernameFile}" ]; then
-              echo "ERROR: Username file not found: ${usernameFile}"
-              exit 1
-            fi
-
-            if [ ! -f "${passwordFile}" ]; then
-              echo "ERROR: Password file not found: ${passwordFile}"
-              exit 1
-            fi
-
-            # Read credentials from secret files
-            USERNAME=$(cat "${usernameFile}")
-            PASSWORD=$(cat "${passwordFile}")
-
-            # Optional sanity checks (avoid quoting edge-cases)
-            if ! echo "$USERNAME" | grep -Eq '^[A-Za-z0-9_]+$'; then
-              echo "ERROR: Username contains unsupported characters: $USERNAME"
-              exit 1
-            fi
-
-            # Escape single quotes in password for SQL literals using awk octal escapes.
-            # This avoids embedding the Nix indented-string terminator sequence.
-            PASSWORD_ESCAPED=$(printf %s "$PASSWORD" | awk '{ gsub(/\047/, "\047\047"); printf "%s", $0 }')
-
-            echo "  Username: $USERNAME"
-            echo "  Database: ${dbName}"
-
-            # Check if role exists
-            if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$USERNAME'" | grep -q 1; then
-              echo "  Role $USERNAME exists, updating password..."
-              psql -v ON_ERROR_STOP=1 \
-                -c "ALTER ROLE \"$USERNAME\" WITH LOGIN PASSWORD '$PASSWORD_ESCAPED';"
-            else
-              echo "  Creating role $USERNAME..."
-              psql -v ON_ERROR_STOP=1 \
-                -c "CREATE ROLE \"$USERNAME\" WITH LOGIN PASSWORD '$PASSWORD_ESCAPED';"
-            fi
-
-            # Check if database exists
-            if psql -tAc "SELECT 1 FROM pg_database WHERE datname='${dbName}'" | grep -q 1; then
-              echo "  Database ${dbName} exists, updating owner..."
-              psql -v ON_ERROR_STOP=1 \
-                -c "ALTER DATABASE \"${dbName}\" OWNER TO \"$USERNAME\";"
-            else
-              echo "  Creating database ${dbName}..."
-              psql -v ON_ERROR_STOP=1 \
-                -c "CREATE DATABASE \"${dbName}\" OWNER \"$USERNAME\";"
-            fi
-
-            # Grant all privileges
-            psql -v ON_ERROR_STOP=1 \
-              -c "GRANT ALL PRIVILEGES ON DATABASE \"${dbName}\" TO \"$USERNAME\";"
-
-            echo "  ✓ Database ${dbName} provisioned successfully"
-          ''
-        )
-        cfg.databases
-      );
-    in {
-      description = "Provision PostgreSQL databases and users from secrets";
-      after = ["postgresql.service"];
-      requires = ["postgresql.service"];
-      wantedBy = ["multi-user.target"];
-
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        User = "postgres";
-        Group = "postgres";
-      };
-
-      path = [
-        cfg.package
-        pkgs.gawk
       ];
 
-      script = ''
-        set -e
+      # --------------------------------------------------------------------------
+      # POSTGRESQL SERVICE CONFIGURATION
+      # --------------------------------------------------------------------------
 
-        echo "Starting PostgreSQL database provisioning..."
+      services.postgresql = {
+        enable = true;
+        package = cfg.package;
+        dataDir = cfg.dataDir;
+        # NixOS sets `services.postgresql.settings.listen_addresses = "localhost"` in
+        # its module. If we set a different value at the same priority it causes a
+        # conflict, so we force our desired listen address and keep the rest merged.
+        settings = let
+          listenAddr = cfg.settings.listen_addresses or "127.0.0.1";
+          otherSettings = removeAttrs cfg.settings ["listen_addresses"];
+        in
+          otherSettings
+          // {
+            listen_addresses = mkForce listenAddr;
+          }
+          // (optionalAttrs cfg.ssl.enable {
+            ssl = mkForce true;
+            ssl_cert_file = mkForce cfg.ssl.certFile;
+            ssl_key_file = mkForce cfg.ssl.keyFile;
+          });
 
-        # Wait for PostgreSQL to be ready
-        for i in {1..30}; do
-          if psql -c "SELECT 1" &>/dev/null; then
-            echo "PostgreSQL is ready"
-            break
-          fi
-          echo "Waiting for PostgreSQL to be ready... ($i/30)"
-          sleep 1
-        done
+        # Enable peer authentication for local postgres user
+        authentication = let
+          hostType =
+            if cfg.ssl.enable
+            then "hostssl"
+            else "host";
 
-        # Provision each database
-        ${provisionCommands}
+          extraAllowed =
+            concatStringsSep "\n" (map (cidr: "${hostType} all all ${cidr} scram-sha-256") cfg.allowedCIDRs);
 
-        echo ""
-        echo "PostgreSQL provisioning complete!"
-        echo ""
-        echo "=== Current roles ==="
-        psql -c "\du"
-        echo ""
-        echo "=== Current databases ==="
-        psql -c "\l"
-      '';
-    };
-
-    # Keep pg_database.collversion aligned with OS ICU after NixOS/glibc upgrades.
-    systemd.services.postgresql-collations = {
-      description = "Refresh PostgreSQL collation version metadata";
-      after = ["postgresql-provision.service"];
-      requires = ["postgresql-provision.service"];
-      wantedBy = ["multi-user.target"];
-
-      serviceConfig = {
-        Type = "oneshot";
-        User = "postgres";
-        Group = "postgres";
+          extraReject =
+            optionalString (cfg.ssl.enable && cfg.ssl.require && cfg.allowedCIDRs != [])
+            (concatStringsSep "\n" (map (cidr: "hostnossl all all ${cidr} reject") cfg.allowedCIDRs));
+        in
+          mkOverride 10 ''
+            # TYPE  DATABASE        USER            ADDRESS                 METHOD
+            local   all             postgres                                peer
+            local   all             all                                     peer
+            ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all 127.0.0.1/32 reject\n"}
+            ${optionalString (cfg.ssl.enable && cfg.ssl.require) "hostnossl all all ::1/128 reject\n"}
+            ${extraReject}
+            ${hostType} all             all             127.0.0.1/32            scram-sha-256
+            ${hostType} all             all             ::1/128                 scram-sha-256
+            ${extraAllowed}
+          '';
       };
 
-      path = [cfg.package];
+      # --------------------------------------------------------------------------
+      # DATABASE AND USER PROVISIONING SERVICE
+      # --------------------------------------------------------------------------
+      # Creates roles and databases after PostgreSQL starts, reading credentials
+      # from secret files rendered by sops-nix
 
-      script = ''
-        set -euo pipefail
-        echo "Refreshing collation version for databases: ${concatStringsSep ", " collationDbNames}"
-        ${refreshCollationCommands}
-      '';
-    };
+      systemd.services.postgresql-provision = let
+        # Build the provisioning script for each database entry
+        provisionCommands = concatStringsSep "\n\n" (
+          mapAttrsToList (
+            key: dbCfg: let
+              usernameFile = "/run/secrets/${dbCfg.secretPrefix}/username";
+              passwordFile = "/run/secrets/${dbCfg.secretPrefix}/password";
+              dbName = dbCfg.dbName;
+            in ''
+              echo "=== Provisioning database: ${dbName} (${key}) ==="
 
-    # --------------------------------------------------------------------------
-    # FIREWALL CONFIGURATION
-    # --------------------------------------------------------------------------
+              # Check if secret files exist
+              if [ ! -f "${usernameFile}" ]; then
+                echo "ERROR: Username file not found: ${usernameFile}"
+                exit 1
+              fi
 
-    # Only open firewall if not listening on localhost only
-    networking.firewall.allowedTCPPorts =
-      mkIf ((cfg.settings.listen_addresses or "127.0.0.1") != "127.0.0.1") [cfg.port];
+              if [ ! -f "${passwordFile}" ]; then
+                echo "ERROR: Password file not found: ${passwordFile}"
+                exit 1
+              fi
 
-    # Add PostgreSQL client tools for database management
-    environment.systemPackages = [cfg.package];
-  });
+              # Read credentials from secret files
+              USERNAME=$(cat "${usernameFile}")
+              PASSWORD=$(cat "${passwordFile}")
+
+              # Optional sanity checks (avoid quoting edge-cases)
+              if ! echo "$USERNAME" | grep -Eq '^[A-Za-z0-9_]+$'; then
+                echo "ERROR: Username contains unsupported characters: $USERNAME"
+                exit 1
+              fi
+
+              # Escape single quotes in password for SQL literals using awk octal escapes.
+              # This avoids embedding the Nix indented-string terminator sequence.
+              PASSWORD_ESCAPED=$(printf %s "$PASSWORD" | awk '{ gsub(/\047/, "\047\047"); printf "%s", $0 }')
+
+              echo "  Username: $USERNAME"
+              echo "  Database: ${dbName}"
+
+              # Check if role exists
+              if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$USERNAME'" | grep -q 1; then
+                echo "  Role $USERNAME exists, updating password..."
+                psql -v ON_ERROR_STOP=1 \
+                  -c "ALTER ROLE \"$USERNAME\" WITH LOGIN PASSWORD '$PASSWORD_ESCAPED';"
+              else
+                echo "  Creating role $USERNAME..."
+                psql -v ON_ERROR_STOP=1 \
+                  -c "CREATE ROLE \"$USERNAME\" WITH LOGIN PASSWORD '$PASSWORD_ESCAPED';"
+              fi
+
+              # Check if database exists
+              if psql -tAc "SELECT 1 FROM pg_database WHERE datname='${dbName}'" | grep -q 1; then
+                echo "  Database ${dbName} exists, updating owner..."
+                psql -v ON_ERROR_STOP=1 \
+                  -c "ALTER DATABASE \"${dbName}\" OWNER TO \"$USERNAME\";"
+              else
+                echo "  Creating database ${dbName}..."
+                psql -v ON_ERROR_STOP=1 \
+                  -c "CREATE DATABASE \"${dbName}\" OWNER \"$USERNAME\";"
+              fi
+
+              # Grant all privileges
+              psql -v ON_ERROR_STOP=1 \
+                -c "GRANT ALL PRIVILEGES ON DATABASE \"${dbName}\" TO \"$USERNAME\";"
+
+              echo "  ✓ Database ${dbName} provisioned successfully"
+            ''
+          )
+          cfg.databases
+        );
+      in {
+        description = "Provision PostgreSQL databases and users from secrets";
+        after = ["postgresql.service"];
+        requires = ["postgresql.service"];
+        wantedBy = ["multi-user.target"];
+
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          User = "postgres";
+          Group = "postgres";
+        };
+
+        path = [
+          cfg.package
+          pkgs.gawk
+        ];
+
+        script = ''
+          set -e
+
+          echo "Starting PostgreSQL database provisioning..."
+
+          # Wait for PostgreSQL to be ready
+          for i in {1..30}; do
+            if psql -c "SELECT 1" &>/dev/null; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL to be ready... ($i/30)"
+            sleep 1
+          done
+
+          # Provision each database
+          ${provisionCommands}
+
+          echo ""
+          echo "PostgreSQL provisioning complete!"
+          echo ""
+          echo "=== Current roles ==="
+          psql -c "\du"
+          echo ""
+          echo "=== Current databases ==="
+          psql -c "\l"
+        '';
+      };
+
+      # Keep pg_database.collversion aligned with OS ICU after NixOS/glibc upgrades.
+      systemd.services.postgresql-collations = {
+        description = "Refresh PostgreSQL collation version metadata";
+        after = ["postgresql-provision.service"];
+        requires = ["postgresql-provision.service"];
+        wantedBy = ["multi-user.target"];
+
+        serviceConfig = {
+          Type = "oneshot";
+          User = "postgres";
+          Group = "postgres";
+        };
+
+        path = [cfg.package];
+
+        script = ''
+          set -euo pipefail
+          echo "Refreshing collation version for databases: ${concatStringsSep ", " collationDbNames}"
+          ${refreshCollationCommands}
+        '';
+      };
+
+      # --------------------------------------------------------------------------
+      # FIREWALL CONFIGURATION
+      # --------------------------------------------------------------------------
+
+      # Only open firewall if not listening on localhost only
+      networking.firewall.allowedTCPPorts =
+        mkIf ((cfg.settings.listen_addresses or "127.0.0.1") != "127.0.0.1") [cfg.port];
+
+      # Add PostgreSQL client tools for database management
+      environment.systemPackages = [cfg.package];
+    }
+  );
 }
