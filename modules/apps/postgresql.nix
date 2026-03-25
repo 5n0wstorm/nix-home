@@ -141,7 +141,25 @@ in {
   # MODULE IMPLEMENTATION
   # ============================================================================
 
-  config = mkIf cfg.enable {
+  config = mkIf cfg.enable (
+    let
+      # After glibc/ICU upgrades, catalogs may still record an old collation version;
+      # refresh so logs stop warning and behavior matches the running OS libraries.
+      collationDbNames = unique (
+        ["postgres" "template1"]
+        ++ mapAttrsToList (_: dbCfg: dbCfg.dbName) cfg.databases
+      );
+
+      refreshCollationCommands = concatStringsSep "\n" (
+        map (
+          dbName: ''
+            echo "Refreshing collation version for database: ${dbName}"
+            psql -v ON_ERROR_STOP=1 -d postgres -c "ALTER DATABASE \"${dbName}\" REFRESH COLLATION VERSION;"
+          ''
+        )
+        collationDbNames
+      );
+    in {
     assertions = [
       {
         assertion = (!cfg.ssl.enable) || (cfg.ssl.certFile != null && cfg.ssl.keyFile != null);
@@ -324,6 +342,28 @@ in {
       '';
     };
 
+    # Keep pg_database.collversion aligned with OS ICU after NixOS/glibc upgrades.
+    systemd.services.postgresql-collations = {
+      description = "Refresh PostgreSQL collation version metadata";
+      after = ["postgresql-provision.service"];
+      requires = ["postgresql-provision.service"];
+      wantedBy = ["multi-user.target"];
+
+      serviceConfig = {
+        Type = "oneshot";
+        User = "postgres";
+        Group = "postgres";
+      };
+
+      path = [cfg.package];
+
+      script = ''
+        set -euo pipefail
+        echo "Refreshing collation version for databases: ${concatStringsSep ", " collationDbNames}"
+        ${refreshCollationCommands}
+      '';
+    };
+
     # --------------------------------------------------------------------------
     # FIREWALL CONFIGURATION
     # --------------------------------------------------------------------------
@@ -334,5 +374,5 @@ in {
 
     # Add PostgreSQL client tools for database management
     environment.systemPackages = [cfg.package];
-  };
+  });
 }

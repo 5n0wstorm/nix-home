@@ -90,6 +90,15 @@ in {
       description = "Name of the Gluetun container";
     };
 
+    containerImage = mkOption {
+      type = types.str;
+      default = "qmcgaw/gluetun:latest";
+      description = ''
+        OCI image for Gluetun. Use a tag or digest for reproducible deploys;
+        `latest` plus UPDATER_PERIOD keeps provider-backed server data fresh.
+      '';
+    };
+
     # Port mappings for services routed through VPN
     ports = {
       webui = mkOption {
@@ -245,7 +254,7 @@ in {
     # --------------------------------------------------------------------------
 
     virtualisation.oci-containers.containers.${cfg.containerName} = {
-      image = "qmcgaw/gluetun:latest";
+      image = cfg.containerImage;
 
       # Environment configuration for PIA
       environment = mkIf (cfg.provider == "private_internet_access") ({
@@ -267,6 +276,9 @@ in {
           # DNS
           DOT = "off"; # Use custom DNS
           DNS_ADDRESS = builtins.elemAt cfg.dnsServers 0;
+
+          # Periodically refresh built-in VPN server lists (reduces stale endpoints / TLS failures)
+          UPDATER_PERIOD = "24h";
 
           # Kill switch
           FIREWALL_VPN_INPUT_PORTS = ""; # Will be set by port forwarding

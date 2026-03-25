@@ -440,8 +440,8 @@ in {
     provider = "private_internet_access";
 
     pia = {
-      # Regions that support port forwarding
-      serverRegions = ["Czech Republic" "FI Helsinki"];
+      # Regions that support port forwarding (wider list so Gluetun can fall back if one POP fails TLS)
+      serverRegions = ["Netherlands" "Czech Republic" "FI Helsinki"];
       portForwarding = true;
       usernameFile = "/run/secrets/pia-vpn/username";
       passwordFile = "/run/secrets/pia-vpn/password";
