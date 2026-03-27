@@ -47,6 +47,26 @@ in {
       description = "Primary group to run gallery-dl instances as";
     };
 
+    applyMtimeFromMetadata = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        Whether to pass `--mtime <mtimeMetadataField>` to all gallery-dl instances.
+        This sets downloaded files' mtime from gallery metadata (for example post date)
+        instead of HTTP Last-Modified headers.
+      '';
+    };
+
+    mtimeMetadataField = mkOption {
+      type = types.str;
+      default = "date";
+      description = ''
+        Metadata key selector passed to `--mtime` (for example `date` or `status[date]`).
+        Only used when `applyMtimeFromMetadata = true`.
+      '';
+      example = "date";
+    };
+
     instances = mkOption {
       type = types.attrsOf (types.submodule ({name, ...}: {
         options = {
@@ -361,6 +381,11 @@ in {
               else "${instanceDir}/archive.txt"
             )
           else null;
+        mtimeArgs =
+          optionals cfg.applyMtimeFromMetadata [
+            "--mtime"
+            cfg.mtimeMetadataField
+          ];
         args =
           (optional (effectiveConfigFile != null) "--config")
           ++ (optional (effectiveConfigFile != null) (toString effectiveConfigFile))
@@ -368,6 +393,7 @@ in {
           ++ (optional (archiveFile != null) archiveFile)
           ++ (optional (inst.urlFile != null) "--input-file")
           ++ (optional (inst.urlFile != null) inst.urlFile)
+          ++ mtimeArgs
           ++ inst.args
           ++ (optionals (inst.urlFile == null) inst.urls);
       in
