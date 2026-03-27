@@ -381,11 +381,10 @@ in {
               else "${instanceDir}/archive.txt"
             )
           else null;
-        mtimeArgs =
-          optionals cfg.applyMtimeFromMetadata [
-            "--mtime"
-            cfg.mtimeMetadataField
-          ];
+        mtimeArgs = optionals cfg.applyMtimeFromMetadata [
+          "--mtime"
+          cfg.mtimeMetadataField
+        ];
         args =
           (optional (effectiveConfigFile != null) "--config")
           ++ (optional (effectiveConfigFile != null) (toString effectiveConfigFile))
