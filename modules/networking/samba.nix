@@ -97,6 +97,11 @@ in {
           "dead time" = "15";
           "getwd cache" = "yes";
 
+          # Disable client-side caching globally — files are modified by
+          # server-side processes (media stack) that bypass Samba, so
+          # SMB clients must always fetch fresh data from the server.
+          "csc policy" = "disable";
+
           # Logging
           "log level" = "1";
           "log file" = "/var/log/samba/%m.log";
@@ -117,6 +122,16 @@ in {
           "vfs objects" = "acl_xattr";
           "map acl inherit" = "yes";
           "store dos attributes" = "yes";
+
+          # Server-side processes (qBittorrent, *arr stack, SABnzbd)
+          # write directly to the filesystem, bypassing Samba. Oplocks
+          # let SMB clients cache data locally and Samba never breaks
+          # the cache because it doesn't see the writes — this causes
+          # stale/lagging directory listings on the client.
+          "oplocks" = "no";
+          "level2 oplocks" = "no";
+          "strict locking" = "yes";
+          "kernel change notify" = "yes";
         };
       };
     };
