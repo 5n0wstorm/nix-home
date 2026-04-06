@@ -541,6 +541,8 @@ in {
             User = cfg.user;
             Group = cfg.group;
             SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+            RuntimeDirectory = "gallery-dl";
+            RuntimeDirectoryMode = "0750";
           };
 
           script = ''
@@ -571,7 +573,7 @@ in {
 
           script = ''
             set -euo pipefail
-            lockfile="/run/gallery-dl-twitter-following-list.lock"
+            lockfile="/run/gallery-dl/twitter-following-list.lock"
             exec 9>"$lockfile"
             # Never run more than one updater in parallel.
             if ! ${pkgs.util-linux}/bin/flock -n 9; then
