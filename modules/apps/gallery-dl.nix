@@ -569,6 +569,8 @@ in {
             User = cfg.user;
             Group = cfg.group;
             SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+            RuntimeDirectory = "gallery-dl";
+            RuntimeDirectoryMode = "0750";
           };
 
           script = ''
