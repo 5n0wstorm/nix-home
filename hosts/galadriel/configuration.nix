@@ -289,7 +289,7 @@ in {
         "@TWITTER_DM_PIN@" = config.sops.secrets."gallery-dl/twitter-messages-pin".path;
       };
 
-      urls = ["https://x.com/message"];
+      urls = ["https://x.com/messages"];
 
       args = [
         "--cookies=/data/archive/twitter/cookies.txt"

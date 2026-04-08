@@ -679,6 +679,8 @@ in {
 
     environment.systemPackages = [
       pkgs.gallery-dl-custom-fixed
+      # Required by Twitter/X DM passcode recovery in gallery-dl.
+      pkgs.nodejs
       # Telegram exporter dependency (python Telethon)
       (pkgs.python3Packages.python.withPackages (_: [
         pkgs.telethonFixed
