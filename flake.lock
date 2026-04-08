@@ -92,11 +92,11 @@
     "gallery-dl-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1775654806,
-        "narHash": "sha256-jRKJa0fygtuapUClWL8OYGRSilqsekkDRtOgP065bOY=",
+        "lastModified": 1775665451,
+        "narHash": "sha256-nXhtMVCVoOacR975+zRy1xAgLSgtYIWK6LX6168ElHA=",
         "ref": "master",
-        "rev": "a3f8029b3891d4460ffa91e0bf70b7958875cd20",
-        "revCount": 16191,
+        "rev": "40fb9c892d7a733f199dcc15a2a4ba72bd7b36d8",
+        "revCount": 16192,
         "type": "git",
         "url": "ssh://gitea@192.168.2.10/Dominik/gallery-dl.git"
       },
@@ -113,11 +113,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1775622785,
-        "narHash": "sha256-/yFxO+7oS1SymDfJ2iVO7K5vJKcYfe9XGIJ+quLqz0Q=",
+        "lastModified": 1775661044,
+        "narHash": "sha256-HlvLj+wE5ELaU+u2cY2nBFUJHdrob1V7qydk9lBx7oE=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "527e47b78fe67213072f706bf933a9705a8c4974",
+        "rev": "4ac0a4fd1537325d769377d574dccd10b97c28a2",
         "type": "github"
       },
       "original": {
