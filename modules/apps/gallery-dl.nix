@@ -398,6 +398,8 @@ in {
       in
         nameValuePair "gallery-dl-job-${name}" {
           description = "gallery-dl instance job: ${name}";
+          # X/Twitter DM extraction may require `node` for passcode recovery.
+          path = [pkgs.nodejs];
 
           # If a job is running during a switch, don't restart it (avoids blocking rebuilds).
           restartIfChanged = false;
