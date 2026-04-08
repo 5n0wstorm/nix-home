@@ -289,7 +289,7 @@ in {
         "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
       };
 
-      urls = ["https://x.com/message"];
+      urls = ["https://x.com/messages"];
 
       argsBeforeMtime = [
         "--cookies"
