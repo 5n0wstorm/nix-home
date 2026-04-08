@@ -234,10 +234,12 @@ in {
         extractor = {
           "base-directory" = "/data/archive";
           archive = "@ARCHIVE_URL@";
+          twitter.messages.pin = "@TWITTER_DM_PIN@";
         };
       };
       configSubstitutions = {
         "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
+        "@TWITTER_DM_PIN@" = config.sops.secrets."gallery-dl/twitter-messages-pin".path;
       };
 
       # one URL per line
@@ -281,23 +283,29 @@ in {
         extractor = {
           "base-directory" = "/data/archive";
           archive = "@ARCHIVE_URL@";
-          twitter.messages.pin = "@TWITTER_DM_PIN@";
         };
       };
       configSubstitutions = {
         "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
-        "@TWITTER_DM_PIN@" = config.sops.secrets."gallery-dl/twitter-messages-pin".path;
       };
 
-      urls = ["https://x.com/messages"];
+      urls = ["https://x.com/message"];
+
+      argsBeforeMtime = [
+        "--cookies"
+        "/data/archive/twitter/cookies.txt"
+      ];
 
       args = [
-        "--cookies=/data/archive/twitter/cookies.txt"
         "--write-metadata"
         "-O"
-        "event=post,file"
+        "event=file"
         "-O"
         "mtime=true"
+        "-o"
+        "extractor.twitter.messages.directory=[\"{category}\",\"{user[name]}\",\"DMs\"]"
+        "-o"
+        "skip=false"
       ];
     };
 
@@ -331,6 +339,15 @@ in {
       chmod -R 0777 /data/archive
     '';
   };
+
+  # Keep Twitter archive tree SMB-readable/writable after each run (DM downloads can
+  # create nested folders with restrictive permissions).
+  systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPost = [
+    "${pkgs.coreutils}/bin/chmod -R 0777 /data/archive/twitter"
+  ];
+  systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPost = [
+    "${pkgs.coreutils}/bin/chmod -R 0777 /data/archive/twitter"
+  ];
 
   # Ensure /data/archive paths exist for gallery-dl
   # NOTE: Keep all tmpfiles rules in a single assignment in this file.

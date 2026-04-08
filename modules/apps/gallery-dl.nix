@@ -124,6 +124,16 @@ in {
             example = ["--verbose" "--write-metadata"];
           };
 
+          argsBeforeMtime = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = ''
+              Extra CLI args passed before `--mtime <...>` (when enabled).
+              Useful for per-instance ordering requirements.
+            '';
+            example = ["--cookies" "/data/archive/twitter/cookies.txt"];
+          };
+
           configFile = mkOption {
             type = types.nullOr (types.oneOf [types.path types.str]);
             default = null;
@@ -392,6 +402,7 @@ in {
           ++ (optional (archiveFile != null) archiveFile)
           ++ (optional (inst.urlFile != null) "--input-file")
           ++ (optional (inst.urlFile != null) inst.urlFile)
+          ++ inst.argsBeforeMtime
           ++ mtimeArgs
           ++ inst.args
           ++ (optionals (inst.urlFile == null) inst.urls);
