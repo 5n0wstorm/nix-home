@@ -286,7 +286,7 @@ in {
       };
       configSubstitutions = {
         "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
-        "@TWITTER_DM_PIN@" = config.sops.secrets."gallery-dl/twitter/messages-pin".path;
+        "@TWITTER_DM_PIN@" = config.sops.secrets."gallery-dl/twitter-messages-pin".path;
       };
 
       urls = ["https://x.com/message"];
@@ -922,7 +922,7 @@ in {
         group = config.fleet.apps.galleryDl.group;
         mode = "0400";
       };
-      "gallery-dl/twitter/messages-pin" = {
+      "gallery-dl/twitter-messages-pin" = {
         owner = config.fleet.apps.galleryDl.user;
         group = config.fleet.apps.galleryDl.group;
         mode = "0400";
