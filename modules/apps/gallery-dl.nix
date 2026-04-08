@@ -124,6 +124,16 @@ in {
             example = ["--verbose" "--write-metadata"];
           };
 
+          argsBeforeMtime = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = ''
+              Extra CLI args passed before `--mtime <...>` (when enabled).
+              Useful for per-instance ordering requirements.
+            '';
+            example = ["--cookies" "/data/archive/twitter/cookies.txt"];
+          };
+
           configFile = mkOption {
             type = types.nullOr (types.oneOf [types.path types.str]);
             default = null;
@@ -392,12 +402,15 @@ in {
           ++ (optional (archiveFile != null) archiveFile)
           ++ (optional (inst.urlFile != null) "--input-file")
           ++ (optional (inst.urlFile != null) inst.urlFile)
+          ++ inst.argsBeforeMtime
           ++ mtimeArgs
           ++ inst.args
           ++ (optionals (inst.urlFile == null) inst.urls);
       in
         nameValuePair "gallery-dl-job-${name}" {
           description = "gallery-dl instance job: ${name}";
+          # X/Twitter DM extraction may require `node` for passcode recovery.
+          path = [pkgs.nodejs];
 
           # If a job is running during a switch, don't restart it (avoids blocking rebuilds).
           restartIfChanged = false;
