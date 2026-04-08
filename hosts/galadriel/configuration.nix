@@ -271,6 +271,36 @@ in {
       args = ["--cookies=/data/archive/twitter/cookies.txt" "--write-metadata"];
     };
 
+    instances.twitterDm = {
+      enable = true;
+      onCalendar = "hourly";
+
+      workingDir = "/data/archive/twitter";
+      useDownloadArchiveFile = false;
+      config = {
+        extractor = {
+          "base-directory" = "/data/archive";
+          archive = "@ARCHIVE_URL@";
+          twitter.messages.pin = "@TWITTER_DM_PIN@";
+        };
+      };
+      configSubstitutions = {
+        "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
+        "@TWITTER_DM_PIN@" = config.sops.secrets."gallery-dl/twitter/messages-pin".path;
+      };
+
+      urls = ["https://x.com/message"];
+
+      args = [
+        "--cookies=/data/archive/twitter/cookies.txt"
+        "--write-metadata"
+        "-O"
+        "event=post,file"
+        "-O"
+        "mtime=true"
+      ];
+    };
+
     twitterFollowingList = {
       urlFile = "/data/archive/twitter/urls.txt";
       cookiesPath = "/data/archive/twitter/cookies.txt";
@@ -888,6 +918,11 @@ in {
         mode = "0400";
       };
       "gallery-dl/telegram/session-string" = {
+        owner = config.fleet.apps.galleryDl.user;
+        group = config.fleet.apps.galleryDl.group;
+        mode = "0400";
+      };
+      "gallery-dl/twitter/messages-pin" = {
         owner = config.fleet.apps.galleryDl.user;
         group = config.fleet.apps.galleryDl.group;
         mode = "0400";
