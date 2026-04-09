@@ -615,13 +615,15 @@ in {
                 echo "$line/media"
               elif [[ "$line" =~ ^https?://(twitter\.com|x\.com)/[A-Za-z0-9_]+$ ]]; then
                 userpart="''${line##*/}"
-                if [[ ! "$userpart" =~ ^(home|explore|notifications|messages|search|settings|compose|login|signup|hashtag|share|intent|i)$ ]]; then
+                if [[ ! "$userpart" =~ ^(home|explore|notifications|message|messages|search|settings|compose|login|signup|hashtag|share|intent|i)$ ]]; then
                   echo "https://x.com/$userpart/media"
                 fi
               elif [[ "$line" =~ ^https?://(twitter\.com|x\.com)/[A-Za-z0-9_]+/media$ ]]; then
                 base="''${line%/media}"
                 userpart="''${base##*/}"
-                echo "https://x.com/$userpart/media"
+                if [[ ! "$userpart" =~ ^(home|explore|notifications|message|messages|search|settings|compose|login|signup|hashtag|share|intent|i)$ ]]; then
+                  echo "https://x.com/$userpart/media"
+                fi
               fi
             done < "$raw" | sort -u > "$newlist"
             # Only update urlFile if the list changed
