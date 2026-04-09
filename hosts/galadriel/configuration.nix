@@ -283,10 +283,12 @@ in {
         extractor = {
           "base-directory" = "/data/archive";
           archive = "@ARCHIVE_URL@";
+          twitter.messages.pin = "@TWITTER_DM_PIN@";
         };
       };
       configSubstitutions = {
         "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
+        "@TWITTER_DM_PIN@" = config.sops.secrets."gallery-dl/twitter-messages-pin".path;
       };
 
       urls = ["https://x.com/messages"];
