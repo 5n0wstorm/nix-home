@@ -306,8 +306,6 @@ in {
         "mtime=true"
         "-o"
         "extractor.twitter.messages.directory=[\"{category}\",\"{user[name]}\",\"DMs\"]"
-        "-o"
-        "skip=false"
       ];
     };
 
