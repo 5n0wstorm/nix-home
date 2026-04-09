@@ -341,9 +341,19 @@ in {
 
   # Keep Twitter archive tree SMB-readable after each run (DM downloads can
   # create nested files with restrictive permissions depending on process umask).
+  # With 0755, only the owner can write, so ensure twitter tree ownership is
+  # normalized to the gallery-dl service user before each run.
+  systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPre = [
+    "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} /data/archive/twitter"
+    "+${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
+  ];
   systemd.services.gallery-dl-job-twitter.serviceConfig.UMask = "0022";
   systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPost = [
     "${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
+  ];
+  systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPre = [
+    "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} /data/archive/twitter"
+    "+${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
   ];
   systemd.services.gallery-dl-job-twitterDm.serviceConfig.UMask = "0022";
   systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPost = [
