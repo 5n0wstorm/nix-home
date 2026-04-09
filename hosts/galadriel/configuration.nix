@@ -318,12 +318,11 @@ in {
   };
 
   # --------------------------------------------------------------------------
-  # /data/archive permissions (requested)ist
-  # WARNING: this makes everything under /data/archive world-readable + writable.
+  # /data/archive permissions baseline.
   # --------------------------------------------------------------------------
 
   systemd.services.data-archive-permissions = {
-    description = "Force /data/archive permissions to 0777 recursively (requested)";
+    description = "Force /data/archive permissions to 0755 recursively";
     wantedBy = ["multi-user.target"];
     after = ["local-fs.target"];
     restartIfChanged = false;
@@ -336,17 +335,19 @@ in {
 
     script = ''
       set -euo pipefail
-      chmod -R 0777 /data/archive
+      chmod -R 0755 /data/archive
     '';
   };
 
-  # Keep Twitter archive tree SMB-readable/writable after each run (DM downloads can
-  # create nested folders with restrictive permissions).
+  # Keep Twitter archive tree SMB-readable after each run (DM downloads can
+  # create nested files with restrictive permissions depending on process umask).
+  systemd.services.gallery-dl-job-twitter.serviceConfig.UMask = "0022";
   systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPost = [
-    "${pkgs.coreutils}/bin/chmod -R 0777 /data/archive/twitter"
+    "${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
   ];
+  systemd.services.gallery-dl-job-twitterDm.serviceConfig.UMask = "0022";
   systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPost = [
-    "${pkgs.coreutils}/bin/chmod -R 0777 /data/archive/twitter"
+    "${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
   ];
 
   # Ensure /data/archive paths exist for gallery-dl
