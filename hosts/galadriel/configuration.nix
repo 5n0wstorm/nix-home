@@ -1209,7 +1209,10 @@ in {
   # ============================================================================
 
   # Required for mounting CIFS/SMB shares
-  environment.systemPackages = [pkgs.cifs-utils];
+  environment.systemPackages = [
+    pkgs.cifs-utils
+    pkgs.ripgrep
+  ];
 
   fileSystems."/mnt/nas" = {
     device = "//192.168.2.2/dataPool0";
