@@ -86,6 +86,16 @@ in {
             '';
           };
 
+          renderedConfigFileName = mkOption {
+            type = types.str;
+            default = "config.json";
+            description = ''
+              Filename for the rendered config when `config` is set. The file is written
+              under `workingDir` and passed via `--config`.
+            '';
+            example = "config-replies.json";
+          };
+
           configSubstitutions = mkOption {
             type = types.attrsOf (types.oneOf [types.path types.str]);
             default = {};
@@ -377,7 +387,7 @@ in {
           else "${galleryDlBaseDir}/${name}";
         # User requested persistent config on disk:
         # /data/archive/<instance>/config.json
-        renderedConfigFile = "${instanceDir}/config.json";
+        renderedConfigFile = "${instanceDir}/${inst.renderedConfigFileName}";
         effectiveConfigFile =
           if inst.config != null
           then renderedConfigFile

@@ -148,12 +148,12 @@ in {
             download = [
               "messages"
               "stories"
+              "media"
               "text"
               "posts"
               "profile_pictures"
             ];
             "avatar-size" = [64 64];
-            "media-mime-types" = [];
             "batch-size" = 2000;
             "order-messages" = "desc";
             limit = null;
@@ -188,6 +188,7 @@ in {
       onCalendar = "minutely";
 
       workingDir = "/data/archive/telegram";
+      renderedConfigFileName = "config-replies.json";
       useDownloadArchiveFile = false;
       config = {
         extractor = {
@@ -200,10 +201,10 @@ in {
             "session-string" = "@TG_SESSION_STRING@";
             download = [
               "replies"
+              "media"
               "text"
             ];
             "avatar-size" = [64 64];
-            "media-mime-types" = [];
             "batch-size" = 2000;
             "order-messages" = "desc";
             limit = null;
