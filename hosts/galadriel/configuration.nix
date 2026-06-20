@@ -20,6 +20,7 @@ in {
     ../../modules/networking/reverse-proxy.nix
     ../../modules/networking/vpn-gateway.nix
     ../../modules/networking/samba.nix
+    ../../modules/networking/tailscale.nix
     # Monitoring
     ../../modules/monitoring/prometheus.nix
     ../../modules/monitoring/grafana.nix
@@ -969,6 +970,13 @@ in {
         mode = "0400";
       };
 
+      # Tailscale/headscale pre-auth key for joining the mesh (used by tailscaled)
+      "tailscale/galadriel/auth-key" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+
       "ssh_key" = {
         path = "/home/dominik/.ssh/id_ed25519";
         owner = "dominik";
@@ -1220,6 +1228,22 @@ in {
   };
 
   networking.firewall.allowedTCPPorts = [];
+
+  # ============================================================================
+  # TAILSCALE / HEADSCALE MESH
+  # ============================================================================
+  #
+  # galadriel is 100.64.0.2 on the headscale tailnet. Proxmox's SNI passthrough
+  # forwards *.sn0wstorm.com (default) to 100.64.0.2:443, so without this the
+  # entire wildcard is unreachable from the internet. acceptDns is disabled so
+  # MagicDNS does not override the static 8.8.8.8/1.1.1.1 resolver and the
+  # public *.sn0wstorm.com -> Proxmox resolution this host relies on.
+  fleet.networking.tailscale = {
+    enable = true;
+    hostname = "galadriel";
+    authKeyFile = config.sops.secrets."tailscale/galadriel/auth-key".path;
+    acceptDns = false;
+  };
 
   # ============================================================================
   # SMB/CIFS MOUNTS
