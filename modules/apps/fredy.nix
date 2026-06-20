@@ -89,14 +89,15 @@ in {
   # MODULE IMPLEMENTATION
   # ============================================================================
 
-  config = mkIf cfg.enable let
-    confDir = "${cfg.dataDir}/conf";
-    dbDir = "${cfg.dataDir}/db";
-    hostPort =
-      if cfg.openFirewall
-      then toString cfg.port
-      else "${cfg.listenAddress}:${toString cfg.port}";
-  in {
+  config = mkIf cfg.enable (
+    let
+      confDir = "${cfg.dataDir}/conf";
+      dbDir = "${cfg.dataDir}/db";
+      hostPort =
+        if cfg.openFirewall
+        then toString cfg.port
+        else "${cfg.listenAddress}:${toString cfg.port}";
+    in {
     # --------------------------------------------------------------------------
     # HOMEPAGE DASHBOARD REGISTRATION
     # --------------------------------------------------------------------------
@@ -158,6 +159,7 @@ in {
       };
 
       script = ''
+        mkdir -p ${confDir} ${dbDir}
         if [ ! -f ${confDir}/config.json ]; then
           printf '%s\n' '{"sqlitepath":"/db"}' > ${confDir}/config.json
           chmod 0644 ${confDir}/config.json
@@ -188,5 +190,5 @@ in {
     # --------------------------------------------------------------------------
 
     networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [cfg.port];
-  };
+  });
 }

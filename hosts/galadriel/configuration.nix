@@ -527,7 +527,7 @@ in {
     path = "/data";
     usernameFile = config.sops.secrets."samba/data/username".path;
     passwordFile = config.sops.secrets."samba/data/password".path;
-    allowedNetworks = ["192.168.2.0/24" "127.0.0.1"];
+    allowedNetworks = ["192.168.178.0/24" "100.64.0.0/10" "127.0.0.1"];
     openFirewall = true;
     wsdd.enable = true;
   };
@@ -669,7 +669,7 @@ in {
     };
 
     # Allow LAN clients; all TCP auth will be forced to TLS via hostssl/hostnossl.
-    allowedCIDRs = ["192.168.2.0/24"];
+    allowedCIDRs = ["192.168.178.0/24"];
 
     ssl = {
       enable = true;
@@ -1206,7 +1206,7 @@ in {
         }
       ];
     };
-    defaultGateway = "192.168.2.1";
+    defaultGateway = "192.168.178.1";
     nameservers = ["8.8.8.8" "1.1.1.1"];
   };
 

@@ -164,6 +164,16 @@ with lib;
             exit 1
         fi
 
+        # Age key is required before rebuild (sops-nix secrets)
+        if [ ! -f "/home/dominik/.config/sops/age/keys.txt" ]; then
+            echo "Age key not found at /home/dominik/.config/sops/age/keys.txt"
+            echo "This is required for decrypting secrets with sops-nix."
+            echo ""
+            echo "Run: setup-age-key"
+            echo "Or copy your age key to ~/.config/sops/age/keys.txt"
+            exit 1
+        fi
+
         # State file to track last deployed commit per host
         STATE_DIR="/var/lib/nixos-rebuild"
         STATE_FILE="$STATE_DIR/$HOSTNAME-last-deployed"
@@ -208,9 +218,7 @@ with lib;
             echo "Force rebuilding - skipping change analysis"
         else
             echo "Analysing changes..."
-            # Show uncommitted changes
             git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null || true
-            # Show changes since last deploy
             if [ -f "$STATE_FILE" ]; then
                 LAST_DEPLOYED=$(cat "$STATE_FILE")
                 if [ "$CURRENT_COMMIT" != "$LAST_DEPLOYED" ]; then
@@ -221,63 +229,49 @@ with lib;
         fi
 
         echo "Rebuilding NixOS..."
-        # Autoformat nix files
         ${pkgs.alejandra}/bin/alejandra --quiet hosts/ modules/ flake.nix hosts.nix 2>/dev/null || true
 
-        # Rebuild system using nh (enhanced nix helper with diff and tree view)
         nh os switch . -H "$HOSTNAME"
 
         echo "NixOS Rebuild Completed!"
 
-        # Record the deployed commit for future change detection
         sudo mkdir -p "$STATE_DIR"
         echo "$CURRENT_COMMIT" | sudo tee "$STATE_FILE" > /dev/null
         echo "Recorded deploy commit: ''${CURRENT_COMMIT:0:8}"
 
-        # Get current generation info
         current=$(nixos-rebuild list-generations --json | ${pkgs.jq}/bin/jq -r '.[] | select(.current == true) | .generation')
 
-        # Commit changes
         git add hosts/ modules/ flake.nix flake.lock hosts.nix
-        git commit -m "rebuild($HOSTNAME): generation $current"
+        if ! git diff --cached --quiet; then
+            git commit -m "rebuild($HOSTNAME): generation $current"
+            echo "Changes committed successfully!"
+        else
+            echo "No formatting changes to commit."
+        fi
 
-        echo "Changes committed successfully!"
+        # SSH setup for git push
+        if [ -z "''${SSH_AUTH_SOCK:-}" ] || [ ! -S "''${SSH_AUTH_SOCK}" ]; then
+            if [ -n "''${XDG_RUNTIME_DIR:-}" ] && [ -S "''${XDG_RUNTIME_DIR}/ssh-agent" ]; then
+                export SSH_AUTH_SOCK="''${XDG_RUNTIME_DIR}/ssh-agent"
+            else
+                eval "$(ssh-agent -s)" > /dev/null
+            fi
+        fi
 
-      # Check if age key exists for sops-nix
-      if [ ! -f "/home/dominik/.config/sops/age/keys.txt" ]; then
-          echo "⚠️  Age key not found at /home/dominik/.config/sops/age/keys.txt"
-          echo "This is required for decrypting secrets with sops-nix."
-          echo ""
-          echo "Run this command first to set up your age key:"
-          echo "  setup-age-key"
-          echo ""
-          echo "Or manually copy your age key to:"
-          echo "  ~/.config/sops/age/keys.txt"
-          echo ""
-          echo "Then run rebuild again."
-          exit 1
-      fi
+        if ! ssh-add -l 2>/dev/null | grep -q "id_ed25519"; then
+            ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
+        fi
 
-      # Set up SSH for git operations
-      export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent"
-      if [ -z "$SSH_AUTH_SOCK" ] || [ ! -S "$SSH_AUTH_SOCK" ]; then
-          # Start SSH agent if not running
-          eval "$(ssh-agent -s)" > /dev/null
-          export SSH_AUTH_SOCK="$SSH_AGENT_PID"
-      fi
+        echo "Syncing with remote before push..."
+        git pull --rebase origin main
 
-      # Add SSH key to agent if not already added
-      if ! ssh-add -l | grep -q "id_ed25519"; then
-          ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
-      fi
-
-        # Push to remote repository
         echo "Pushing changes to remote repository..."
-        if git push origin main 2>/dev/null; then
+        if git push origin main; then
             echo "Changes pushed successfully!"
         else
-            echo "Warning: Failed to push changes. SSH key may not be properly configured."
+            echo "Error: Failed to push changes to origin/main."
             echo "Try: ssh-add /home/dominik/.ssh/id_ed25519 && git push origin main"
+            exit 1
         fi
     '';
   in {
