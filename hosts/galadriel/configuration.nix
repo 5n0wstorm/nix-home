@@ -1198,24 +1198,25 @@ in {
 
   # ============================================================================
 
-  # Network interface
-  # Galadriel uses declarative static IP on eno1. Mark it unmanaged by
-  # NetworkManager (enabled in common.nix) so network-addresses-eno1 owns it
-  # without NM fighting during nixos-rebuild switch.
+  # Network: static IP via NetworkManager only (no network-addresses-eno1).
+  # The legacy networking.interfaces path restarts network-addresses-eno1 on
+  # every switch and drops SSH/default route mid-activation.
   networking = {
-    networkmanager.unmanaged = ["interface-name:eno1"];
-    useDHCP = false;
-    interfaces.eno1 = {
-      useDHCP = false;
-      ipv4.addresses = [
-        {
-          address = hosts.galadriel.ip;
-          prefixLength = 24;
-        }
-      ];
+    useDHCP = lib.mkForce false;
+    networkmanager.ensureProfiles.profiles.galadriel-eno1 = {
+      connection = {
+        id = "galadriel-eno1";
+        type = "ethernet";
+        autoconnect = true;
+        interface-name = "eno1";
+      };
+      ethernet = {};
+      ipv4 = {
+        method = "manual";
+        address1 = "${hosts.galadriel.ip}/24,192.168.178.1";
+        dns = "8.8.8.8;1.1.1.1;";
+      };
     };
-    defaultGateway = "192.168.178.1";
-    nameservers = ["8.8.8.8" "1.1.1.1"];
   };
 
   networking.firewall.allowedTCPPorts = [];
