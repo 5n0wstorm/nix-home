@@ -15,7 +15,7 @@ with lib;
 #
 # OPTIONS:
 #   --force, -f      Force rebuild even without changes
-#   --attached, -a   Run in foreground (default: detached via systemd)
+#   --attached, -a   Run in foreground (default: detached GNU screen session)
 #   --hostname, -h   Specify hostname (default: current hostname)
 #   --help           Show help message
 #
@@ -130,7 +130,7 @@ with lib;
                     echo "Usage: rebuild-system [hostname] [options]"
                     echo "Options:"
                     echo "  --force, -f        Force rebuild even without changes"
-                    echo "  --attached, -a     Run in foreground (default: detached systemd unit)"
+                    echo "  --attached, -a     Run in foreground (default: detached screen session)"
                     echo "  --hostname, -h     Specify hostname (default: current hostname)"
                     echo "  --help             Show this help message"
                     exit 0
@@ -235,14 +235,18 @@ with lib;
             fi
         fi
 
-        # Detached rebuild survives SSH loss while network units restart.
-        if [ -z "''${NIXOS_REBUILD_CHILD:-}" ] && [ "$ATTACHED" = false ]; then
-            UNIT="nixos-rebuild-''${HOSTNAME}"
+        # Detached screen session survives SSH loss while network units restart.
+        if [ -z "''${STY:-}" ] && [ "$ATTACHED" = false ]; then
+            SCREEN_NAME="nixos-rebuild-''${HOSTNAME}"
             LOG_FILE="''${STATE_DIR}/last-rebuild.log"
-            if systemctl is-active "''${UNIT}.service" &>/dev/null; then
-                echo "Rebuild already running on $HOSTNAME."
-                echo "  journalctl -fu ''${UNIT}"
-                echo "  sudo tail -f ''${LOG_FILE}"
+            if screen -list 2>/dev/null | grep -q "[.]''${SCREEN_NAME}[[:space:]]"; then
+                echo "Rebuild screen session already running on $HOSTNAME."
+                echo "  screen -r ''${SCREEN_NAME}"
+                echo "  tail -f ''${LOG_FILE}"
+                exit 1
+            fi
+            if ! command -v screen >/dev/null 2>&1; then
+                echo "Error: screen is not installed (required for detached rebuild)."
                 exit 1
             fi
             sudo mkdir -p "$STATE_DIR"
@@ -250,19 +254,20 @@ with lib;
             if [ "$FORCE_REBUILD" = true ]; then
                 FORCE_FLAG="--force"
             fi
-            echo "Starting detached rebuild (continues if SSH drops during activation)..."
-            sudo systemd-run \
-                --unit="$UNIT" \
-                --collect \
-                --working-directory="$REPO_ROOT" \
-                --property=User="$(id -un)" \
-                --property=Group="$(id -gn)" \
-                --setenv=HOME="$HOME" \
-                --setenv=NIXOS_REBUILD_CHILD=1 \
-                bash -c "cd '$REPO_ROOT' && exec \"$(command -v rebuild-system)\" --attached $FORCE_FLAG $HOSTNAME >> '$LOG_FILE' 2>&1"
+            echo "Starting rebuild in detached screen session (continues if SSH drops)..."
+            screen -dmS "$SCREEN_NAME" bash -lc "
+                cd '$REPO_ROOT'
+                set +e
+                rebuild-system --attached $FORCE_FLAG $HOSTNAME 2>&1 | tee -a '$LOG_FILE'
+                status=\$?
+                echo
+                echo \"Rebuild finished with exit code \$status\"
+                echo \"Detach with Ctrl-a d; session stays until you exit screen.\"
+                exec bash
+            "
             echo "Detached rebuild started."
-            echo "  journalctl -fu ''${UNIT}"
-            echo "  sudo tail -f ''${LOG_FILE}"
+            echo "  screen -r ''${SCREEN_NAME}"
+            echo "  tail -f ''${LOG_FILE}"
             exit 0
         fi
 
@@ -287,7 +292,7 @@ with lib;
             echo "No formatting changes to commit."
         fi
 
-        # SSH for git push (works in detached systemd-run without agent)
+        # SSH for git push (works without agent in detached screen)
         export GIT_SSH_COMMAND="ssh -i /home/dominik/.ssh/id_ed25519 -o IdentitiesOnly=yes"
 
         if [ -z "''${SSH_AUTH_SOCK:-}" ] || [ ! -S "''${SSH_AUTH_SOCK}" ]; then
@@ -347,6 +352,7 @@ with lib;
       environment.systemPackages = [
         cfg.package
         ageKeySetupScript
+        pkgs.screen
         pkgs.alejandra # Nix formatter
         pkgs.jq # JSON processor for generation info
         pkgs.sops # Secrets encryption/decryption
