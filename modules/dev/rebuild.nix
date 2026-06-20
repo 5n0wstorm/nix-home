@@ -107,6 +107,11 @@ with lib;
         # Usage: rebuild-system [hostname] [--force|-f] [--hostname|-h <host>]
         set -e
 
+        # Ensure the setuid sudo wrapper is found first. Without this, nh/sudo
+        # can resolve to /run/current-system/sw/bin/sudo (no setuid bit) and
+        # activation fails with "sudo must be owned by uid 0 ...".
+        export PATH="/run/wrappers/bin:$PATH"
+
         # Parse command line arguments
         FORCE_REBUILD=false
         ATTACHED=false
