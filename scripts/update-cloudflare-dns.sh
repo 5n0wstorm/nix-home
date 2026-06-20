@@ -9,12 +9,31 @@ IP="178.254.38.246"
 
 upsert_a() {
   local name="$1"
-  local rid
-  rid=$(curl -sG "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
-    --data-urlencode "type=A" \
+
+  # Fetch ALL records for this name (any type), so we can clear conflicts.
+  local resp
+  resp=$(curl -sG "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
     --data-urlencode "name=${name}" \
-    -H "Authorization: Bearer ${TOKEN}" \
-    | python3 -c 'import sys,json; d=json.load(sys.stdin)["result"]; print(d[0]["id"] if d else "")')
+    -H "Authorization: Bearer ${TOKEN}")
+
+  # A name cannot hold both a CNAME and an A record. Delete any non-A records
+  # (e.g. a stale wildcard CNAME) that would block the A record below.
+  local del_ids
+  del_ids=$(echo "$resp" | python3 -c 'import sys,json
+d=json.load(sys.stdin)["result"]
+print("\n".join(r["id"] for r in d if r["type"]!="A"))')
+  local del_id
+  for del_id in $del_ids; do
+    curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${del_id}" \
+      -H "Authorization: Bearer ${TOKEN}" >/dev/null
+    echo "${name} deleted conflicting non-A record ${del_id}"
+  done
+
+  local rid
+  rid=$(echo "$resp" | python3 -c 'import sys,json
+d=json.load(sys.stdin)["result"]
+a=[r for r in d if r["type"]=="A"]
+print(a[0]["id"] if a else "")')
 
   local payload
   payload=$(python3 -c "import json; print(json.dumps({'type':'A','name':'${name}','content':'${IP}','ttl':120,'proxied':False}))")
