@@ -262,15 +262,21 @@ with lib;
             ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
         fi
 
+        push_remote="origin"
+        push_url="$(git remote get-url "$push_remote" 2>/dev/null || true)"
+        if [[ "$push_url" == https://github.com/* ]]; then
+            push_remote="git@github.com:''${push_url#https://github.com/}"
+        fi
+
         echo "Syncing with remote before push..."
-        git pull --rebase origin main
+        git pull --rebase "$push_remote" main
 
         echo "Pushing changes to remote repository..."
-        if git push origin main; then
+        if git push "$push_remote" main; then
             echo "Changes pushed successfully!"
         else
-            echo "Error: Failed to push changes to origin/main."
-            echo "Try: ssh-add /home/dominik/.ssh/id_ed25519 && git push origin main"
+            echo "Error: Failed to push changes to main."
+            echo "Try: ssh-add /home/dominik/.ssh/id_ed25519 && git push git@github.com:5n0wstorm/nix-home.git main"
             exit 1
         fi
     '';
