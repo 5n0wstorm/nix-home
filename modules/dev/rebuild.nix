@@ -15,6 +15,7 @@ with lib;
 #
 # OPTIONS:
 #   --force, -f      Force rebuild even without changes
+#   --attached, -a   Run in foreground (default: detached via systemd)
 #   --hostname, -h   Specify hostname (default: current hostname)
 #   --help           Show help message
 #
@@ -108,12 +109,17 @@ with lib;
 
         # Parse command line arguments
         FORCE_REBUILD=false
+        ATTACHED=false
         HOSTNAME=$(hostname)
 
         while [[ $# -gt 0 ]]; do
             case $1 in
                 --force|-f)
                     FORCE_REBUILD=true
+                    shift
+                    ;;
+                --attached|-a)
+                    ATTACHED=true
                     shift
                     ;;
                 --hostname|-h)
@@ -123,9 +129,10 @@ with lib;
                 --help)
                     echo "Usage: rebuild-system [hostname] [options]"
                     echo "Options:"
-                    echo "  --force, -f      Force rebuild even without changes"
-                    echo "  --hostname, -h   Specify hostname (default: current hostname)"
-                    echo "  --help           Show this help message"
+                    echo "  --force, -f        Force rebuild even without changes"
+                    echo "  --attached, -a     Run in foreground (default: detached systemd unit)"
+                    echo "  --hostname, -h     Specify hostname (default: current hostname)"
+                    echo "  --help             Show this help message"
                     exit 0
                     ;;
                 *)
@@ -228,6 +235,37 @@ with lib;
             fi
         fi
 
+        # Detached rebuild survives SSH loss while network units restart.
+        if [ -z "''${NIXOS_REBUILD_CHILD:-}" ] && [ "$ATTACHED" = false ]; then
+            UNIT="nixos-rebuild-''${HOSTNAME}"
+            LOG_FILE="''${STATE_DIR}/last-rebuild.log"
+            if systemctl is-active "''${UNIT}.service" &>/dev/null; then
+                echo "Rebuild already running on $HOSTNAME."
+                echo "  journalctl -fu ''${UNIT}"
+                echo "  sudo tail -f ''${LOG_FILE}"
+                exit 1
+            fi
+            sudo mkdir -p "$STATE_DIR"
+            FORCE_FLAG=""
+            if [ "$FORCE_REBUILD" = true ]; then
+                FORCE_FLAG="--force"
+            fi
+            echo "Starting detached rebuild (continues if SSH drops during activation)..."
+            sudo systemd-run \
+                --unit="$UNIT" \
+                --collect \
+                --working-directory="$REPO_ROOT" \
+                --property=User="$(id -un)" \
+                --property=Group="$(id -gn)" \
+                --setenv=HOME="$HOME" \
+                --setenv=NIXOS_REBUILD_CHILD=1 \
+                bash -c "cd '$REPO_ROOT' && exec \"$(command -v rebuild-system)\" --attached $FORCE_FLAG $HOSTNAME >> '$LOG_FILE' 2>&1"
+            echo "Detached rebuild started."
+            echo "  journalctl -fu ''${UNIT}"
+            echo "  sudo tail -f ''${LOG_FILE}"
+            exit 0
+        fi
+
         echo "Rebuilding NixOS..."
         ${pkgs.alejandra}/bin/alejandra --quiet hosts/ modules/ flake.nix hosts.nix 2>/dev/null || true
 
@@ -249,7 +287,9 @@ with lib;
             echo "No formatting changes to commit."
         fi
 
-        # SSH setup for git push
+        # SSH for git push (works in detached systemd-run without agent)
+        export GIT_SSH_COMMAND="ssh -i /home/dominik/.ssh/id_ed25519 -o IdentitiesOnly=yes"
+
         if [ -z "''${SSH_AUTH_SOCK:-}" ] || [ ! -S "''${SSH_AUTH_SOCK}" ]; then
             if [ -n "''${XDG_RUNTIME_DIR:-}" ] && [ -S "''${XDG_RUNTIME_DIR}/ssh-agent" ]; then
                 export SSH_AUTH_SOCK="''${XDG_RUNTIME_DIR}/ssh-agent"
