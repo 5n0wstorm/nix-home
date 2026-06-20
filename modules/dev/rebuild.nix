@@ -101,234 +101,234 @@ with lib;
     '';
 
     rebuildScript = pkgs.writeShellScriptBin "rebuild-system" ''
-        #!/usr/bin/env bash
+      #!/usr/bin/env bash
 
-        # A rebuild script that commits on a successful build
-        # Usage: rebuild-system [hostname] [--force|-f] [--hostname|-h <host>]
-        set -e
+      # A rebuild script that commits on a successful build
+      # Usage: rebuild-system [hostname] [--force|-f] [--hostname|-h <host>]
+      set -e
 
-        # Ensure the setuid sudo wrapper is found first. Without this, nh/sudo
-        # can resolve to /run/current-system/sw/bin/sudo (no setuid bit) and
-        # activation fails with "sudo must be owned by uid 0 ...".
-        export PATH="/run/wrappers/bin:$PATH"
+      # Ensure the setuid sudo wrapper is found first. Without this, nh/sudo
+      # can resolve to /run/current-system/sw/bin/sudo (no setuid bit) and
+      # activation fails with "sudo must be owned by uid 0 ...".
+      export PATH="/run/wrappers/bin:$PATH"
 
-        # Parse command line arguments
-        FORCE_REBUILD=false
-        ATTACHED=false
-        HOSTNAME=$(hostname)
+      # Parse command line arguments
+      FORCE_REBUILD=false
+      ATTACHED=false
+      HOSTNAME=$(hostname)
 
-        while [[ $# -gt 0 ]]; do
-            case $1 in
-                --force|-f)
-                    FORCE_REBUILD=true
-                    shift
-                    ;;
-                --attached|-a)
-                    ATTACHED=true
-                    shift
-                    ;;
-                --hostname|-h)
-                    HOSTNAME="$2"
-                    shift 2
-                    ;;
-                --help)
-                    echo "Usage: rebuild-system [hostname] [options]"
-                    echo "Options:"
-                    echo "  --force, -f        Force rebuild even without changes"
-                    echo "  --attached, -a     Run in foreground (default: detached screen session)"
-                    echo "  --hostname, -h     Specify hostname (default: current hostname)"
-                    echo "  --help             Show this help message"
-                    exit 0
-                    ;;
-                *)
-                    HOSTNAME="$1"
-                    shift
-                    ;;
-            esac
-        done
+      while [[ $# -gt 0 ]]; do
+          case $1 in
+              --force|-f)
+                  FORCE_REBUILD=true
+                  shift
+                  ;;
+              --attached|-a)
+                  ATTACHED=true
+                  shift
+                  ;;
+              --hostname|-h)
+                  HOSTNAME="$2"
+                  shift 2
+                  ;;
+              --help)
+                  echo "Usage: rebuild-system [hostname] [options]"
+                  echo "Options:"
+                  echo "  --force, -f        Force rebuild even without changes"
+                  echo "  --attached, -a     Run in foreground (default: detached screen session)"
+                  echo "  --hostname, -h     Specify hostname (default: current hostname)"
+                  echo "  --help             Show this help message"
+                  exit 0
+                  ;;
+              *)
+                  HOSTNAME="$1"
+                  shift
+                  ;;
+          esac
+      done
 
-        echo "Hostname: $HOSTNAME"
-        if [ "$FORCE_REBUILD" = true ]; then
-            echo "Force rebuild enabled - will rebuild even without changes"
-        fi
+      echo "Hostname: $HOSTNAME"
+      if [ "$FORCE_REBUILD" = true ]; then
+          echo "Force rebuild enabled - will rebuild even without changes"
+      fi
 
-        # Find the git repository root (where flake.nix is located)
-        REPO_ROOT="$(pwd)"
-        while [ "$REPO_ROOT" != "/" ] && [ ! -f "$REPO_ROOT/flake.nix" ]; do
-            REPO_ROOT="$(dirname "$REPO_ROOT")"
-        done
+      # Find the git repository root (where flake.nix is located)
+      REPO_ROOT="$(pwd)"
+      while [ "$REPO_ROOT" != "/" ] && [ ! -f "$REPO_ROOT/flake.nix" ]; do
+          REPO_ROOT="$(dirname "$REPO_ROOT")"
+      done
 
-        if [ ! -f "$REPO_ROOT/flake.nix" ]; then
-            echo "Error: Could not find flake.nix in current directory or parent directories"
-            echo "Current directory: $(pwd)"
-            echo "Make sure you're running this from your nix-home git repository or a subdirectory"
-            exit 1
-        fi
+      if [ ! -f "$REPO_ROOT/flake.nix" ]; then
+          echo "Error: Could not find flake.nix in current directory or parent directories"
+          echo "Current directory: $(pwd)"
+          echo "Make sure you're running this from your nix-home git repository or a subdirectory"
+          exit 1
+      fi
 
-        cd "$REPO_ROOT"
-        echo "Repository root: $(pwd)"
+      cd "$REPO_ROOT"
+      echo "Repository root: $(pwd)"
 
-        # Check if we're in a git repository
-        if ! git rev-parse --git-dir > /dev/null 2>&1; then
-            echo "Error: Not in a git repository"
-            echo "Current directory: $(pwd)"
-            echo "Make sure you're running this from your nix-home git repository"
-            exit 1
-        fi
+      # Check if we're in a git repository
+      if ! git rev-parse --git-dir > /dev/null 2>&1; then
+          echo "Error: Not in a git repository"
+          echo "Current directory: $(pwd)"
+          echo "Make sure you're running this from your nix-home git repository"
+          exit 1
+      fi
 
-        # Age key is required before rebuild (sops-nix secrets)
-        if [ ! -f "/home/dominik/.config/sops/age/keys.txt" ]; then
-            echo "Age key not found at /home/dominik/.config/sops/age/keys.txt"
-            echo "This is required for decrypting secrets with sops-nix."
-            echo ""
-            echo "Run: setup-age-key"
-            echo "Or copy your age key to ~/.config/sops/age/keys.txt"
-            exit 1
-        fi
+      # Age key is required before rebuild (sops-nix secrets)
+      if [ ! -f "/home/dominik/.config/sops/age/keys.txt" ]; then
+          echo "Age key not found at /home/dominik/.config/sops/age/keys.txt"
+          echo "This is required for decrypting secrets with sops-nix."
+          echo ""
+          echo "Run: setup-age-key"
+          echo "Or copy your age key to ~/.config/sops/age/keys.txt"
+          exit 1
+      fi
 
-        # State file to track last deployed commit per host
-        STATE_DIR="/var/lib/nixos-rebuild"
-        STATE_FILE="$STATE_DIR/$HOSTNAME-last-deployed"
-        CURRENT_COMMIT=$(git rev-parse HEAD)
+      # State file to track last deployed commit per host
+      STATE_DIR="/var/lib/nixos-rebuild"
+      STATE_FILE="$STATE_DIR/$HOSTNAME-last-deployed"
+      CURRENT_COMMIT=$(git rev-parse HEAD)
 
-        # Check for changes (unless force rebuild is enabled)
-        if [ "$FORCE_REBUILD" = false ]; then
-            NEEDS_REBUILD=false
+      # Check for changes (unless force rebuild is enabled)
+      if [ "$FORCE_REBUILD" = false ]; then
+          NEEDS_REBUILD=false
 
-            # Check 1: Uncommitted local changes in config files
-            if ! git diff --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null; then
-                echo "Uncommitted local changes detected."
-                NEEDS_REBUILD=true
-            fi
+          # Check 1: Uncommitted local changes in config files
+          if ! git diff --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null; then
+              echo "Uncommitted local changes detected."
+              NEEDS_REBUILD=true
+          fi
 
-            # Check 2: Staged but uncommitted changes
-            if ! git diff --cached --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null; then
-                echo "Staged changes detected."
-                NEEDS_REBUILD=true
-            fi
+          # Check 2: Staged but uncommitted changes
+          if ! git diff --cached --quiet --exit-code -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null; then
+              echo "Staged changes detected."
+              NEEDS_REBUILD=true
+          fi
 
-            # Check 3: Current commit differs from last deployed commit
-            if [ -f "$STATE_FILE" ]; then
-                LAST_DEPLOYED=$(cat "$STATE_FILE")
-                if [ "$CURRENT_COMMIT" != "$LAST_DEPLOYED" ]; then
-                    echo "New commits detected since last deploy (last: ''${LAST_DEPLOYED:0:8}, current: ''${CURRENT_COMMIT:0:8})."
-                    NEEDS_REBUILD=true
-                fi
-            else
-                echo "No previous deploy recorded for $HOSTNAME - first deploy or state was cleared."
-                NEEDS_REBUILD=true
-            fi
+          # Check 3: Current commit differs from last deployed commit
+          if [ -f "$STATE_FILE" ]; then
+              LAST_DEPLOYED=$(cat "$STATE_FILE")
+              if [ "$CURRENT_COMMIT" != "$LAST_DEPLOYED" ]; then
+                  echo "New commits detected since last deploy (last: ''${LAST_DEPLOYED:0:8}, current: ''${CURRENT_COMMIT:0:8})."
+                  NEEDS_REBUILD=true
+              fi
+          else
+              echo "No previous deploy recorded for $HOSTNAME - first deploy or state was cleared."
+              NEEDS_REBUILD=true
+          fi
 
-            if [ "$NEEDS_REBUILD" = false ]; then
-                echo "No changes detected in configuration files, exiting."
-                echo "Use --force or -f to rebuild anyway."
-                exit 0
-            fi
-        fi
+          if [ "$NEEDS_REBUILD" = false ]; then
+              echo "No changes detected in configuration files, exiting."
+              echo "Use --force or -f to rebuild anyway."
+              exit 0
+          fi
+      fi
 
-        if [ "$FORCE_REBUILD" = true ]; then
-            echo "Force rebuilding - skipping change analysis"
-        else
-            echo "Analysing changes..."
-            git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null || true
-            if [ -f "$STATE_FILE" ]; then
-                LAST_DEPLOYED=$(cat "$STATE_FILE")
-                if [ "$CURRENT_COMMIT" != "$LAST_DEPLOYED" ]; then
-                    echo "Commits since last deploy:"
-                    git log --oneline "$LAST_DEPLOYED".."$CURRENT_COMMIT" -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null || true
-                fi
-            fi
-        fi
+      if [ "$FORCE_REBUILD" = true ]; then
+          echo "Force rebuilding - skipping change analysis"
+      else
+          echo "Analysing changes..."
+          git diff --name-only -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null || true
+          if [ -f "$STATE_FILE" ]; then
+              LAST_DEPLOYED=$(cat "$STATE_FILE")
+              if [ "$CURRENT_COMMIT" != "$LAST_DEPLOYED" ]; then
+                  echo "Commits since last deploy:"
+                  git log --oneline "$LAST_DEPLOYED".."$CURRENT_COMMIT" -- "hosts/$HOSTNAME" "modules" "flake.nix" "flake.lock" "hosts.nix" 2>/dev/null || true
+              fi
+          fi
+      fi
 
-        # Detached screen session survives SSH loss while network units restart.
-        if [ -z "''${STY:-}" ] && [ "$ATTACHED" = false ]; then
-            SCREEN_NAME="nixos-rebuild-''${HOSTNAME}"
-            LOG_FILE="''${STATE_DIR}/last-rebuild.log"
-            if screen -list 2>/dev/null | grep -q "[.]''${SCREEN_NAME}[[:space:]]"; then
-                echo "Rebuild screen session already running on $HOSTNAME."
-                echo "  screen -r ''${SCREEN_NAME}"
-                echo "  tail -f ''${LOG_FILE}"
-                exit 1
-            fi
-            if ! command -v screen >/dev/null 2>&1; then
-                echo "Error: screen is not installed (required for detached rebuild)."
-                exit 1
-            fi
-            sudo mkdir -p "$STATE_DIR"
-            FORCE_FLAG=""
-            if [ "$FORCE_REBUILD" = true ]; then
-                FORCE_FLAG="--force"
-            fi
-            echo "Starting rebuild in detached screen session (continues if SSH drops)..."
-            screen -dmS "$SCREEN_NAME" bash -lc "
-                cd '$REPO_ROOT'
-                set +e
-                rebuild-system --attached $FORCE_FLAG $HOSTNAME 2>&1 | tee -a '$LOG_FILE'
-                status=\$?
-                echo
-                echo \"Rebuild finished with exit code \$status\"
-                echo \"Detach with Ctrl-a d; session stays until you exit screen.\"
-                exec bash
-            "
-            echo "Detached rebuild started."
-            echo "  screen -r ''${SCREEN_NAME}"
-            echo "  tail -f ''${LOG_FILE}"
-            exit 0
-        fi
+      # Detached screen session survives SSH loss while network units restart.
+      if [ -z "''${STY:-}" ] && [ "$ATTACHED" = false ]; then
+          SCREEN_NAME="nixos-rebuild-''${HOSTNAME}"
+          LOG_FILE="''${STATE_DIR}/last-rebuild.log"
+          if screen -list 2>/dev/null | grep -q "[.]''${SCREEN_NAME}[[:space:]]"; then
+              echo "Rebuild screen session already running on $HOSTNAME."
+              echo "  screen -r ''${SCREEN_NAME}"
+              echo "  tail -f ''${LOG_FILE}"
+              exit 1
+          fi
+          if ! command -v screen >/dev/null 2>&1; then
+              echo "Error: screen is not installed (required for detached rebuild)."
+              exit 1
+          fi
+          sudo mkdir -p "$STATE_DIR"
+          FORCE_FLAG=""
+          if [ "$FORCE_REBUILD" = true ]; then
+              FORCE_FLAG="--force"
+          fi
+          echo "Starting rebuild in detached screen session (continues if SSH drops)..."
+          screen -dmS "$SCREEN_NAME" bash -lc "
+              cd '$REPO_ROOT'
+              set +e
+              rebuild-system --attached $FORCE_FLAG $HOSTNAME 2>&1 | tee -a '$LOG_FILE'
+              status=\$?
+              echo
+              echo \"Rebuild finished with exit code \$status\"
+              echo \"Detach with Ctrl-a d; session stays until you exit screen.\"
+              exec bash
+          "
+          echo "Detached rebuild started."
+          echo "  screen -r ''${SCREEN_NAME}"
+          echo "  tail -f ''${LOG_FILE}"
+          exit 0
+      fi
 
-        echo "Rebuilding NixOS..."
-        ${pkgs.alejandra}/bin/alejandra --quiet hosts/ modules/ flake.nix hosts.nix 2>/dev/null || true
+      echo "Rebuilding NixOS..."
+      ${pkgs.alejandra}/bin/alejandra --quiet hosts/ modules/ flake.nix hosts.nix 2>/dev/null || true
 
-        nh os switch . -H "$HOSTNAME"
+      nh os switch . -H "$HOSTNAME"
 
-        echo "NixOS Rebuild Completed!"
+      echo "NixOS Rebuild Completed!"
 
-        sudo mkdir -p "$STATE_DIR"
-        echo "$CURRENT_COMMIT" | sudo tee "$STATE_FILE" > /dev/null
-        echo "Recorded deploy commit: ''${CURRENT_COMMIT:0:8}"
+      sudo mkdir -p "$STATE_DIR"
+      echo "$CURRENT_COMMIT" | sudo tee "$STATE_FILE" > /dev/null
+      echo "Recorded deploy commit: ''${CURRENT_COMMIT:0:8}"
 
-        current=$(nixos-rebuild list-generations --json | ${pkgs.jq}/bin/jq -r '.[] | select(.current == true) | .generation')
+      current=$(nixos-rebuild list-generations --json | ${pkgs.jq}/bin/jq -r '.[] | select(.current == true) | .generation')
 
-        git add hosts/ modules/ flake.nix flake.lock hosts.nix
-        if ! git diff --cached --quiet; then
-            git commit -m "rebuild($HOSTNAME): generation $current"
-            echo "Changes committed successfully!"
-        else
-            echo "No formatting changes to commit."
-        fi
+      git add hosts/ modules/ flake.nix flake.lock hosts.nix
+      if ! git diff --cached --quiet; then
+          git commit -m "rebuild($HOSTNAME): generation $current"
+          echo "Changes committed successfully!"
+      else
+          echo "No formatting changes to commit."
+      fi
 
-        # SSH for git push (works without agent in detached screen)
-        export GIT_SSH_COMMAND="ssh -i /home/dominik/.ssh/id_ed25519 -o IdentitiesOnly=yes"
+      # SSH for git push (works without agent in detached screen)
+      export GIT_SSH_COMMAND="ssh -i /home/dominik/.ssh/id_ed25519 -o IdentitiesOnly=yes"
 
-        if [ -z "''${SSH_AUTH_SOCK:-}" ] || [ ! -S "''${SSH_AUTH_SOCK}" ]; then
-            if [ -n "''${XDG_RUNTIME_DIR:-}" ] && [ -S "''${XDG_RUNTIME_DIR}/ssh-agent" ]; then
-                export SSH_AUTH_SOCK="''${XDG_RUNTIME_DIR}/ssh-agent"
-            else
-                eval "$(ssh-agent -s)" > /dev/null
-            fi
-        fi
+      if [ -z "''${SSH_AUTH_SOCK:-}" ] || [ ! -S "''${SSH_AUTH_SOCK}" ]; then
+          if [ -n "''${XDG_RUNTIME_DIR:-}" ] && [ -S "''${XDG_RUNTIME_DIR}/ssh-agent" ]; then
+              export SSH_AUTH_SOCK="''${XDG_RUNTIME_DIR}/ssh-agent"
+          else
+              eval "$(ssh-agent -s)" > /dev/null
+          fi
+      fi
 
-        if ! ssh-add -l 2>/dev/null | grep -q "id_ed25519"; then
-            ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
-        fi
+      if ! ssh-add -l 2>/dev/null | grep -q "id_ed25519"; then
+          ssh-add /home/dominik/.ssh/id_ed25519 2>/dev/null || true
+      fi
 
-        push_remote="origin"
-        push_url="$(git remote get-url "$push_remote" 2>/dev/null || true)"
-        if [[ "$push_url" == https://github.com/* ]]; then
-            push_remote="git@github.com:''${push_url#https://github.com/}"
-        fi
+      push_remote="origin"
+      push_url="$(git remote get-url "$push_remote" 2>/dev/null || true)"
+      if [[ "$push_url" == https://github.com/* ]]; then
+          push_remote="git@github.com:''${push_url#https://github.com/}"
+      fi
 
-        echo "Syncing with remote before push..."
-        git pull --rebase "$push_remote" main
+      echo "Syncing with remote before push..."
+      git pull --rebase "$push_remote" main
 
-        echo "Pushing changes to remote repository..."
-        if git push "$push_remote" main; then
-            echo "Changes pushed successfully!"
-        else
-            echo "Error: Failed to push changes to main."
-            echo "Try: ssh-add /home/dominik/.ssh/id_ed25519 && git push git@github.com:5n0wstorm/nix-home.git main"
-            exit 1
-        fi
+      echo "Pushing changes to remote repository..."
+      if git push "$push_remote" main; then
+          echo "Changes pushed successfully!"
+      else
+          echo "Error: Failed to push changes to main."
+          echo "Try: ssh-add /home/dominik/.ssh/id_ed25519 && git push git@github.com:5n0wstorm/nix-home.git main"
+          exit 1
+      fi
     '';
   in {
     # ============================================================================

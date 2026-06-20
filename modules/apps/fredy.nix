@@ -98,97 +98,98 @@ in {
         then toString cfg.port
         else "${cfg.listenAddress}:${toString cfg.port}";
     in {
-    # --------------------------------------------------------------------------
-    # HOMEPAGE DASHBOARD REGISTRATION
-    # --------------------------------------------------------------------------
+      # --------------------------------------------------------------------------
+      # HOMEPAGE DASHBOARD REGISTRATION
+      # --------------------------------------------------------------------------
 
-    fleet.apps.homepage.serviceRegistry.fredy = mkIf (cfg.homepage.enable && homepageCfg.enable) {
-      name = cfg.homepage.name;
-      description = cfg.homepage.description;
-      icon = cfg.homepage.icon;
-      href = "https://${cfg.domain}";
-      category = cfg.homepage.category;
-    };
-
-    # --------------------------------------------------------------------------
-    # REVERSE PROXY REGISTRATION
-    # --------------------------------------------------------------------------
-
-    fleet.networking.reverseProxy.serviceRegistry.fredy = {
-      port = cfg.port;
-      labels = {
-        "fleet.reverse-proxy.enable" = "true";
-        "fleet.reverse-proxy.domain" = cfg.domain;
-        "fleet.reverse-proxy.ssl" = "true";
-        "fleet.reverse-proxy.websockets" = "true";
-        "fleet.authelia.bypass" = "true";
-      };
-    };
-
-    # --------------------------------------------------------------------------
-    # PODMAN / OCI CONTAINERS
-    # --------------------------------------------------------------------------
-
-    virtualisation = {
-      containers.enable = true;
-      podman = {
-        enable = true;
-        dockerCompat = true;
-        defaultNetwork.settings.dns_enabled = true;
-      };
-    };
-    virtualisation.oci-containers.backend = "podman";
-
-    systemd.tmpfiles.rules = [
-      "d ${cfg.dataDir} 0755 root root -"
-      "d ${confDir} 0755 root root -"
-      "d ${dbDir} 0755 root root -"
-    ];
-
-    systemd.services.fredy-config = {
-      description = "Bootstrap Fredy config.json if missing";
-      before = ["podman-fredy.service"];
-      requiredBy = ["podman-fredy.service"];
-      wantedBy = ["multi-user.target"];
-
-      path = [pkgs.coreutils];
-
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
+      fleet.apps.homepage.serviceRegistry.fredy = mkIf (cfg.homepage.enable && homepageCfg.enable) {
+        name = cfg.homepage.name;
+        description = cfg.homepage.description;
+        icon = cfg.homepage.icon;
+        href = "https://${cfg.domain}";
+        category = cfg.homepage.category;
       };
 
-      script = ''
-        mkdir -p ${confDir} ${dbDir}
-        if [ ! -f ${confDir}/config.json ]; then
-          printf '%s\n' '{"sqlitepath":"/db"}' > ${confDir}/config.json
-          chmod 0644 ${confDir}/config.json
-        fi
-      '';
-    };
+      # --------------------------------------------------------------------------
+      # REVERSE PROXY REGISTRATION
+      # --------------------------------------------------------------------------
 
-    virtualisation.oci-containers.containers.fredy = {
-      image = cfg.image;
+      fleet.networking.reverseProxy.serviceRegistry.fredy = {
+        port = cfg.port;
+        labels = {
+          "fleet.reverse-proxy.enable" = "true";
+          "fleet.reverse-proxy.domain" = cfg.domain;
+          "fleet.reverse-proxy.ssl" = "true";
+          "fleet.reverse-proxy.websockets" = "true";
+          "fleet.authelia.bypass" = "true";
+        };
+      };
 
-      ports = [
-        "${hostPort}:9998"
+      # --------------------------------------------------------------------------
+      # PODMAN / OCI CONTAINERS
+      # --------------------------------------------------------------------------
+
+      virtualisation = {
+        containers.enable = true;
+        podman = {
+          enable = true;
+          dockerCompat = true;
+          defaultNetwork.settings.dns_enabled = true;
+        };
+      };
+      virtualisation.oci-containers.backend = "podman";
+
+      systemd.tmpfiles.rules = [
+        "d ${cfg.dataDir} 0755 root root -"
+        "d ${confDir} 0755 root root -"
+        "d ${dbDir} 0755 root root -"
       ];
 
-      volumes = [
-        "${confDir}:/conf"
-        "${dbDir}:/db"
-      ];
-    };
+      systemd.services.fredy-config = {
+        description = "Bootstrap Fredy config.json if missing";
+        before = ["podman-fredy.service"];
+        requiredBy = ["podman-fredy.service"];
+        wantedBy = ["multi-user.target"];
 
-    systemd.services."podman-fredy" = {
-      requires = ["podman.service" "fredy-config.service"];
-      after = ["podman.service" "fredy-config.service"];
-    };
+        path = [pkgs.coreutils];
 
-    # --------------------------------------------------------------------------
-    # FIREWALL CONFIGURATION
-    # --------------------------------------------------------------------------
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
 
-    networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [cfg.port];
-  });
+        script = ''
+          mkdir -p ${confDir} ${dbDir}
+          if [ ! -f ${confDir}/config.json ]; then
+            printf '%s\n' '{"sqlitepath":"/db"}' > ${confDir}/config.json
+            chmod 0644 ${confDir}/config.json
+          fi
+        '';
+      };
+
+      virtualisation.oci-containers.containers.fredy = {
+        image = cfg.image;
+
+        ports = [
+          "${hostPort}:9998"
+        ];
+
+        volumes = [
+          "${confDir}:/conf"
+          "${dbDir}:/db"
+        ];
+      };
+
+      systemd.services."podman-fredy" = {
+        requires = ["podman.service" "fredy-config.service"];
+        after = ["podman.service" "fredy-config.service"];
+      };
+
+      # --------------------------------------------------------------------------
+      # FIREWALL CONFIGURATION
+      # --------------------------------------------------------------------------
+
+      networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [cfg.port];
+    }
+  );
 }
