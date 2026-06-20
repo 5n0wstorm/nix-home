@@ -34,6 +34,7 @@ in {
     ../../modules/apps/gallery-dl.nix
     ../../modules/apps/cockpit.nix
     ../../modules/apps/nextcloud.nix
+    ../../modules/apps/fredy.nix
     # Media
     ../../modules/media/shared-media.nix
     ../../modules/media/jellyfin.nix
@@ -120,6 +121,12 @@ in {
       type = "mysql";
       mysql.useFleetMysql = true;
     };
+  };
+
+  # Fredy - German real estate search automation
+  fleet.apps.fredy = {
+    enable = true;
+    domain = "immo.sn0wstorm.com";
   };
 
   # Custom gallery-dl from Gitea fork
@@ -768,6 +775,7 @@ in {
       "pokemon.sn0wstorm.com"
       "trilium.sn0wstorm.com"
       "cloud.sn0wstorm.com"
+      "immo.sn0wstorm.com"
       "onlyoffice.sn0wstorm.com"
       "bookstack.sn0wstorm.com"
       "stats.sn0wstorm.com"
