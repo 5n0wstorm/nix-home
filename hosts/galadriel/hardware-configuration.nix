@@ -58,5 +58,6 @@
   # NETWORKING
   # ============================================================================
 
-  networking.useDHCP = lib.mkDefault true;
+  # Static LAN IP — DHCP is disabled in hosts/galadriel/configuration.nix.
+  networking.useDHCP = lib.mkDefault false;
 }

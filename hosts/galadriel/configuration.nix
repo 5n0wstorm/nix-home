@@ -680,14 +680,18 @@ in {
   };
 
   # ============================================================================
-  # CLOUDFLARE DYNAMIC DNS SERVICE
+  # PUBLIC DNS (Cloudflare)
   # ============================================================================
+  #
+  # sn0wstorm.com must point at Proxmox (178.254.38.246) for SNI passthrough to
+  # galadriel — NOT at this host's home WAN IP. Do not enable cloudflare-dyndns
+  # here; it will fight the Proxmox entry point and break *.sn0wstorm.com.
+  #
+  # To (re)apply DNS: scripts/update-cloudflare-dns.sh on galadriel.
 
-  services.cloudflare-dyndns = {
-    enable = true;
-    apiTokenFile = "/run/secrets/cloudflare_api_token";
-    domains = ["sn0wstorm.com"];
-  };
+  networking.extraHosts = ''
+    178.254.38.246 sn0wstorm.com headscale.sn0wstorm.com
+  '';
 
   fleet.monitoring.prometheus = {
     enable = true;
@@ -1195,7 +1199,11 @@ in {
   # ============================================================================
 
   # Network interface
+  # Galadriel uses declarative static IP on eno1. Mark it unmanaged by
+  # NetworkManager (enabled in common.nix) so network-addresses-eno1 owns it
+  # without NM fighting during nixos-rebuild switch.
   networking = {
+    networkmanager.unmanaged = ["interface-name:eno1"];
     useDHCP = false;
     interfaces.eno1 = {
       useDHCP = false;
