@@ -260,7 +260,8 @@ in {
 
     instances.twitter = {
       enable = true;
-      onCalendar = "minutely";
+      onCalendar = "*/30 * * * *";
+      pruneEmptyDownloads = true;
 
       workingDir = "/data/archive/twitter";
       useDownloadArchiveFile = false;
@@ -285,6 +286,8 @@ in {
     instances.twitterDm = {
       enable = true;
       onCalendar = "hourly";
+      renderedConfigFileName = "config-dm.json";
+      pruneEmptyDownloads = true;
 
       workingDir = "/data/archive/twitter";
       useDownloadArchiveFile = false;

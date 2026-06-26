@@ -97,12 +97,18 @@ in {
       settings = {
         global = {
           security = "user";
-          "server string" = "NixOS Samba Server";
+          "server string" = "${config.networking.hostName} Samba";
+          "netbios name" = config.networking.hostName;
           "workgroup" = "WORKGROUP";
           "server role" = "standalone server";
           "map to guest" = "never";
           "hosts allow" = concatStringsSep " " cfg.allowedNetworks;
           "hosts deny" = "0.0.0.0/0";
+
+          # Windows 11 (esp. 24H2) expects SMB signing and NTLMv2 for workgroup auth.
+          "server signing" = "if_required";
+          "client signing" = "if_required";
+          "ntlm auth" = "ntlmv2-only";
 
           "server min protocol" = "SMB2";
           "client min protocol" = "SMB2";

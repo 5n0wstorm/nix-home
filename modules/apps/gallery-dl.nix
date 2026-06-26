@@ -196,6 +196,17 @@ in {
             '';
             example = "/data/archive/gallery-dl/telegram/archive.txt";
           };
+
+          pruneEmptyDownloads = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              Before each run, delete 0-byte or partial (*.part) media files under
+              `workingDir` and remove matching Postgres archive rows so gallery-dl
+              will retry failed Twitter downloads instead of skipping them forever.
+              Requires `@ARCHIVE_URL@` in `configSubstitutions`.
+            '';
+          };
         };
       }));
       default = {};
@@ -420,7 +431,7 @@ in {
         nameValuePair "gallery-dl-job-${name}" {
           description = "gallery-dl instance job: ${name}";
           # X/Twitter DM extraction may require `node` for passcode recovery.
-          path = [pkgs.nodejs];
+          path = [pkgs.nodejs pkgs.postgresql];
 
           # If a job is running during a switch, don't restart it (avoids blocking rebuilds).
           restartIfChanged = false;
@@ -440,6 +451,7 @@ in {
               if inst.config != null
               then builtins.toJSON inst.config
               else null;
+            archiveUrlFile = inst.configSubstitutions."@ARCHIVE_URL@" or null;
           in ''
             set -euo pipefail
 
@@ -467,6 +479,31 @@ in {
               except OSError:
                   pass
               PY
+            ''}
+
+            ${optionalString (inst.pruneEmptyDownloads && archiveUrlFile != null) ''
+              # Failed downloads can leave 0-byte files while Postgres archive still
+              # marks them complete — gallery-dl then skips them forever.
+              echo "Pruning empty/partial downloads under ${instanceDir}"
+              ARCHIVE_URL=$(tr -d '\n\r' < ${escapeShellArg (toString archiveUrlFile)})
+              while IFS= read -r -d '' f; do
+                base=$(basename "$f")
+                id=$(printf '%s' "$base" | ${pkgs.gnugrep}/bin/grep -oE '^[0-9]+' || true)
+                case "$f" in
+                  *.part)
+                    stem="''${f%.part}"
+                    rm -f "$f" "$stem" "$stem.json"
+                    ;;
+                  *)
+                    rm -f "$f" "$f.json"
+                    ;;
+                esac
+                if [ -n "$id" ]; then
+                  pattern="twitter''${id}_%"
+                  ${pkgs.postgresql}/bin/psql "$ARCHIVE_URL" -v ON_ERROR_STOP=0 \
+                    -c "DELETE FROM archive WHERE entry LIKE '$pattern'" || true
+                fi
+              done < <(find ${escapeShellArg instanceDir} -type f \( -size 0 -o -name '*.part' \) -print0 2>/dev/null || true)
             ''}
 
             # Don't fail the unit hard on extractor/runtime errors. These jobs are
