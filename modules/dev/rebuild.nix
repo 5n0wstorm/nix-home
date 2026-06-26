@@ -244,7 +244,8 @@ with lib;
       if [ -z "''${STY:-}" ] && [ "$ATTACHED" = false ]; then
           SCREEN_NAME="nixos-rebuild-''${HOSTNAME}"
           LOG_FILE="''${STATE_DIR}/last-rebuild.log"
-          if screen -list 2>/dev/null | grep -q "[.]''${SCREEN_NAME}[[:space:]]"; then
+          screen -wipe 2>/dev/null || true
+          if screen -list 2>/dev/null | grep -E "[0-9]+\\.''${SCREEN_NAME}[[:space:]]" | grep -qv "(Dead"; then
               echo "Rebuild screen session already running on $HOSTNAME."
               echo "  screen -r ''${SCREEN_NAME}"
               echo "  tail -f ''${LOG_FILE}"
