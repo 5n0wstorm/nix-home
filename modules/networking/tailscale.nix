@@ -93,6 +93,27 @@ in {
       default = "5min";
       description = "How often to run the Tailscale network recovery check";
     };
+
+    healthCheckPeer = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Optional tailnet IPv4 of a peer that must stay reachable (e.g. Proxmox at
+        100.64.0.1). When ping fails while the backend reports Running, tailscaled
+        is restarted to refresh NAT mappings after a home WAN IP change.
+      '';
+      example = "100.64.0.1";
+    };
+
+    detectWanIpChange = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        Track the STUN-discovered public IPv4 and restart tailscaled when it
+        changes. Needed on NAT hosts where the FritzBox/ISP rotates the WAN
+        address but the LAN interface (and NetworkManager) stay unchanged.
+      '';
+    };
   };
 
   # ============================================================================
@@ -192,11 +213,35 @@ in {
       in ''
         set -uo pipefail
 
+        STATE_DIR=/var/lib/tailscale
+        PUBLIC_IP_FILE="$STATE_DIR/last-public-ipv4"
+        mkdir -p "$STATE_DIR"
+
         if ! systemctl is-active --quiet tailscaled.service; then
           echo "tailscaled inactive, starting"
           systemctl start tailscaled.service || true
           sleep 3
         fi
+
+        ${optionalString cfg.detectWanIpChange ''
+          # WAN IP can change daily on the FritzBox while eno1 stays 192.168.178.x;
+          # tailscaled may keep stale endpoints until STUN is re-run.
+          CURRENT_IP=$(${pkgs.tailscale}/bin/tailscale netcheck 2>/dev/null \
+            | ${pkgs.gnugrep}/bin/grep -oE 'IPv4: yes, [0-9.]+' \
+            | ${pkgs.gnugrep}/bin/grep -oE '[0-9.]+' \
+            | tail -1 || true)
+          if [ -n "''${CURRENT_IP:-}" ] && [ -f "$PUBLIC_IP_FILE" ]; then
+            LAST_IP=$(cat "$PUBLIC_IP_FILE")
+            if [ "$CURRENT_IP" != "$LAST_IP" ]; then
+              echo "Public IPv4 changed ($LAST_IP -> $CURRENT_IP), restarting tailscaled"
+              systemctl restart tailscaled.service || true
+              sleep 5
+            fi
+          fi
+          if [ -n "''${CURRENT_IP:-}" ]; then
+            echo "$CURRENT_IP" > "$PUBLIC_IP_FILE"
+          fi
+        ''}
 
         state=$(${pkgs.tailscale}/bin/tailscale status --json 2>/dev/null | ${pkgs.jq}/bin/jq -r '.BackendState // "Unknown"' || echo "Unknown")
         if [ "$state" != "Running" ]; then
@@ -204,6 +249,16 @@ in {
           systemctl restart tailscaled.service || true
           sleep 5
         fi
+
+        ${optionalString (cfg.healthCheckPeer != null) ''
+          if [ "$state" = "Running" ] || systemctl is-active --quiet tailscaled.service; then
+            if ! ${pkgs.tailscale}/bin/tailscale ping -c 1 ${cfg.healthCheckPeer} >/dev/null 2>&1; then
+              echo "Mesh peer ${cfg.healthCheckPeer} unreachable, restarting tailscaled"
+              systemctl restart tailscaled.service || true
+              sleep 5
+            fi
+          fi
+        ''}
 
         ${optionalString (cfg.authKeyFile != null) ''
           if [ -f "${cfg.authKeyFile}" ]; then
@@ -229,9 +284,9 @@ in {
         # Do not use OnBootSec: when the timer is first enabled during nixos-switch
         # (often >3min after boot), systemd runs the overdue job immediately and can
         # fail activation if headscale re-auth is not ready yet.
-        OnActiveSec = "5min";
+        OnActiveSec = "2min";
         OnUnitActiveSec = cfg.networkRecoveryInterval;
-        AccuracySec = "1min";
+        AccuracySec = "30s";
       };
 
       unitConfig = {

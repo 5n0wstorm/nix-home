@@ -1244,6 +1244,10 @@ in {
     authKeyFile = config.sops.secrets."tailscale/galadriel/auth-key".path;
     acceptDns = false;
     extraUpFlags = ["--reset"];
+    # Proxmox (vynux2) — SNI passthrough target; ping it to detect stale NAT after WAN IP change.
+    healthCheckPeer = "100.64.0.1";
+    detectWanIpChange = true;
+    networkRecoveryInterval = "2min";
   };
 
   # After an unclean shutdown (fsck on boot), postgres recovery can hold the disk
