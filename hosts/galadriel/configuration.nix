@@ -456,39 +456,34 @@ in {
     };
   };
 
-  # Sonarr - TV series management
+  # *arr stack — temporarily disabled (config retained for re-enable)
   fleet.media.sonarr = {
-    enable = true;
+    enable = false;
     domain = "sonarr.sn0wstorm.com";
   };
 
-  # Radarr - Movie management
   fleet.media.radarr = {
-    enable = true;
+    enable = false;
     domain = "radarr.sn0wstorm.com";
   };
 
-  # Lidarr - Music management
   fleet.media.lidarr = {
-    enable = true;
+    enable = false;
     domain = "lidarr.sn0wstorm.com";
   };
 
-  # Readarr - Ebook management
   fleet.media.readarr = {
-    enable = true;
+    enable = false;
     domain = "readarr.sn0wstorm.com";
   };
 
-  # Prowlarr - Indexer management
   fleet.media.prowlarr = {
-    enable = true;
+    enable = false;
     domain = "prowlarr.sn0wstorm.com";
   };
 
-  # Bazarr - Subtitle management
   fleet.media.bazarr = {
-    enable = true;
+    enable = false;
     domain = "bazarr.sn0wstorm.com";
   };
 
@@ -526,7 +521,7 @@ in {
     enable = true;
     shareName = "data";
     path = "/data";
-    usernameFile = config.sops.secrets."samba/data/username".path;
+    username = "chef";
     passwordFile = config.sops.secrets."samba/data/password".path;
     allowedNetworks = ["192.168.178.0/24" "100.64.0.0/10" "127.0.0.1"];
     openFirewall = true;
@@ -562,19 +557,19 @@ in {
     # Uses default: sharedCfg.paths.media.music (/data/media/music)
   };
 
-  # Configarr - TRaSH Guides configuration sync
+  # Configarr - TRaSH Guides configuration sync (disabled with *arr stack)
   fleet.media.configarr = {
-    enable = true;
+    enable = false;
     schedule = "daily"; # Sync once per day
 
     sonarr = {
-      enable = true;
+      enable = false;
       url = "http://localhost:8989";
       apiKeyFile = "/run/secrets/sonarr/api-key";
     };
 
     radarr = {
-      enable = true;
+      enable = false;
       url = "http://localhost:7878";
       apiKeyFile = "/run/secrets/radarr/api-key";
     };
@@ -1145,11 +1140,6 @@ in {
       };
 
       # Samba /data share credentials
-      "samba/data/username" = {
-        owner = "root";
-        group = "root";
-        mode = "0400";
-      };
       "samba/data/password" = {
         owner = "root";
         group = "root";

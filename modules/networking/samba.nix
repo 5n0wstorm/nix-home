@@ -26,14 +26,27 @@ in {
       description = "Path to the directory to share";
     };
 
-    usernameFile = mkOption {
-      type = types.path;
-      description = "Path to file containing the SMB username (from sops-nix)";
+    username = mkOption {
+      type = types.str;
+      example = "chef";
+      description = "Unix/Samba username for the share (declared via users.users)";
     };
 
     passwordFile = mkOption {
       type = types.path;
       description = "Path to file containing the SMB password (from sops-nix)";
+    };
+
+    dataGroup = mkOption {
+      type = types.str;
+      default =
+        if config.fleet.media.shared.enable or false
+        then config.fleet.media.shared.group
+        else "media";
+      description = ''
+        POSIX group used for share access. Should match fleet.media.shared.group
+        so standard directory modes on /data apply without ACLs.
+      '';
     };
 
     allowedNetworks = mkOption {
@@ -63,6 +76,13 @@ in {
   # ============================================================================
 
   config = mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.username != "";
+        message = "fleet.networking.sambaDataShare.username must be set when Samba is enabled";
+      }
+    ];
+
     # ==========================================================================
     # SAMBA SERVICE
     # ==========================================================================
@@ -71,7 +91,6 @@ in {
       enable = true;
       openFirewall = cfg.openFirewall;
 
-      # Ensure state directory exists
       nmbd.enable = true;
       winbindd.enable = false;
 
@@ -85,53 +104,37 @@ in {
           "hosts allow" = concatStringsSep " " cfg.allowedNetworks;
           "hosts deny" = "0.0.0.0/0";
 
-          # SMB2+ only (disable SMB1 for security)
           "server min protocol" = "SMB2";
           "client min protocol" = "SMB2";
 
-          # Performance tuning
           "socket options" = "TCP_NODELAY IPTOS_LOWDELAY";
           "read raw" = "yes";
           "write raw" = "yes";
           "max xmit" = "65535";
           "dead time" = "15";
           "getwd cache" = "yes";
-
-          # Disable client-side caching globally — files are modified by
-          # server-side processes (media stack) that bypass Samba, so
-          # SMB clients must always fetch fresh data from the server.
           "csc policy" = "disable";
 
-          # Logging
           "log level" = "1";
           "log file" = "/var/log/samba/%m.log";
           "max log size" = "50";
         };
 
-        # Data share configuration
         ${cfg.shareName} = {
           path = cfg.path;
           "read only" = "no";
           "guest ok" = "no";
-          "valid users" = "@smb-data";
-          "force group" = "smb-data";
+          "valid users" = cfg.username;
+          "force group" = cfg.dataGroup;
           "create mask" = "0664";
           "directory mask" = "0775";
           browseable = "yes";
           writable = "yes";
-          "vfs objects" = "acl_xattr";
-          "map acl inherit" = "yes";
           "store dos attributes" = "yes";
 
-          # Server-side processes (qBittorrent, *arr stack, SABnzbd)
-          # write directly to the filesystem, bypassing Samba. Oplocks
-          # let SMB clients cache data locally and Samba never breaks
-          # the cache because it doesn't see the writes — this causes
-          # stale/lagging directory listings on the client.
           "oplocks" = "no";
           "level2 oplocks" = "no";
           "strict locking" = "yes";
-          "kernel change notify" = "yes";
         };
       };
     };
@@ -146,139 +149,68 @@ in {
     };
 
     # ==========================================================================
-    # USER/GROUP MANAGEMENT
+    # USER MANAGEMENT (POSIX permissions via shared media group)
     # ==========================================================================
 
-    # Create static group for SMB users
-    users.groups.smb-data = {};
+    users.users.${cfg.username} = {
+      isSystemUser = true;
+      group = cfg.dataGroup;
+      home = "/var/empty";
+      createHome = false;
+    };
 
     # ==========================================================================
     # STATE DIRECTORY
     # ==========================================================================
 
-    # Ensure Samba state directories exist before services start
     systemd.tmpfiles.rules = [
       "d /var/lib/samba 0755 root root -"
       "d /var/lib/samba/private 0700 root root -"
     ];
 
     # ==========================================================================
-    # PROVISIONING SERVICE
+    # SAMBA PASSWORD SYNC
+    # Samba passwords live in a separate ldb — sync from sops on activation.
     # ==========================================================================
 
-    systemd.services.samba-data-provision = {
-      description = "Provision Samba user and ACLs for ${cfg.shareName} share";
+    systemd.services.samba-password-sync = {
+      description = "Sync Samba password for ${cfg.username}";
       wantedBy = ["multi-user.target"];
-      after = ["sops-nix.service" "local-fs.target" "systemd-tmpfiles-setup.service"];
+      after = ["sops-nix.service"];
       before = ["samba-smbd.service"];
-      # Don't require - let Samba start even if provisioning fails initially
-      # requiredBy = ["samba-smbd.service"];
 
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        User = "root";
-        Group = "root";
       };
 
-      path = with pkgs; [
-        samba
-        acl
-        coreutils
-        gnugrep
-        gawk
-        shadow
-      ];
+      path = [pkgs.samba];
 
       script = ''
         set -euo pipefail
-
-        # Ensure Samba directories exist
-        mkdir -p /var/lib/samba/private
-        chmod 700 /var/lib/samba/private
-
-        # Read credentials from secret files
-        if [ ! -f "${cfg.usernameFile}" ]; then
-          echo "ERROR: Username file not found: ${cfg.usernameFile}"
-          exit 1
-        fi
 
         if [ ! -f "${cfg.passwordFile}" ]; then
           echo "ERROR: Password file not found: ${cfg.passwordFile}"
           exit 1
         fi
 
-        SMB_USER=$(cat "${cfg.usernameFile}" | tr -d '\n\r')
-        SMB_PASS=$(cat "${cfg.passwordFile}" | tr -d '\n\r')
-
-        if [ -z "$SMB_USER" ]; then
-          echo "ERROR: Username is empty"
-          exit 1
-        fi
-
+        SMB_PASS=$(tr -d '\n\r' < "${cfg.passwordFile}")
         if [ -z "$SMB_PASS" ]; then
-          echo "ERROR: Password is empty"
+          echo "ERROR: Samba password is empty"
           exit 1
         fi
 
-        echo "Provisioning Samba user: $SMB_USER"
-
-        # Create Unix user if it doesn't exist
-        if ! id "$SMB_USER" &>/dev/null; then
-          echo "Creating Unix user: $SMB_USER"
-          useradd --system --no-create-home --shell /sbin/nologin --groups smb-data "$SMB_USER"
+        if pdbedit -L 2>/dev/null | grep -q '^${cfg.username}:'; then
+          echo "Updating Samba password for ${cfg.username}"
         else
-          echo "Unix user already exists: $SMB_USER"
-          # Ensure user is in smb-data group
-          if ! groups "$SMB_USER" | grep -q smb-data; then
-            echo "Adding $SMB_USER to smb-data group"
-            usermod -aG smb-data "$SMB_USER"
-          fi
+          echo "Creating Samba user ${cfg.username}"
         fi
 
-        # Create/update Samba user password (idempotent)
-        if pdbedit -L | grep -q "^$SMB_USER:"; then
-          echo "Updating Samba password for: $SMB_USER"
-        else
-          echo "Creating Samba user: $SMB_USER"
-        fi
-        printf '%s\n%s\n' "$SMB_PASS" "$SMB_PASS" | smbpasswd -a -s "$SMB_USER"
-        smbpasswd -e "$SMB_USER"
-
-        # Verify ACL support on the filesystem
-        echo "Checking ACL support on ${cfg.path}"
-        if ! touch "${cfg.path}/.acl_test" 2>/dev/null; then
-          echo "ERROR: Cannot write to ${cfg.path}"
-          exit 1
-        fi
-
-        if ! setfacl -m u:"$SMB_USER":rwx "${cfg.path}/.acl_test" 2>/dev/null; then
-          rm -f "${cfg.path}/.acl_test"
-          echo "ERROR: Filesystem at ${cfg.path} does not support POSIX ACLs"
-          echo "Please ensure the filesystem is mounted with ACL support (e.g., ext4, xfs, btrfs)"
-          exit 1
-        fi
-        rm -f "${cfg.path}/.acl_test"
-
-        # Apply recursive ACLs for the SMB user
-        echo "Applying recursive ACLs for $SMB_USER on ${cfg.path}"
-        setfacl -R -m u:"$SMB_USER":rwx "${cfg.path}"
-
-        # Apply default ACLs for new files/directories
-        echo "Applying default ACLs for $SMB_USER on ${cfg.path}"
-        find "${cfg.path}" -type d -exec setfacl -d -m u:"$SMB_USER":rwx {} \;
-
-        echo "Samba provisioning complete for user: $SMB_USER"
+        printf '%s\n%s\n' "$SMB_PASS" "$SMB_PASS" | smbpasswd -a -s ${cfg.username}
+        smbpasswd -e ${cfg.username}
       '';
     };
 
-    # ==========================================================================
-    # SYSTEM PACKAGES
-    # ==========================================================================
-
-    environment.systemPackages = with pkgs; [
-      samba
-      acl
-    ];
+    environment.systemPackages = [pkgs.samba];
   };
 }
