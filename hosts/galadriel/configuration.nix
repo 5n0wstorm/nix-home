@@ -260,7 +260,7 @@ in {
 
     instances.twitter = {
       enable = true;
-      onCalendar = "*/30 * * * *";
+      onCalendar = "*-*-* *:0/30:00";
       pruneEmptyDownloads = true;
 
       workingDir = "/data/archive/twitter";
