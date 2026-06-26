@@ -6,6 +6,29 @@
 }:
 with lib; let
   cfg = config.fleet.networking.tailscale;
+
+  # Shared tailscale up flags. --reset belongs only in the recovery oneshot so
+  # nixos-switch does not pass it twice (breaks tailscale up) via tailscaled +
+  # fleet-tailscale-network-recovery running in the same activation.
+  tailscaleUpFlags =
+    [
+      "--login-server=${cfg.loginServer}"
+      "--accept-routes=${
+        if cfg.acceptRoutes
+        then "true"
+        else "false"
+      }"
+      "--accept-dns=${
+        if cfg.acceptDns
+        then "true"
+        else "false"
+      }"
+    ]
+    ++ (optionals (cfg.hostname != null) ["--hostname=${cfg.hostname}"])
+    ++ (optionals (cfg.advertiseRoutes != []) [
+      "--advertise-routes=${concatStringsSep "," cfg.advertiseRoutes}"
+    ])
+    ++ (filter (f: f != "--reset") cfg.extraUpFlags);
 in {
   # ============================================================================
   # MODULE OPTIONS
@@ -136,26 +159,7 @@ in {
 
       extraDaemonFlags = cfg.extraDaemonFlags;
 
-      extraUpFlags =
-        [
-          "--login-server=${cfg.loginServer}"
-          "--accept-routes=${
-            if cfg.acceptRoutes
-            then "true"
-            else "false"
-          }"
-          "--accept-dns=${
-            if cfg.acceptDns
-            then "true"
-            else "false"
-          }"
-        ]
-        ++ (optionals (cfg.hostname != null) ["--hostname=${cfg.hostname}"])
-        ++ (optionals (cfg.advertiseRoutes != []) [
-          "--advertise-routes=${concatStringsSep "," cfg.advertiseRoutes}"
-        ])
-        ++ cfg.extraUpFlags
-        ++ optionals (cfg.authKeyFile != null) ["--reset"];
+      extraUpFlags = tailscaleUpFlags;
     };
 
     # Avoid stop-then-start during nixos-rebuild switch. Stopping tailscaled
@@ -175,7 +179,7 @@ in {
 
     systemd.services.fleet-tailscale-network-recovery = mkIf cfg.networkRecovery {
       description = "Recover Tailscale mesh after network outages";
-      after = ["tailscaled.service" "network-online.target"];
+      after = ["tailscaled.service" "network-online.target" "sysinit-reactivation.target"];
       wants = ["network-online.target"];
       restartIfChanged = false;
 
@@ -183,36 +187,34 @@ in {
         Type = "oneshot";
         RemainAfterExit = true;
         User = "root";
-        # Re-auth against headscale must not block nixos-switch if keys/flags drift.
-        SuccessExitStatus = "0 1";
+        # Must not fail nixos-switch / nh rebuild activation.
+        SuccessExitStatus = "0 1 2 143";
+        # Skip when switch-to-configuration is still reactivating services.
+        ExecCondition = "! ${pkgs.systemd}/bin/systemctl is-active --quiet sysinit-reactivation.target";
       };
 
-      path = with pkgs; [tailscale jq coreutils];
+      path = with pkgs; [tailscale jq coreutils systemd];
 
       script = let
-        upFlags =
-          [
-            "--login-server=${cfg.loginServer}"
-            "--accept-routes=${
-              if cfg.acceptRoutes
-              then "true"
-              else "false"
-            }"
-            "--accept-dns=${
-              if cfg.acceptDns
-              then "true"
-              else "false"
-            }"
-            "--reset"
-          ]
-          ++ (optionals (cfg.hostname != null) ["--hostname=${cfg.hostname}"])
-          ++ (optionals (cfg.advertiseRoutes != []) [
-            "--advertise-routes=${concatStringsSep "," cfg.advertiseRoutes}"
-          ])
-          ++ cfg.extraUpFlags;
-        upCommand = "tailscale up ${concatStringsSep " " upFlags}";
+        upCommand = "tailscale up ${concatStringsSep " " (tailscaleUpFlags ++ ["--reset"])}";
       in ''
-        set -uo pipefail
+        set -o pipefail
+
+        restart_tailscaled_if_ready() {
+          case "$(systemctl show tailscaled.service -p ActiveState --value 2>/dev/null || echo unknown)" in
+            active)
+              systemctl restart tailscaled.service || true
+              sleep 5
+              ;;
+            activating|reloading)
+              echo "tailscaled still starting, skipping restart"
+              ;;
+            *)
+              systemctl start tailscaled.service || true
+              sleep 3
+              ;;
+          esac
+        }
 
         STATE_DIR=/var/lib/tailscale
         PUBLIC_IP_FILE="$STATE_DIR/last-public-ipv4"
@@ -220,13 +222,10 @@ in {
 
         if ! systemctl is-active --quiet tailscaled.service; then
           echo "tailscaled inactive, starting"
-          systemctl start tailscaled.service || true
-          sleep 3
+          restart_tailscaled_if_ready
         fi
 
         ${optionalString cfg.detectWanIpChange ''
-          # WAN IP can change daily on the FritzBox while eno1 stays 192.168.178.x;
-          # tailscaled may keep stale endpoints until STUN is re-run.
           CURRENT_IP=$(${pkgs.tailscale}/bin/tailscale netcheck 2>/dev/null \
             | ${pkgs.gnugrep}/bin/grep -oE 'IPv4: yes, [0-9.]+' \
             | ${pkgs.gnugrep}/bin/grep -oE '[0-9.]+' \
@@ -235,8 +234,7 @@ in {
             LAST_IP=$(cat "$PUBLIC_IP_FILE")
             if [ "$CURRENT_IP" != "$LAST_IP" ]; then
               echo "Public IPv4 changed ($LAST_IP -> $CURRENT_IP), restarting tailscaled"
-              systemctl restart tailscaled.service || true
-              sleep 5
+              restart_tailscaled_if_ready
             fi
           fi
           if [ -n "''${CURRENT_IP:-}" ]; then
@@ -247,16 +245,14 @@ in {
         state=$(${pkgs.tailscale}/bin/tailscale status --json 2>/dev/null | ${pkgs.jq}/bin/jq -r '.BackendState // "Unknown"' || echo "Unknown")
         if [ "$state" != "Running" ]; then
           echo "Tailscale backend state is $state, restarting tailscaled"
-          systemctl restart tailscaled.service || true
-          sleep 5
+          restart_tailscaled_if_ready
         fi
 
         ${optionalString (cfg.healthCheckPeer != null) ''
-          if [ "$state" = "Running" ] || systemctl is-active --quiet tailscaled.service; then
+          if [ "$state" = "Running" ]; then
             if ! ${pkgs.tailscale}/bin/tailscale ping -c 1 ${cfg.healthCheckPeer} >/dev/null 2>&1; then
               echo "Mesh peer ${cfg.healthCheckPeer} unreachable, restarting tailscaled"
-              systemctl restart tailscaled.service || true
-              sleep 5
+              restart_tailscaled_if_ready
             fi
           fi
         ''}
