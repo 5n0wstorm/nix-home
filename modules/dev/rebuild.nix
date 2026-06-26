@@ -245,12 +245,14 @@ with lib;
           SCREEN_NAME="nixos-rebuild-''${HOSTNAME}"
           LOG_FILE="''${STATE_DIR}/last-rebuild.log"
           screen -wipe 2>/dev/null || true
-          if screen -list 2>/dev/null | grep -E "[0-9]+\\.''${SCREEN_NAME}[[:space:]]" | grep -qv "(Dead"; then
+          # screen marks crashed SSH sessions as "(Remote or dead)" — only block live ones.
+          if screen -list 2>/dev/null | grep -E "[0-9]+\\.''${SCREEN_NAME}[[:space:]]" | grep -qE '\\(Attached|Detached\\)'; then
               echo "Rebuild screen session already running on $HOSTNAME."
               echo "  screen -r ''${SCREEN_NAME}"
               echo "  tail -f ''${LOG_FILE}"
               exit 1
           fi
+          screen -wipe 2>/dev/null || true
           if ! command -v screen >/dev/null 2>&1; then
               echo "Error: screen is not installed (required for detached rebuild)."
               exit 1
