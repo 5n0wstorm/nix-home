@@ -1245,6 +1245,12 @@ in {
     acceptDns = false;
   };
 
+  # After an unclean shutdown (fsck on boot), postgres recovery can hold the disk
+  # busy for minutes; default systemd start timeouts are too short for jenkins/sabnzbd.
+  systemd.services.jenkins.serviceConfig.TimeoutStartSec = "5min";
+  systemd.services.sabnzbd.serviceConfig.TimeoutStartSec = "5min";
+  systemd.services.postgresql.serviceConfig.TimeoutStartSec = "10min";
+
   # ============================================================================
   # SMB/CIFS MOUNTS
   # ============================================================================
