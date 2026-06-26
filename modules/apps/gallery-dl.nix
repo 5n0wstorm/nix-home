@@ -486,7 +486,7 @@ in {
               # marks them complete — gallery-dl then skips them forever.
               echo "Pruning empty/partial downloads under ${instanceDir}"
               ARCHIVE_URL=$(tr -d '\n\r' < ${escapeShellArg (toString archiveUrlFile)})
-              while IFS= read -r -d '' f; do
+              while IFS= read -r -d "$(printf ''\0'')" f; do
                 base=$(basename "$f")
                 id=$(printf '%s' "$base" | ${pkgs.gnugrep}/bin/grep -oE '^[0-9]+' || true)
                 case "$f" in
