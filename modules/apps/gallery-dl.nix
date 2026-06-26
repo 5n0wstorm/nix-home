@@ -486,7 +486,7 @@ in {
               # marks them complete — gallery-dl then skips them forever.
               echo "Pruning empty/partial downloads under ${instanceDir}"
               ARCHIVE_URL=$(tr -d '\n\r' < ${escapeShellArg (toString archiveUrlFile)})
-              while IFS= read -r -d "$(printf ''\0'')" f; do
+              find ${escapeShellArg instanceDir} -type f \( -size 0 -o -name '*.part' \) 2>/dev/null | while IFS= read -r f; do
                 base=$(basename "$f")
                 id=$(printf '%s' "$base" | ${pkgs.gnugrep}/bin/grep -oE '^[0-9]+' || true)
                 case "$f" in
@@ -503,7 +503,7 @@ in {
                   ${pkgs.postgresql}/bin/psql "$ARCHIVE_URL" -v ON_ERROR_STOP=0 \
                     -c "DELETE FROM archive WHERE entry LIKE '$pattern'" || true
                 fi
-              done < <(find ${escapeShellArg instanceDir} -type f \( -size 0 -o -name '*.part' \) -print0 2>/dev/null || true)
+              done
             ''}
 
             # Don't fail the unit hard on extractor/runtime errors. These jobs are
