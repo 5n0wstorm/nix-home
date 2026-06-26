@@ -118,8 +118,16 @@ in {
       extraUpFlags =
         [
           "--login-server=${cfg.loginServer}"
-          "--accept-routes=${if cfg.acceptRoutes then "true" else "false"}"
-          "--accept-dns=${if cfg.acceptDns then "true" else "false"}"
+          "--accept-routes=${
+            if cfg.acceptRoutes
+            then "true"
+            else "false"
+          }"
+          "--accept-dns=${
+            if cfg.acceptDns
+            then "true"
+            else "false"
+          }"
         ]
         ++ (optionals (cfg.hostname != null) ["--hostname=${cfg.hostname}"])
         ++ (optionals (cfg.advertiseRoutes != []) [
@@ -163,8 +171,16 @@ in {
         upFlags =
           [
             "--login-server=${cfg.loginServer}"
-            "--accept-routes=${if cfg.acceptRoutes then "true" else "false"}"
-            "--accept-dns=${if cfg.acceptDns then "true" else "false"}"
+            "--accept-routes=${
+              if cfg.acceptRoutes
+              then "true"
+              else "false"
+            }"
+            "--accept-dns=${
+              if cfg.acceptDns
+              then "true"
+              else "false"
+            }"
             "--reset"
           ]
           ++ (optionals (cfg.hostname != null) ["--hostname=${cfg.hostname}"])
