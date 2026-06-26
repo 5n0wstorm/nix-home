@@ -151,7 +151,10 @@ in {
 
       serviceConfig = {
         Type = "oneshot";
+        RemainAfterExit = true;
         User = "root";
+        # Re-auth against headscale must not block nixos-switch if keys/flags drift.
+        SuccessExitStatus = "0 1";
       };
 
       path = with pkgs; [tailscale jq coreutils];
@@ -162,6 +165,7 @@ in {
             "--login-server=${cfg.loginServer}"
             "--accept-routes=${if cfg.acceptRoutes then "true" else "false"}"
             "--accept-dns=${if cfg.acceptDns then "true" else "false"}"
+            "--reset"
           ]
           ++ (optionals (cfg.hostname != null) ["--hostname=${cfg.hostname}"])
           ++ (optionals (cfg.advertiseRoutes != []) [
@@ -170,30 +174,34 @@ in {
           ++ cfg.extraUpFlags;
         upCommand = "tailscale up ${concatStringsSep " " upFlags}";
       in ''
-        set -euo pipefail
+        set -uo pipefail
 
         if ! systemctl is-active --quiet tailscaled.service; then
           echo "tailscaled inactive, starting"
-          systemctl start tailscaled.service
+          systemctl start tailscaled.service || true
           sleep 3
         fi
 
-        state=$(${pkgs.tailscale}/bin/tailscale status --json | ${pkgs.jq}/bin/jq -r '.BackendState // "Unknown"')
+        state=$(${pkgs.tailscale}/bin/tailscale status --json 2>/dev/null | ${pkgs.jq}/bin/jq -r '.BackendState // "Unknown"' || echo "Unknown")
         if [ "$state" != "Running" ]; then
           echo "Tailscale backend state is $state, restarting tailscaled"
-          systemctl restart tailscaled.service
+          systemctl restart tailscaled.service || true
           sleep 5
         fi
 
         ${optionalString (cfg.authKeyFile != null) ''
           if [ -f "${cfg.authKeyFile}" ]; then
             AUTH_KEY=$(tr -d '[:space:]' < "${cfg.authKeyFile}")
-            ${upCommand} --auth-key="$AUTH_KEY" || ${upCommand}
+            ${upCommand} --auth-key="$AUTH_KEY" || ${upCommand} || echo "warn: tailscale up failed; timer will retry"
           else
-            ${upCommand}
+            ${upCommand} || echo "warn: tailscale up failed; timer will retry"
           fi
         ''}
-        ${optionalString (cfg.authKeyFile == null) upCommand}
+        ${optionalString (cfg.authKeyFile == null) ''
+          ${upCommand} || echo "warn: tailscale up failed; timer will retry"
+        ''}
+
+        exit 0
       '';
     };
 
@@ -202,7 +210,10 @@ in {
       wantedBy = ["timers.target"];
 
       timerConfig = {
-        OnBootSec = "3min";
+        # Do not use OnBootSec: when the timer is first enabled during nixos-switch
+        # (often >3min after boot), systemd runs the overdue job immediately and can
+        # fail activation if headscale re-auth is not ready yet.
+        OnActiveSec = "5min";
         OnUnitActiveSec = cfg.networkRecoveryInterval;
         AccuracySec = "1min";
       };

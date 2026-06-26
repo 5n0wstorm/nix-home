@@ -1243,6 +1243,7 @@ in {
     hostname = "galadriel";
     authKeyFile = config.sops.secrets."tailscale/galadriel/auth-key".path;
     acceptDns = false;
+    extraUpFlags = ["--reset"];
   };
 
   # After an unclean shutdown (fsck on boot), postgres recovery can hold the disk
