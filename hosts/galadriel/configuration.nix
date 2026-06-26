@@ -1243,8 +1243,7 @@ in {
     hostname = "galadriel";
     authKeyFile = config.sops.secrets."tailscale/galadriel/auth-key".path;
     acceptDns = false;
-    extraUpFlags = ["--reset"];
-    # Proxmox (vynux2) — SNI passthrough target; ping it to detect stale NAT after WAN IP change.
+    # --reset is applied by fleet.networking.tailscale recovery / autoconnect paths.
     healthCheckPeer = "100.64.0.1";
     detectWanIpChange = true;
     networkRecoveryInterval = "2min";

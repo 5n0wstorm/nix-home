@@ -154,7 +154,8 @@ in {
         ++ (optionals (cfg.advertiseRoutes != []) [
           "--advertise-routes=${concatStringsSep "," cfg.advertiseRoutes}"
         ])
-        ++ cfg.extraUpFlags;
+        ++ cfg.extraUpFlags
+        ++ optionals (cfg.authKeyFile != null) ["--reset"];
     };
 
     # Avoid stop-then-start during nixos-rebuild switch. Stopping tailscaled
