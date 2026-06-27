@@ -189,8 +189,8 @@ in {
         User = "root";
         # Must not fail nixos-switch / nh rebuild activation.
         SuccessExitStatus = "0 1 2 143";
-        # Skip when switch-to-configuration is still reactivating services.
-        ExecCondition = "! ${pkgs.systemd}/bin/systemctl is-active --quiet sysinit-reactivation.target";
+        # Skip during nixos-switch activation (systemd 259 rejects `!` prefix here).
+        ExecCondition = "${pkgs.systemd}/bin/systemctl is-inactive --quiet sysinit-reactivation.target";
       };
 
       path = with pkgs; [tailscale jq coreutils systemd];
@@ -284,10 +284,6 @@ in {
         OnActiveSec = "2min";
         OnUnitActiveSec = cfg.networkRecoveryInterval;
         AccuracySec = "30s";
-      };
-
-      unitConfig = {
-        Unit = "fleet-tailscale-network-recovery.service";
       };
     };
   };
