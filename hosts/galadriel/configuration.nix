@@ -5,6 +5,39 @@
   ...
 }: let
   hosts = import ../../hosts.nix;
+  hetznerMount = "/mnt/hetzner";
+  archiveBase = "${hetznerMount}/archive";
+  galleryDlAfterMount = [
+    "gallery-dl-telegram.service"
+    "gallery-dl-telegramReplies.service"
+    "gallery-dl-boosty.service"
+    "gallery-dl-twitter.service"
+    "gallery-dl-twitterDm.service"
+    "gallery-dl-telegram-channel-list.service"
+    "gallery-dl-twitter-following-list.service"
+    "gallery-dl-job-telegram.service"
+    "gallery-dl-job-telegramReplies.service"
+    "gallery-dl-job-boosty.service"
+    "gallery-dl-job-twitter.service"
+    "gallery-dl-job-twitterDm.service"
+  ];
+  archiveMountConsumers =
+    galleryDlAfterMount
+    ++ [
+      "media-permissions.service"
+      "data-archive-permissions.service"
+      "podman-gluetun.service"
+      "podman-qbittorrent.service"
+      "qbittorrent-credentials.service"
+      "qbittorrent-config.service"
+      "sabnzbd.service"
+      "sonarr.service"
+      "radarr.service"
+      "lidarr.service"
+      "readarr.service"
+      "prowlarr.service"
+      "bazarr.service"
+    ];
 in {
   # ============================================================================
   # IMPORTS
@@ -53,6 +86,7 @@ in {
     ../../modules/media/configarr.nix
     # System
     ../../modules/system/backup-var-lib.nix
+    ../../modules/system/hetzner-archive-mount.nix
   ];
 
   # ============================================================================
@@ -124,15 +158,24 @@ in {
     };
   };
 
+  # Hetzner Storage Box — downloader and gallery-dl archive tree
+  fleet.system.hetznerArchiveMount = {
+    enable = true;
+    mountPoint = hetznerMount;
+    archiveSubdir = "archive";
+    afterMountServices = archiveMountConsumers;
+  };
+
   # Fredy - German real estate search automation
   fleet.apps.fredy = {
-    enable = true;
+    enable = false;
     domain = "immo.sn0wstorm.com";
   };
 
-  # Custom gallery-dl from Gitea fork
+  # Custom gallery-dl from Gitea fork (downloads to Hetzner archive share)
   fleet.apps.galleryDl = {
     enable = true;
+    archiveDir = archiveBase;
 
     instances.telegram = {
       enable = true;
@@ -140,13 +183,13 @@ in {
       onCalendar = "minutely";
 
       # Render config from Nix attrset + sops secrets (no external template file)
-      workingDir = "/data/archive/telegram";
+      workingDir = "${archiveBase}/telegram";
       # We use Postgres-backed archive via `extractor.archive` in config;
       # do not override it with `--download-archive <file>`.
       useDownloadArchiveFile = false;
       config = {
         extractor = {
-          "base-directory" = "/data/archive";
+          "base-directory" = "${archiveBase}";
           archive = "@ARCHIVE_URL@";
           telegram = {
             "api-id" = "@TG_API_ID@";
@@ -176,7 +219,7 @@ in {
       };
 
       # one URL per line
-      urlFile = "/data/archive/telegram/urls.txt";
+      urlFile = "${archiveBase}/telegram/urls.txt";
 
       # Add your preferred args here:
       args = ["--write-metadata"];
@@ -184,7 +227,8 @@ in {
 
     # Update urls.txt with all Telegram channels the account is part of (every 10 minutes).
     telegramChannelList = {
-      urlFile = "/data/archive/telegram/urls.txt";
+      urlFile = "${archiveBase}/telegram/urls.txt";
+      urlLogFile = "${archiveBase}/telegram/url-logs.txt";
       apiIdPath = config.sops.secrets."gallery-dl/telegram/api-id".path;
       apiHashPath = config.sops.secrets."gallery-dl/telegram/api-hash".path;
       sessionStringPath = config.sops.secrets."gallery-dl/telegram/session-string".path;
@@ -195,12 +239,12 @@ in {
       enable = true;
       onCalendar = "minutely";
 
-      workingDir = "/data/archive/telegram";
+      workingDir = "${archiveBase}/telegram";
       renderedConfigFileName = "config-replies.json";
       useDownloadArchiveFile = false;
       config = {
         extractor = {
-          "base-directory" = "/data/archive";
+          "base-directory" = "${archiveBase}";
           archive = "@ARCHIVE_URL@";
           telegram = {
             "api-id" = "@TG_API_ID@";
@@ -227,7 +271,7 @@ in {
       };
 
       # one URL per line (same as main telegram instance)
-      urlFile = "/data/archive/telegram/urls.txt";
+      urlFile = "${archiveBase}/telegram/urls.txt";
 
       # Add your preferred args here:
       args = ["--write-metadata"];
@@ -237,11 +281,11 @@ in {
       enable = true;
       onCalendar = "hourly";
 
-      workingDir = "/data/archive/boosty";
+      workingDir = "${archiveBase}/boosty";
       useDownloadArchiveFile = false;
       config = {
         extractor = {
-          "base-directory" = "/data/archive";
+          "base-directory" = "${archiveBase}";
           archive = "@ARCHIVE_URL@";
           twitter.messages.pin = "@TWITTER_DM_PIN@";
         };
@@ -252,10 +296,10 @@ in {
       };
 
       # one URL per line
-      urlFile = "/data/archive/boosty/urls.txt";
+      urlFile = "${archiveBase}/boosty/urls.txt";
 
       # Add your preferred args here:
-      args = ["--cookies=/data/archive/boosty/cookies.txt" "--write-metadata"];
+      args = ["--cookies=${archiveBase}/boosty/cookies.txt" "--write-metadata"];
     };
 
     instances.twitter = {
@@ -263,11 +307,11 @@ in {
       onCalendar = "*-*-* *:0/30:00";
       pruneEmptyDownloads = true;
 
-      workingDir = "/data/archive/twitter";
+      workingDir = "${archiveBase}/twitter";
       useDownloadArchiveFile = false;
       config = {
         extractor = {
-          "base-directory" = "/data/archive";
+          "base-directory" = "${archiveBase}";
           archive = "@ARCHIVE_URL@";
           skip = "abort:10";
         };
@@ -277,10 +321,10 @@ in {
       };
 
       # one URL per line
-      urlFile = "/data/archive/twitter/urls.txt";
+      urlFile = "${archiveBase}/twitter/urls.txt";
 
       # Add your preferred args here:
-      args = ["--cookies=/data/archive/twitter/cookies.txt" "--write-metadata"];
+      args = ["--cookies=${archiveBase}/twitter/cookies.txt" "--write-metadata"];
     };
 
     instances.twitterDm = {
@@ -289,11 +333,11 @@ in {
       renderedConfigFileName = "config-dm.json";
       pruneEmptyDownloads = true;
 
-      workingDir = "/data/archive/twitter";
+      workingDir = "${archiveBase}/twitter";
       useDownloadArchiveFile = false;
       config = {
         extractor = {
-          "base-directory" = "/data/archive";
+          "base-directory" = "${archiveBase}";
           archive = "@ARCHIVE_URL@";
           twitter.messages.pin = "@TWITTER_DM_PIN@";
         };
@@ -307,7 +351,7 @@ in {
 
       argsBeforeMtime = [
         "--cookies"
-        "/data/archive/twitter/cookies.txt"
+        "${archiveBase}/twitter/cookies.txt"
       ];
 
       args = [
@@ -322,19 +366,21 @@ in {
     };
 
     twitterFollowingList = {
-      urlFile = "/data/archive/twitter/urls.txt";
-      cookiesPath = "/data/archive/twitter/cookies.txt";
+      urlFile = "${archiveBase}/twitter/urls.txt";
+      urlLogFile = "${archiveBase}/twitter/url-logs.txt";
+      cookiesPath = "${archiveBase}/twitter/cookies.txt";
       twitterUsername = "Siad0n";
       onCalendar = "hourly"; # toned down from every 10 min
     };
   };
 
   # --------------------------------------------------------------------------
-  # /data/archive permissions baseline.
+  # ${archiveBase} permissions baseline.
   # --------------------------------------------------------------------------
 
   systemd.services.data-archive-permissions = {
-    description = "Force /data/archive permissions to 0755 recursively";
+    enable = true;
+    description = "Force ${archiveBase} permissions to 0755 recursively";
     wantedBy = ["multi-user.target"];
     after = ["local-fs.target"];
     restartIfChanged = false;
@@ -347,7 +393,8 @@ in {
 
     script = ''
       set -euo pipefail
-      chmod -R 0755 /data/archive
+      find ${archiveBase}/telegram ${archiveBase}/twitter ${archiveBase}/boosty -type d -exec chmod 2775 {} + 2>/dev/null || true
+      find ${archiveBase}/telegram ${archiveBase}/twitter ${archiveBase}/boosty -type f -exec chmod 664 {} + 2>/dev/null || true
     '';
   };
 
@@ -356,23 +403,23 @@ in {
   # With 0755, only the owner can write, so ensure twitter tree ownership is
   # normalized to the gallery-dl service user before each run.
   systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPre = [
-    "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} /data/archive/twitter"
-    "+${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
+    "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} ${archiveBase}/twitter"
+    "+${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
   ];
   systemd.services.gallery-dl-job-twitter.serviceConfig.UMask = "0022";
   systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPost = [
-    "${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
+    "${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
   ];
   systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPre = [
-    "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} /data/archive/twitter"
-    "+${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
+    "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} ${archiveBase}/twitter"
+    "+${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
   ];
   systemd.services.gallery-dl-job-twitterDm.serviceConfig.UMask = "0022";
   systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPost = [
-    "${pkgs.coreutils}/bin/chmod -R 0755 /data/archive/twitter"
+    "${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
   ];
 
-  # Ensure /data/archive paths exist for gallery-dl
+  # Ensure ${archiveBase} paths exist for gallery-dl
   # NOTE: Keep all tmpfiles rules in a single assignment in this file.
 
   # Homepage Dashboard
@@ -420,10 +467,11 @@ in {
   # SHARED MEDIA DIRECTORY STRUCTURE
   # ============================================================================
 
+  # Shared media dirs on Hetzner archive share (torrents, usenet, library)
   fleet.media.shared = {
     enable = true;
-    baseDir = "/data";
-    # Directory structure:
+    baseDir = archiveBase;
+    # Directory structure (when re-enabled):
     # /data/
     # ├── torrents/
     # │   ├── incomplete/   <- qBittorrent temp path
@@ -445,12 +493,12 @@ in {
   };
 
   # ============================================================================
-  # MEDIA SERVICES
+  # MEDIA SERVICES (download stack on Hetzner archive; streaming apps stay off)
   # ============================================================================
 
   # Jellyfin - Media streaming server
   fleet.media.jellyfin = {
-    enable = true;
+    enable = false;
     domain = "jellyfin.sn0wstorm.com";
     # Uses default: sharedCfg.paths.media.root (/data/media)
     hardwareAcceleration = {
@@ -459,40 +507,40 @@ in {
     };
   };
 
-  # *arr stack — temporarily disabled (config retained for re-enable)
+  # *arr stack
   fleet.media.sonarr = {
-    enable = false;
+    enable = true;
     domain = "sonarr.sn0wstorm.com";
   };
 
   fleet.media.radarr = {
-    enable = false;
+    enable = true;
     domain = "radarr.sn0wstorm.com";
   };
 
   fleet.media.lidarr = {
-    enable = false;
+    enable = true;
     domain = "lidarr.sn0wstorm.com";
   };
 
   fleet.media.readarr = {
-    enable = false;
+    enable = true;
     domain = "readarr.sn0wstorm.com";
   };
 
   fleet.media.prowlarr = {
-    enable = false;
+    enable = true;
     domain = "prowlarr.sn0wstorm.com";
   };
 
   fleet.media.bazarr = {
-    enable = false;
+    enable = true;
     domain = "bazarr.sn0wstorm.com";
   };
 
   # Overseerr - Media request management
   fleet.media.overseerr = {
-    enable = true;
+    enable = false;
     domain = "overseerr.sn0wstorm.com";
   };
 
@@ -531,7 +579,7 @@ in {
     wsdd.enable = true;
   };
 
-  # qBittorrent - Torrent client (VPN protected)
+  # qBittorrent - Torrent client (VPN protected, saves to Hetzner archive)
   fleet.media.qbittorrent = {
     enable = true;
     domain = "qbittorrent.sn0wstorm.com";
@@ -555,24 +603,24 @@ in {
 
   # Navidrome - Music streaming server
   fleet.media.navidrome = {
-    enable = true;
+    enable = false;
     domain = "navidrome.sn0wstorm.com";
     # Uses default: sharedCfg.paths.media.music (/data/media/music)
   };
 
-  # Configarr - TRaSH Guides configuration sync (disabled with *arr stack)
+  # Configarr - TRaSH Guides configuration sync
   fleet.media.configarr = {
-    enable = false;
+    enable = true;
     schedule = "daily"; # Sync once per day
 
     sonarr = {
-      enable = false;
+      enable = true;
       url = "http://localhost:8989";
       apiKeyFile = "/run/secrets/sonarr/api-key";
     };
 
     radarr = {
-      enable = false;
+      enable = true;
       url = "http://localhost:7878";
       apiKeyFile = "/run/secrets/radarr/api-key";
     };
@@ -761,8 +809,6 @@ in {
       # Services with their own authentication
       "qbittorrent.sn0wstorm.com"
       "bitwarden.sn0wstorm.com"
-      "jellyfin.sn0wstorm.com"
-      "navidrome.sn0wstorm.com"
       # Legacy services from Docker config
       "grocy.sn0wstorm.com"
       "photos.sn0wstorm.com"
@@ -805,7 +851,7 @@ in {
       "headscale-admin.sn0wstorm.com"
     ];
 
-    # Domains where /api/* bypasses auth (for *arr apps)
+    # Domains where /api/* bypasses auth (for *arr apps; empty while media stack is off)
     apiBypassDomains = [
       "sonarr.sn0wstorm.com"
       "radarr.sn0wstorm.com"
@@ -897,8 +943,37 @@ in {
   # ============================================================================
 
   fleet.system.backupVarLib = {
-    enable = true;
-    schedule = "daily";
+    enable = false;
+    # Local Windows share (D:\Backups\Galadriel_NixOS on 192.168.178.83).
+    schedule = "04:00:00";
+    timeout = "24h";
+    memoryMax = "4G";
+    mountPoint = "/mnt/galadriel-local-backup";
+    repoPath = "/mnt/galadriel-local-backup/restic";
+    secrets = {
+      smbShareFile = "/run/secrets/local_backup_smb/share";
+      smbUsernameFile = "/run/secrets/local_backup_smb/username";
+      smbPasswordFile = "/run/secrets/local_backup_smb/password";
+    };
+    paths = [
+      "/var/lib"
+      "/data"
+      "/etc"
+      "/home"
+      "/root"
+      "/nix/var"
+      "/boot"
+    ];
+    excludes = [
+      "/nix/store"
+      "/mnt"
+      "/var/lib/docker/overlay2"
+      "/var/lib/containers/storage/overlay"
+      "/var/lib/systemd/coredump"
+      "**/.cache"
+      "**/__pycache__"
+      "*.tmp"
+    ];
     retention = {
       keepDaily = 7;
       keepWeekly = 4;
@@ -941,30 +1016,30 @@ in {
         mode = "0400";
       };
 
-      # gallery-dl (telegram) secrets used to render config.json at runtime
+      # gallery-dl secrets
       "gallery-dl/archive-url" = {
-        owner = config.fleet.apps.galleryDl.user;
-        group = config.fleet.apps.galleryDl.group;
+        owner = "gallery-dl";
+        group = "gallery-dl";
         mode = "0400";
       };
       "gallery-dl/telegram/api-id" = {
-        owner = config.fleet.apps.galleryDl.user;
-        group = config.fleet.apps.galleryDl.group;
+        owner = "gallery-dl";
+        group = "gallery-dl";
         mode = "0400";
       };
       "gallery-dl/telegram/api-hash" = {
-        owner = config.fleet.apps.galleryDl.user;
-        group = config.fleet.apps.galleryDl.group;
+        owner = "gallery-dl";
+        group = "gallery-dl";
         mode = "0400";
       };
       "gallery-dl/telegram/session-string" = {
-        owner = config.fleet.apps.galleryDl.user;
-        group = config.fleet.apps.galleryDl.group;
+        owner = "gallery-dl";
+        group = "gallery-dl";
         mode = "0400";
       };
       "gallery-dl/twitter-messages-pin" = {
-        owner = config.fleet.apps.galleryDl.user;
-        group = config.fleet.apps.galleryDl.group;
+        owner = "gallery-dl";
+        group = "gallery-dl";
         mode = "0400";
       };
 
@@ -1125,7 +1200,7 @@ in {
         mode = "0400";
       };
 
-      # Hetzner SMB backup credentials
+      # Hetzner SMB backup credentials (legacy; backup now uses local_backup_smb)
       "hetzner_smb/share" = {
         owner = "root";
         group = "root";
@@ -1137,6 +1212,23 @@ in {
         mode = "0400";
       };
       "hetzner_smb/password" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+
+      # Local Windows SMB backup (D:\Backups\Galadriel_NixOS)
+      "local_backup_smb/share" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "local_backup_smb/username" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      "local_backup_smb/password" = {
         owner = "root";
         group = "root";
         mode = "0400";
@@ -1174,20 +1266,9 @@ in {
   # SOPS AGE KEY DIRECTORY
   # ============================================================================
 
-  # Ensure dominik's directories (and /data/archive paths) exist
+  # Ensure dominik's directories and Nextcloud /data paths exist
   systemd.tmpfiles.rules = [
-    # gallery-dl base (telegram dir and files owned by gallery-dl so the service can chmod/write)
-    "d /data/archive 0777 root root -"
-    "d /data/archive/telegram 0775 gallery-dl gallery-dl -"
-    "f /data/archive/telegram/urls.txt 0664 gallery-dl gallery-dl -"
-    "f /data/archive/telegram/url-logs.txt 0664 gallery-dl gallery-dl -"
-    "d /data/archive/boosty 0777 root root -"
-    "f /data/archive/boosty/urls.txt 0666 root root -"
-    "d /data/archive/twitter 0777 root root -"
-    "f /data/archive/twitter/urls.txt 0666 root root -"
-    "f /data/archive/twitter/url-logs.txt 0666 root root -"
-
-    # Nextcloud data directory
+    # Nextcloud data directory (only /data tree kept on local NVMe)
     "d /data/nextcloud 0770 nextcloud users -"
     "d /data/nextcloud/apps 0770 nextcloud users -"
 

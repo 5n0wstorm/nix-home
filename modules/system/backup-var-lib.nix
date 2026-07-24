@@ -7,6 +7,10 @@
 with lib; let
   cfg = config.fleet.system.backupVarLib;
 
+  pathsLabel = concatStringsSep ", " cfg.paths;
+  resticPathArgs = concatMapStringsSep " " escapeShellArg cfg.paths;
+  resticExcludeArgs = concatMapStringsSep " " (ex: "--exclude=${escapeShellArg ex}") cfg.excludes;
+
   # msmtp does not support `tls_min_version` (it errors with "unknown command").
   # Use gnutls priority strings via `tls_priorities` instead.
   tlsPrioritiesForMinVersion = v:
@@ -27,10 +31,23 @@ with lib; let
     set -euo pipefail
 
     HOSTNAME="${config.networking.hostName}"
+    BACKUP_PATHS="${pathsLabel}"
 
     # Logging helpers
     log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ''$*"; }
     log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ''$*" >&2; }
+
+    on_failure() {
+      log_error "Backup failed"
+      send_email "❌ Backup Failed on ''${HOSTNAME}" "Backup job failed at $(date)
+
+Check logs: journalctl -u backup-var-lib.service
+
+Hostname: ''${HOSTNAME}
+Paths: ''${BACKUP_PATHS}
+Repository: ${cfg.repoPath}"
+      exit 1
+    }
 
     # Email notification helper
     send_email() {
@@ -66,10 +83,10 @@ with lib; let
     }
 
     # Trap errors and send failure email
-    trap 'log_error "Backup failed"; send_email "❌ Backup Failed on ''${HOSTNAME}" "Backup job failed at $(date)\n\nCheck logs: journalctl -u backup-var-lib.service\n\nHostname: ''${HOSTNAME}\nPath: /var/lib"; exit 1' ERR
+    trap on_failure ERR
 
     START_TIME=$(date +%s)
-    log "Starting backup of /var/lib to ${cfg.repoPath}"
+    log "Starting backup of ''${BACKUP_PATHS} to ${cfg.repoPath}"
 
     # Read SMB credentials
     SMB_SHARE=$(cat ${cfg.secrets.smbShareFile})
@@ -79,15 +96,14 @@ with lib; let
     # Create mount point if it doesn't exist
     mkdir -p ${cfg.mountPoint}
 
-    # Mount the SMB share with seal (encryption)
-    log "Mounting SMB share with encryption..."
+    log "Mounting SMB share..."
     mount.cifs \
       "''${SMB_SHARE}" \
       ${cfg.mountPoint} \
-      -o "vers=3.1.1,seal,nosuid,nodev,noexec,uid=0,gid=0,dir_mode=0700,file_mode=0600,username=''${SMB_USERNAME},password=''${SMB_PASSWORD}"
+      -o "${cfg.smbMountOptions},username=''${SMB_USERNAME},password=''${SMB_PASSWORD}"
 
-    # Ensure unmount on exit
-    trap 'log "Unmounting SMB share..."; umount ${cfg.mountPoint} 2>/dev/null || true; send_email "❌ Backup Failed on ''${HOSTNAME}" "Backup job failed at $(date)\n\nCheck logs: journalctl -u backup-var-lib.service\n\nHostname: ''${HOSTNAME}\nPath: /var/lib"; exit 1' ERR
+    # Ensure unmount on exit; report failures via on_failure
+    trap on_failure ERR
     trap 'log "Unmounting SMB share..."; umount ${cfg.mountPoint} 2>/dev/null || true' EXIT
 
     # Initialize restic repo if it doesn't exist
@@ -99,13 +115,11 @@ with lib; let
       restic init
     fi
 
-    # Run backup
+  # Run backup
     log "Running restic backup..."
-    BACKUP_OUTPUT=$(restic backup /var/lib \
-      --exclude='/var/lib/docker/overlay2' \
-      --exclude='/var/lib/systemd/coredump' \
-      --exclude='*.tmp' \
-      --exclude='*.cache' \
+    BACKUP_OUTPUT=$(restic backup ${resticPathArgs} \
+      ${resticExcludeArgs} \
+      --one-file-system \
       --verbose 2>&1)
 
     BACKUP_EXIT=''$?
@@ -139,7 +153,7 @@ with lib; let
     EMAIL_BODY="✅ Backup completed successfully!
 
     Hostname: ''${HOSTNAME}
-    Backup Path: /var/lib
+    Backup Paths: ''${BACKUP_PATHS}
     Repository: ${cfg.repoPath}
     Duration: ''${DURATION_MIN}m ''${DURATION_SEC}s
     Completed: $(date)
@@ -173,18 +187,57 @@ in {
   # ============================================================================
 
   options.fleet.system.backupVarLib = {
-    enable = mkEnableOption "Encrypted backup of /var/lib to SMB share";
+    enable = mkEnableOption "Encrypted restic backup to Hetzner Storage Box (SMB)";
+
+    paths = mkOption {
+      type = types.listOf types.str;
+      default = ["/var/lib"];
+      description = "Absolute paths to include in the restic backup.";
+      example = ["/var/lib" "/data" "/etc" "/home"];
+    };
+
+    excludes = mkOption {
+      type = types.listOf types.str;
+      default = [
+        "/var/lib/docker/overlay2"
+        "/var/lib/containers/storage/overlay"
+        "/var/lib/systemd/coredump"
+        "*.tmp"
+        "*.cache"
+      ];
+      description = "Patterns passed to restic --exclude for every backup run.";
+    };
 
     mountPoint = mkOption {
       type = types.str;
-      default = "/mnt/hetzner-backup";
+      default = "/mnt/galadriel-local-backup";
       description = "Mount point for the SMB share";
+    };
+
+    smbMountOptions = mkOption {
+      type = types.str;
+      default = "vers=3.0,nosuid,nodev,noexec,uid=0,gid=0,dir_mode=0700,file_mode=0600";
+      description = "Extra mount.cifs -o options (username/password appended by the script).";
+      example = "vers=3.1.1,seal,nosuid,nodev,noexec,uid=0,gid=0,dir_mode=0700,file_mode=0600";
     };
 
     repoPath = mkOption {
       type = types.str;
-      default = "${config.fleet.system.backupVarLib.mountPoint}/${config.networking.hostName}/restic/var-lib";
+      default = "${config.fleet.system.backupVarLib.mountPoint}/${config.networking.hostName}/restic/system";
       description = "Path to the restic repository on the mounted share";
+    };
+
+    timeout = mkOption {
+      type = types.str;
+      default = "4h";
+      description = "Maximum runtime for a single backup job (systemd TimeoutStartSec).";
+      example = "24h";
+    };
+
+    memoryMax = mkOption {
+      type = types.str;
+      default = "2G";
+      description = "Memory limit for the backup service.";
     };
 
     schedule = mkOption {
@@ -309,14 +362,12 @@ in {
 
     # Systemd service for backup
     systemd.services.backup-var-lib = {
-      description = "Backup /var/lib to encrypted SMB share";
+      description = "Encrypted restic backup to Hetzner Storage Box";
 
-      # Ensure network is available
+      # Avoid overlapping with other heavy jobs; serialized via timer only.
       after = ["network-online.target"];
       wants = ["network-online.target"];
 
-      # Put mount.cifs, restic, msmtp in PATH so the script finds them;
-      # these packages are in the service closure and stay available at runtime.
       path = with pkgs; [cifs-utils restic msmtp];
 
       serviceConfig = {
@@ -325,22 +376,21 @@ in {
         User = "root";
         Group = "root";
 
-        # Security hardening
         PrivateTmp = true;
 
-        # Resource limits
+        # Keep disk load low — important on galadriel's LVM spanning HDD.
+        Nice = 10;
+        IOSchedulingClass = "idle";
         CPUQuota = "80%";
-        MemoryMax = "2G";
-        IOWeight = 100;
+        MemoryMax = cfg.memoryMax;
+        IOWeight = 50;
 
-        # Timeout (4 hours max)
-        TimeoutStartSec = "4h";
+        TimeoutStartSec = cfg.timeout;
       };
     };
 
-    # Systemd timer for scheduled backups
     systemd.timers.backup-var-lib = {
-      description = "Timer for /var/lib backup";
+      description = "Timer for Hetzner restic backup";
       wantedBy = ["timers.target"];
       timerConfig = {
         OnCalendar = cfg.schedule;

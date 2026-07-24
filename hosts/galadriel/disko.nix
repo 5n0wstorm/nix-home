@@ -2,16 +2,12 @@
 # DISKO CONFIGURATION - Declarative disk partitioning for galadriel
 # ============================================================================
 #
-# NVMe disk with UEFI + LVM layout:
+# NVMe-only UEFI + LVM layout (HGST HDD removed from VG):
 #   /dev/nvme0n1p1 - EFI System Partition (512MB, vfat, /boot)
 #   /dev/nvme0n1p2 - LVM PV (remaining space)
 #     └─ vg_galadriel
 #        ├─ lv_swap (8GB)
 #        └─ lv_root (remaining - ext4)
-#
-# HGST HDD added to LVM:
-#   /dev/disk/by-id/ata-HGST_HTS541010A9E680_JA10001F1DGNPN - LVM PV (100%)
-#     └─ vg_galadriel (extends existing volume group)
 #
 # Verified: UEFI boot via `ls /sys/firmware/efi`
 # Disk: /dev/nvme0n1 (476.9GB)
@@ -39,22 +35,6 @@
             };
             # LVM physical volume - all remaining space
             root = {
-              size = "100%";
-              content = {
-                type = "lvm_pv";
-                vg = "vg_galadriel";
-              };
-            };
-          };
-        };
-      };
-      hgst = {
-        type = "disk";
-        device = "/dev/disk/by-id/ata-HGST_HTS541010A9E680_JA10001F1DGNPN";
-        content = {
-          type = "gpt";
-          partitions = {
-            lvm = {
               size = "100%";
               content = {
                 type = "lvm_pv";

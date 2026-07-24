@@ -155,8 +155,10 @@ in {
     };
 
     # ==========================================================================
-    # USER MANAGEMENT (POSIX permissions via shared media group)
+    # USER MANAGEMENT (POSIX permissions via share group)
     # ==========================================================================
+
+    users.groups.${cfg.dataGroup} = {};
 
     users.users.${cfg.username} = {
       isSystemUser = true;
