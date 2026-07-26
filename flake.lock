@@ -92,18 +92,18 @@
     "gallery-dl-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1775665451,
-        "narHash": "sha256-nXhtMVCVoOacR975+zRy1xAgLSgtYIWK6LX6168ElHA=",
+        "lastModified": 1785089416,
+        "narHash": "sha256-hceaOgofEeh7+uxc3lEkwNp8cdrfZdqytR0jlt11gQQ=",
         "ref": "master",
-        "rev": "40fb9c892d7a733f199dcc15a2a4ba72bd7b36d8",
-        "revCount": 16192,
+        "rev": "69a43ea442d4b14be533a4783b5e6c5282b9ade5",
+        "revCount": 16194,
         "type": "git",
-        "url": "ssh://gitea@192.168.2.10/Dominik/gallery-dl.git"
+        "url": "ssh://gitea@192.168.178.88/Dominik/gallery-dl.git"
       },
       "original": {
         "ref": "master",
         "type": "git",
-        "url": "ssh://gitea@192.168.2.10/Dominik/gallery-dl.git"
+        "url": "ssh://gitea@192.168.178.88/Dominik/gallery-dl.git"
       }
     },
     "home-manager": {

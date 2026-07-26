@@ -93,6 +93,19 @@ in {
   # HOST IDENTIFICATION
   # ============================================================================
 
+  system.activationScripts.nixGiteaNetrc = {
+    deps = [ "setupSecrets" ];
+    text = ''
+    TOKEN="$(cat ${config.sops.secrets."gitea/nix-fetch-token".path})"
+    install -D -m 600 /dev/null /root/.netrc
+    cat > /root/.netrc <<EOF
+machine git.sn0wstorm.com
+login Dominik
+password ''${TOKEN}
+EOF
+    '';
+  };
+
   networking.hostName = "galadriel";
 
   # ============================================================================
@@ -378,25 +391,9 @@ in {
   # ${archiveBase} permissions baseline.
   # --------------------------------------------------------------------------
 
-  systemd.services.data-archive-permissions = {
-    enable = true;
-    description = "Force ${archiveBase} permissions to 0755 recursively";
-    wantedBy = ["multi-user.target"];
-    after = ["local-fs.target"];
-    restartIfChanged = false;
-
-    serviceConfig = {
-      Type = "oneshot";
-      User = "root";
-      Group = "root";
-    };
-
-    script = ''
-      set -euo pipefail
-      find ${archiveBase}/telegram ${archiveBase}/twitter ${archiveBase}/boosty -type d -exec chmod 2775 {} + 2>/dev/null || true
-      find ${archiveBase}/telegram ${archiveBase}/twitter ${archiveBase}/boosty -type f -exec chmod 664 {} + 2>/dev/null || true
-    '';
-  };
+  # CIFS archive permissions come from hetzner-archive-mount (dir_mode/file_mode).
+  # Recursive chmod over SMB is slow and blocks nixos-rebuild for 15+ minutes.
+  systemd.services.data-archive-permissions.enable = false;
 
   # Keep Twitter archive tree SMB-readable after each run (DM downloads can
   # create nested files with restrictive permissions depending on process umask).
@@ -406,6 +403,7 @@ in {
     "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} ${archiveBase}/twitter"
     "+${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
   ];
+  systemd.services.gallery-dl-job-twitter.serviceConfig.TimeoutStartSec = "3h";
   systemd.services.gallery-dl-job-twitter.serviceConfig.UMask = "0022";
   systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPost = [
     "${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
@@ -414,6 +412,7 @@ in {
     "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} ${archiveBase}/twitter"
     "+${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
   ];
+  systemd.services.gallery-dl-job-twitterDm.serviceConfig.TimeoutStartSec = "2h";
   systemd.services.gallery-dl-job-twitterDm.serviceConfig.UMask = "0022";
   systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPost = [
     "${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
@@ -1040,6 +1039,12 @@ in {
       "gallery-dl/twitter-messages-pin" = {
         owner = "gallery-dl";
         group = "gallery-dl";
+        mode = "0400";
+      };
+
+      "gitea/nix-fetch-token" = {
+        owner = "root";
+        group = "root";
         mode = "0400";
       };
 

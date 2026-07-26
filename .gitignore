@@ -4,3 +4,6 @@
 secrets/*.decrypted.*
 *.key
 *keys.txt
+
+# Keep gallery-dl fork on Gitea only; do not vendor into this public repo
+vendor/gallery-dl/
