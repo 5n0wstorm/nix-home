@@ -43,7 +43,7 @@
       (final: prev: let
         inherit (prev) lib;
         # Use upstream Telethon source directly; nixpkgs patch list can lag behind upstream tags.
-        telethonFixed = prev.python3Packages.telethon.overrideAttrs (_oldAttrs: rec {
+        telethonFixed = prev.python3Packages.telethon.overridePythonAttrs (oldAttrs: rec {
           version = "1.42.0";
           src = prev.fetchFromCodeberg {
             owner = "Lonami";
@@ -52,6 +52,14 @@
             hash = "sha256-NMHJkSTGR3/tck0k97EfVN9f85PAWst+EZ6G7Tgrt5s=";
           };
           patches = [];
+          nativeBuildInputs =
+            (oldAttrs.nativeBuildInputs or [])
+            ++ [
+              prev.python3Packages.setuptools
+              prev.python3Packages.wheel
+            ];
+          # Python 3.14 removed implicit event loop; one upstream test still assumes it.
+          doCheck = false;
         });
         galleryDlCustom = prev.gallery-dl.overrideAttrs (oldAttrs: {
           src = gallery-dl-src;

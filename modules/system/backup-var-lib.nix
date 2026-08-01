@@ -28,158 +28,158 @@ with lib; let
 
   # Build the backup script
   backupScript = pkgs.writeShellScript "backup-var-lib" ''
-    set -euo pipefail
+        set -euo pipefail
 
-    HOSTNAME="${config.networking.hostName}"
-    BACKUP_PATHS="${pathsLabel}"
+        HOSTNAME="${config.networking.hostName}"
+        BACKUP_PATHS="${pathsLabel}"
 
-    # Logging helpers
-    log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ''$*"; }
-    log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ''$*" >&2; }
+        # Logging helpers
+        log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ''$*"; }
+        log_error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: ''$*" >&2; }
 
-    on_failure() {
-      log_error "Backup failed"
-      send_email "❌ Backup Failed on ''${HOSTNAME}" "Backup job failed at $(date)
+        on_failure() {
+          log_error "Backup failed"
+          send_email "❌ Backup Failed on ''${HOSTNAME}" "Backup job failed at $(date)
 
-Check logs: journalctl -u backup-var-lib.service
+    Check logs: journalctl -u backup-var-lib.service
 
-Hostname: ''${HOSTNAME}
-Paths: ''${BACKUP_PATHS}
-Repository: ${cfg.repoPath}"
-      exit 1
-    }
+    Hostname: ''${HOSTNAME}
+    Paths: ''${BACKUP_PATHS}
+    Repository: ${cfg.repoPath}"
+          exit 1
+        }
 
-    # Email notification helper
-    send_email() {
-      local subject="''${1}"
-      local body="''${2}"
+        # Email notification helper
+        send_email() {
+          local subject="''${1}"
+          local body="''${2}"
 
-      # Create msmtp config
-      cat > /tmp/msmtprc.''$$ <<EOF
-    account default
-    host ${cfg.email.smtp.host}
-    port ${toString cfg.email.smtp.port}
-    from ${cfg.email.from}
-    auth on
-    user $(cat ${cfg.email.smtp.usernameFile})
-    password $(cat ${cfg.email.smtp.passwordFile})
-    tls on
-    tls_starttls on
-    tls_certcheck ${
+          # Create msmtp config
+          cat > /tmp/msmtprc.''$$ <<EOF
+        account default
+        host ${cfg.email.smtp.host}
+        port ${toString cfg.email.smtp.port}
+        from ${cfg.email.from}
+        auth on
+        user $(cat ${cfg.email.smtp.usernameFile})
+        password $(cat ${cfg.email.smtp.passwordFile})
+        tls on
+        tls_starttls on
+        tls_certcheck ${
       if cfg.email.smtp.tls.skipVerify
       then "off"
       else "on"
     }
-    ${optionalString ((tlsPrioritiesForMinVersion cfg.email.smtp.tls.minimumVersion) != "") "tls_priorities ${tlsPrioritiesForMinVersion cfg.email.smtp.tls.minimumVersion}"}
-    logfile /var/log/backup-var-lib-msmtp.log
-    EOF
-      chmod 600 /tmp/msmtprc.''$$
+        ${optionalString ((tlsPrioritiesForMinVersion cfg.email.smtp.tls.minimumVersion) != "") "tls_priorities ${tlsPrioritiesForMinVersion cfg.email.smtp.tls.minimumVersion}"}
+        logfile /var/log/backup-var-lib-msmtp.log
+        EOF
+          chmod 600 /tmp/msmtprc.''$$
 
-      # Send email
-      echo -e "Subject: ''${subject}\n\n''${body}" | \
-        msmtp --file=/tmp/msmtprc.''$$ -t "${cfg.email.to}"
+          # Send email
+          echo -e "Subject: ''${subject}\n\n''${body}" | \
+            msmtp --file=/tmp/msmtprc.''$$ -t "${cfg.email.to}"
 
-      rm -f /tmp/msmtprc.''$$
-    }
+          rm -f /tmp/msmtprc.''$$
+        }
 
-    # Trap errors and send failure email
-    trap on_failure ERR
+        # Trap errors and send failure email
+        trap on_failure ERR
 
-    START_TIME=$(date +%s)
-    log "Starting backup of ''${BACKUP_PATHS} to ${cfg.repoPath}"
+        START_TIME=$(date +%s)
+        log "Starting backup of ''${BACKUP_PATHS} to ${cfg.repoPath}"
 
-    # Read SMB credentials
-    SMB_SHARE=$(cat ${cfg.secrets.smbShareFile})
-    SMB_USERNAME=$(cat ${cfg.secrets.smbUsernameFile})
-    SMB_PASSWORD=$(cat ${cfg.secrets.smbPasswordFile})
+        # Read SMB credentials
+        SMB_SHARE=$(cat ${cfg.secrets.smbShareFile})
+        SMB_USERNAME=$(cat ${cfg.secrets.smbUsernameFile})
+        SMB_PASSWORD=$(cat ${cfg.secrets.smbPasswordFile})
 
-    # Create mount point if it doesn't exist
-    mkdir -p ${cfg.mountPoint}
+        # Create mount point if it doesn't exist
+        mkdir -p ${cfg.mountPoint}
 
-    log "Mounting SMB share..."
-    mount.cifs \
-      "''${SMB_SHARE}" \
-      ${cfg.mountPoint} \
-      -o "${cfg.smbMountOptions},username=''${SMB_USERNAME},password=''${SMB_PASSWORD}"
+        log "Mounting SMB share..."
+        mount.cifs \
+          "''${SMB_SHARE}" \
+          ${cfg.mountPoint} \
+          -o "${cfg.smbMountOptions},username=''${SMB_USERNAME},password=''${SMB_PASSWORD}"
 
-    # Ensure unmount on exit; report failures via on_failure
-    trap on_failure ERR
-    trap 'log "Unmounting SMB share..."; umount ${cfg.mountPoint} 2>/dev/null || true' EXIT
+        # Ensure unmount on exit; report failures via on_failure
+        trap on_failure ERR
+        trap 'log "Unmounting SMB share..."; umount ${cfg.mountPoint} 2>/dev/null || true' EXIT
 
-    # Initialize restic repo if it doesn't exist
-    export RESTIC_PASSWORD_FILE=${cfg.secrets.resticPasswordFile}
-    export RESTIC_REPOSITORY=${cfg.repoPath}
+        # Initialize restic repo if it doesn't exist
+        export RESTIC_PASSWORD_FILE=${cfg.secrets.resticPasswordFile}
+        export RESTIC_REPOSITORY=${cfg.repoPath}
 
-    if ! restic snapshots &>/dev/null; then
-      log "Initializing new restic repository..."
-      restic init
-    fi
+        if ! restic snapshots &>/dev/null; then
+          log "Initializing new restic repository..."
+          restic init
+        fi
 
-  # Run backup
-    log "Running restic backup..."
-    BACKUP_OUTPUT=$(restic backup ${resticPathArgs} \
-      ${resticExcludeArgs} \
-      --one-file-system \
-      --verbose 2>&1)
+      # Run backup
+        log "Running restic backup..."
+        BACKUP_OUTPUT=$(restic backup ${resticPathArgs} \
+          ${resticExcludeArgs} \
+          --one-file-system \
+          --verbose 2>&1)
 
-    BACKUP_EXIT=''$?
-    if [ ''${BACKUP_EXIT} -ne 0 ]; then
-      log_error "Restic backup failed with exit code ''${BACKUP_EXIT}"
-      exit ''${BACKUP_EXIT}
-    fi
+        BACKUP_EXIT=''$?
+        if [ ''${BACKUP_EXIT} -ne 0 ]; then
+          log_error "Restic backup failed with exit code ''${BACKUP_EXIT}"
+          exit ''${BACKUP_EXIT}
+        fi
 
-    # Apply retention policy
-    log "Applying retention policy..."
-    FORGET_OUTPUT=$(restic forget --prune \
-      --keep-daily ${toString cfg.retention.keepDaily} \
-      --keep-weekly ${toString cfg.retention.keepWeekly} \
-      --keep-monthly ${toString cfg.retention.keepMonthly} \
-      --verbose 2>&1)
+        # Apply retention policy
+        log "Applying retention policy..."
+        FORGET_OUTPUT=$(restic forget --prune \
+          --keep-daily ${toString cfg.retention.keepDaily} \
+          --keep-weekly ${toString cfg.retention.keepWeekly} \
+          --keep-monthly ${toString cfg.retention.keepMonthly} \
+          --verbose 2>&1)
 
-    # Get repository stats
-    log "Gathering repository statistics..."
-    STATS_OUTPUT=$(restic stats --mode raw-data 2>&1 || echo "Stats unavailable")
+        # Get repository stats
+        log "Gathering repository statistics..."
+        STATS_OUTPUT=$(restic stats --mode raw-data 2>&1 || echo "Stats unavailable")
 
-    END_TIME=$(date +%s)
-    DURATION=$((END_TIME - START_TIME))
-    DURATION_MIN=$((DURATION / 60))
-    DURATION_SEC=$((DURATION % 60))
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        DURATION_MIN=$((DURATION / 60))
+        DURATION_SEC=$((DURATION % 60))
 
-    # Extract useful info from backup output
-    FILES_NEW=$(echo "''${BACKUP_OUTPUT}" | grep -oP 'Added to the repository: \K[\d.]+\s+\w+' || echo "N/A")
-    FILES_CHANGED=$(echo "''${BACKUP_OUTPUT}" | grep -oP 'processed \K\d+ files' || echo "N/A")
+        # Extract useful info from backup output
+        FILES_NEW=$(echo "''${BACKUP_OUTPUT}" | grep -oP 'Added to the repository: \K[\d.]+\s+\w+' || echo "N/A")
+        FILES_CHANGED=$(echo "''${BACKUP_OUTPUT}" | grep -oP 'processed \K\d+ files' || echo "N/A")
 
-    # Build success email
-    EMAIL_BODY="✅ Backup completed successfully!
+        # Build success email
+        EMAIL_BODY="✅ Backup completed successfully!
 
-    Hostname: ''${HOSTNAME}
-    Backup Paths: ''${BACKUP_PATHS}
-    Repository: ${cfg.repoPath}
-    Duration: ''${DURATION_MIN}m ''${DURATION_SEC}s
-    Completed: $(date)
+        Hostname: ''${HOSTNAME}
+        Backup Paths: ''${BACKUP_PATHS}
+        Repository: ${cfg.repoPath}
+        Duration: ''${DURATION_MIN}m ''${DURATION_SEC}s
+        Completed: $(date)
 
-    === Backup Summary ===
-    ''${FILES_CHANGED}
-    Data Added: ''${FILES_NEW}
+        === Backup Summary ===
+        ''${FILES_CHANGED}
+        Data Added: ''${FILES_NEW}
 
-    === Retention Policy ===
-    Daily: ${toString cfg.retention.keepDaily}
-    Weekly: ${toString cfg.retention.keepWeekly}
-    Monthly: ${toString cfg.retention.keepMonthly}
+        === Retention Policy ===
+        Daily: ${toString cfg.retention.keepDaily}
+        Weekly: ${toString cfg.retention.keepWeekly}
+        Monthly: ${toString cfg.retention.keepMonthly}
 
-    === Repository Stats ===
-    ''${STATS_OUTPUT}
+        === Repository Stats ===
+        ''${STATS_OUTPUT}
 
-    === Recent Snapshots ===
-    $(restic snapshots --compact | tail -10)
+        === Recent Snapshots ===
+        $(restic snapshots --compact | tail -10)
 
-    Check full logs: journalctl -u backup-var-lib.service
-    "
+        Check full logs: journalctl -u backup-var-lib.service
+        "
 
-    log "Backup completed successfully in ''${DURATION_MIN}m ''${DURATION_SEC}s"
+        log "Backup completed successfully in ''${DURATION_MIN}m ''${DURATION_SEC}s"
 
-    # Send success email
-    send_email "✅ Backup Successful on ''${HOSTNAME}" "''${EMAIL_BODY}"
+        # Send success email
+        send_email "✅ Backup Successful on ''${HOSTNAME}" "''${EMAIL_BODY}"
   '';
 in {
   # ============================================================================

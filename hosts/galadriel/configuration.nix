@@ -94,15 +94,15 @@ in {
   # ============================================================================
 
   system.activationScripts.nixGiteaNetrc = {
-    deps = [ "setupSecrets" ];
+    deps = ["setupSecrets"];
     text = ''
-    TOKEN="$(cat ${config.sops.secrets."gitea/nix-fetch-token".path})"
-    install -D -m 600 /dev/null /root/.netrc
-    cat > /root/.netrc <<EOF
-machine git.sn0wstorm.com
-login Dominik
-password ''${TOKEN}
-EOF
+          TOKEN="$(cat ${config.sops.secrets."gitea/nix-fetch-token".path})"
+          install -D -m 600 /dev/null /root/.netrc
+          cat > /root/.netrc <<EOF
+      machine git.sn0wstorm.com
+      login Dominik
+      password ''${TOKEN}
+      EOF
     '';
   };
 

@@ -134,16 +134,16 @@ in {
         };
       }
       (foldl' (
-        acc: svc:
-          acc
-          // {
-            ${svc} = {
-              after = mkAfter ["hetzner-archive-mount.service"];
-              requires = mkAfter ["hetzner-archive-mount.service"];
-            };
-          }
-      ) {}
-      cfg.afterMountServices)
+          acc: svc:
+            acc
+            // {
+              ${svc} = {
+                after = mkAfter ["hetzner-archive-mount.service"];
+                requires = mkAfter ["hetzner-archive-mount.service"];
+              };
+            }
+        ) {}
+        cfg.afterMountServices)
     ];
   };
 }
