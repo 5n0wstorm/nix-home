@@ -77,6 +77,10 @@ in {
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
+            # Unmount on stop (shutdown/reboot). A separate RequiredBy=umount.target
+            # unit with DefaultDependencies=yes Conflicts=shutdown.target while umount
+            # wants to start it, which breaks reboot with stop/start job conflicts.
+            ExecStop = "${pkgs.util-linux}/bin/umount ${cfg.mountPoint} || true";
           };
 
           path = [pkgs.cifs-utils pkgs.coreutils pkgs.util-linux];
@@ -114,22 +118,6 @@ in {
               touch "${archivePath}/$f"
               chmod 664 "${archivePath}/$f" || true
             done
-          '';
-        };
-
-        hetzner-archive-mount-pre-stop = {
-          description = "Unmount Hetzner Storage Box on shutdown";
-          requiredBy = ["umount.target"];
-          before = ["umount.target"];
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-          };
-          path = [pkgs.util-linux];
-          script = ''
-            if ${pkgs.util-linux}/bin/mountpoint -q ${cfg.mountPoint}; then
-              umount ${cfg.mountPoint} || true
-            fi
           '';
         };
       }
