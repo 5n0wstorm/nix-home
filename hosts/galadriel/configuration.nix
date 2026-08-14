@@ -13,13 +13,16 @@
     "gallery-dl-boosty.service"
     "gallery-dl-twitter.service"
     "gallery-dl-twitterDm.service"
+    "gallery-dl-simpcity.service"
     "gallery-dl-telegram-channel-list.service"
     "gallery-dl-twitter-following-list.service"
+    "gallery-dl-simpcity-watched-threads-list.service"
     "gallery-dl-job-telegram.service"
     "gallery-dl-job-telegramReplies.service"
     "gallery-dl-job-boosty.service"
     "gallery-dl-job-twitter.service"
     "gallery-dl-job-twitterDm.service"
+    "gallery-dl-job-simpcity.service"
   ];
   archiveMountConsumers =
     galleryDlAfterMount
@@ -92,19 +95,6 @@ in {
   # ============================================================================
   # HOST IDENTIFICATION
   # ============================================================================
-
-  system.activationScripts.nixGiteaNetrc = {
-    deps = ["setupSecrets"];
-    text = ''
-          TOKEN="$(cat ${config.sops.secrets."gitea/nix-fetch-token".path})"
-          install -D -m 600 /dev/null /root/.netrc
-          cat > /root/.netrc <<EOF
-      machine git.sn0wstorm.com
-      login Dominik
-      password ''${TOKEN}
-      EOF
-    '';
-  };
 
   networking.hostName = "galadriel";
 
@@ -385,38 +375,78 @@ in {
       twitterUsername = "Siad0n";
       onCalendar = "hourly"; # toned down from every 10 min
     };
+
+    instances.simpcity = {
+      enable = true;
+      onCalendar = "hourly";
+
+      workingDir = "${archiveBase}/simpcity";
+      useDownloadArchiveFile = false;
+      config = {
+        extractor = {
+          "base-directory" = archiveBase;
+          archive = "@ARCHIVE_URL@";
+          simpcity = {
+            username = "@SIMPCITY_USERNAME@";
+            password = "@SIMPCITY_PASSWORD@";
+            "order-posts" = "asc";
+            directory = [
+              "{category}"
+              ''{thread[section]}''
+              ''{thread[title]} ({thread[id]})''
+            ];
+            "parent-directory" = true;
+            "parent-metadata" = "simpc";
+          };
+          "simpcity>*" = {
+            directory = [];
+          };
+        };
+      };
+      configSubstitutions = {
+        "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
+        "@SIMPCITY_USERNAME@" = config.sops.secrets."gallery-dl/simpcity/username".path;
+        "@SIMPCITY_PASSWORD@" = config.sops.secrets."gallery-dl/simpcity/password".path;
+      };
+
+      urlFile = "${archiveBase}/simpcity/urls.txt";
+
+      args = ["--write-metadata"];
+    };
+
+    simpcityWatchedThreadsList = {
+      urlFile = "${archiveBase}/simpcity/urls.txt";
+      urlLogFile = "${archiveBase}/simpcity/url-logs.txt";
+      usernamePath = config.sops.secrets."gallery-dl/simpcity/username".path;
+      passwordPath = config.sops.secrets."gallery-dl/simpcity/password".path;
+      watchedThreadsUrl = "https://simpcity.cr/watched/threads";
+      onCalendar = "hourly";
+    };
   };
 
   # --------------------------------------------------------------------------
   # ${archiveBase} permissions baseline.
   # --------------------------------------------------------------------------
 
-  # CIFS archive permissions come from hetzner-archive-mount (dir_mode/file_mode).
-  # Recursive chmod over SMB is slow and blocks nixos-rebuild for 15+ minutes.
-  systemd.services.data-archive-permissions.enable = false;
+  systemd.services.data-archive-permissions = {
+    enable = true;
+    description = "Force ${archiveBase} permissions to 0755 recursively";
+    wantedBy = ["multi-user.target"];
+    after = ["local-fs.target"];
+    restartIfChanged = false;
 
-  # Keep Twitter archive tree SMB-readable after each run (DM downloads can
-  # create nested files with restrictive permissions depending on process umask).
-  # With 0755, only the owner can write, so ensure twitter tree ownership is
-  # normalized to the gallery-dl service user before each run.
-  systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPre = [
-    "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} ${archiveBase}/twitter"
-    "+${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
-  ];
-  systemd.services.gallery-dl-job-twitter.serviceConfig.TimeoutStartSec = "3h";
-  systemd.services.gallery-dl-job-twitter.serviceConfig.UMask = "0022";
-  systemd.services.gallery-dl-job-twitter.serviceConfig.ExecStartPost = [
-    "${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
-  ];
-  systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPre = [
-    "+${pkgs.coreutils}/bin/chown -R ${config.fleet.apps.galleryDl.user}:${config.fleet.apps.galleryDl.group} ${archiveBase}/twitter"
-    "+${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
-  ];
-  systemd.services.gallery-dl-job-twitterDm.serviceConfig.TimeoutStartSec = "2h";
-  systemd.services.gallery-dl-job-twitterDm.serviceConfig.UMask = "0022";
-  systemd.services.gallery-dl-job-twitterDm.serviceConfig.ExecStartPost = [
-    "${pkgs.coreutils}/bin/chmod -R 0755 ${archiveBase}/twitter"
-  ];
+    serviceConfig = {
+      Type = "oneshot";
+      User = "root";
+      Group = "root";
+    };
+
+    script = ''
+      set -euo pipefail
+      find ${archiveBase}/telegram ${archiveBase}/twitter ${archiveBase}/boosty ${archiveBase}/simpcity -type d -exec chmod 2775 {} + 2>/dev/null || true
+      find ${archiveBase}/telegram ${archiveBase}/twitter ${archiveBase}/boosty ${archiveBase}/simpcity -type f -exec chmod 664 {} + 2>/dev/null || true
+    '';
+  };
 
   # Ensure ${archiveBase} paths exist for gallery-dl
   # NOTE: Keep all tmpfiles rules in a single assignment in this file.
@@ -1041,10 +1071,14 @@ in {
         group = "gallery-dl";
         mode = "0400";
       };
-
-      "gitea/nix-fetch-token" = {
-        owner = "root";
-        group = "root";
+      "gallery-dl/simpcity/username" = {
+        owner = "gallery-dl";
+        group = "gallery-dl";
+        mode = "0400";
+      };
+      "gallery-dl/simpcity/password" = {
+        owner = "gallery-dl";
+        group = "gallery-dl";
         mode = "0400";
       };
 

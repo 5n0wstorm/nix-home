@@ -322,6 +322,61 @@ in {
           head -n 1 /data/archive/twitter/urls.txt | xargs gallery-dl --cookies /data/archive/twitter/cookies.txt --simulate
       '';
     };
+
+    simpcityWatchedThreadsList = mkOption {
+      type = types.nullOr (types.submodule {
+        options = {
+          enable = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Whether to run the SimpCity watched-threads list updater.";
+          };
+          urlFile = mkOption {
+            type = types.str;
+            description = "Path to the file to write thread URLs (one per line), e.g. the urlFile used by gallery-dl simpcity instance.";
+            example = "/data/archive/simpcity/urls.txt";
+          };
+          usernamePath = mkOption {
+            type = types.str;
+            description = "Path to file containing the SimpCity username.";
+            example = "/run/secrets/gallery-dl/simpcity/username";
+          };
+          passwordPath = mkOption {
+            type = types.str;
+            description = "Path to file containing the SimpCity password.";
+            example = "/run/secrets/gallery-dl/simpcity/password";
+          };
+          watchedThreadsUrl = mkOption {
+            type = types.str;
+            default = "https://simpcity.cr/watched/threads";
+            description = "SimpCity watched-threads page to enumerate.";
+            example = "https://simpcity.cr/watched/threads";
+          };
+          urlLogFile = mkOption {
+            type = types.str;
+            default = "/data/archive/simpcity/url-logs.txt";
+            description = "Path to append added/deleted URL diffs when the watched-threads list changes.";
+            example = "/data/archive/simpcity/url-logs.txt";
+          };
+          onCalendar = mkOption {
+            type = types.str;
+            default = "daily";
+            description = "systemd OnCalendar for the watched-threads updater timer.";
+            example = "*-*-* 04:30:00";
+          };
+        };
+      });
+      default = null;
+      description = ''
+        If set, a systemd service and timer fetch all watched thread URLs from
+        https://simpcity.cr/watched/threads (with username/password) and write them to urlFile.
+
+        Sanity check (on the host):
+          systemctl start gallery-dl-simpcity-watched-threads-list.service
+          cat /data/archive/simpcity/urls.txt
+          head -n 1 /data/archive/simpcity/urls.txt | xargs gallery-dl -u "$(cat /run/secrets/gallery-dl/simpcity/username)" -p "$(cat /run/secrets/gallery-dl/simpcity/password)" --simulate
+      '';
+    };
   };
 
   # ============================================================================
@@ -454,6 +509,17 @@ in {
             archiveUrlFile = inst.configSubstitutions."@ARCHIVE_URL@" or null;
           in ''
             set -euo pipefail
+
+            ${optionalString (inst.urlFile != null) ''
+              # Input lists can be removed or may not have existed when the CIFS
+              # archive mount was initialized. An empty list is a valid no-op run.
+              ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname ${escapeShellArg inst.urlFile})"
+              # Use a newline rather than a zero-byte file: pruneEmptyDownloads
+              # deliberately removes zero-byte files before invoking gallery-dl.
+              if [ ! -s ${escapeShellArg inst.urlFile} ]; then
+                ${pkgs.coreutils}/bin/printf "%s\n" "" > ${escapeShellArg inst.urlFile}
+              fi
+            ''}
 
             ${optionalString (inst.config != null) ''
               # Render config from Nix attrset + secret files at runtime (keeps secrets out of git/Nix store).
@@ -673,6 +739,14 @@ in {
                 fi
               fi
             done < "$raw" | sort -u > "$newlist"
+            if [ ! -s ${escapeShellArg cookiesPath} ]; then
+              echo "cookies file missing or empty: ${cookiesPath}" >&2
+              exit 0
+            fi
+            if [ ! -s "$newlist" ]; then
+              echo "following list fetch returned no URLs; keeping existing ${urlFile}" >&2
+              exit 0
+            fi
             # Only update urlFile if the list changed
             if [[ -f "$out" ]] && ${pkgs.diffutils}/bin/cmp -s "$newlist" "$out"; then
               exit 0
@@ -694,8 +768,177 @@ in {
               echo ""
             } >> "$logfile"
             chmod 666 "$logfile" 2>/dev/null || true
-            chmod 666 "$newlist"
-            mv "$newlist" "$out"
+            ${pkgs.coreutils}/bin/cp "$newlist" "$out"
+          '';
+        };
+      }))
+      //
+      # SimpCity watched-threads list updater (optional)
+      (optionalAttrs (cfg.enable && cfg.simpcityWatchedThreadsList != null && cfg.simpcityWatchedThreadsList.enable) (let
+        swl = cfg.simpcityWatchedThreadsList;
+        urlFile = swl.urlFile;
+        urlLogFile = swl.urlLogFile;
+        usernamePath = swl.usernamePath;
+        passwordPath = swl.passwordPath;
+        watchedThreadsUrl = swl.watchedThreadsUrl;
+        pythonScript = ''
+          import re
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timezone
+          from http.cookiejar import CookieJar
+          from pathlib import Path
+
+          WATCHED_URL = "${watchedThreadsUrl}".rstrip("/")
+          USERNAME_PATH = Path("${usernamePath}")
+          PASSWORD_PATH = Path("${passwordPath}")
+          OUT_PATH = Path("${urlFile}")
+          LOG_PATH = Path("${urlLogFile}")
+          THREAD_RE = re.compile(
+              r'(/(?:index\\.php\\?)?threads/[^"]+)"[^>]+data-xf-init='
+          )
+          TOKEN_RE = re.compile(r'name="_xfToken" value="([^"]+)"')
+          _parsed = urllib.parse.urlsplit(WATCHED_URL)
+          ROOT = f"{_parsed.scheme}://{_parsed.netloc}"
+          USER_AGENT = (
+              "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          )
+
+          def normalize_thread_url(path):
+              path = urllib.parse.unquote(path.split("#", 1)[0]).rstrip("/") + "/"
+              return ROOT + path
+
+          def load_opener():
+              jar = CookieJar()
+              opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+              opener.addheaders = [("User-Agent", USER_AGENT)]
+              return opener
+
+          def fetch_page(opener, url, data=None, method=None):
+              req = urllib.request.Request(url, data=data, method=method)
+              with opener.open(req, timeout=120) as resp:
+                  return resp.read().decode("utf-8", errors="replace"), resp.geturl()
+
+          def login(opener, username, password):
+              login_url = f"{ROOT}/login/login"
+              page, _ = fetch_page(opener, login_url)
+              match = TOKEN_RE.search(page)
+              if not match:
+                  raise RuntimeError("missing _xfToken on login page")
+              payload = urllib.parse.urlencode({
+                  "_xfToken": match.group(1),
+                  "login": username,
+                  "password": password,
+                  "remember": "1",
+                  "_xfRedirect": "",
+              }).encode("utf-8")
+              fetch_page(
+                  opener,
+                  login_url,
+                  data=payload,
+                  method="POST",
+              )
+
+          def extract_threads(page):
+              urls = set()
+              for path in THREAD_RE.findall(page):
+                  urls.add(normalize_thread_url(path))
+              return urls
+
+          def fetch_watched_threads(opener):
+              urls = set()
+              page_num = 1
+              while True:
+                  url = WATCHED_URL if page_num == 1 else f"{WATCHED_URL}/page-{page_num}"
+                  page, final_url = fetch_page(opener, url)
+                  if "watched/threads" not in final_url and page_num == 1:
+                      raise RuntimeError(f"unexpected redirect while fetching watched threads: {final_url}")
+                  urls.update(extract_threads(page))
+                  if "pageNav-jump--next" not in page:
+                      break
+                  page_num += 1
+              return sorted(urls)
+
+          def main():
+              if not USERNAME_PATH.is_file() or USERNAME_PATH.stat().st_size == 0:
+                  print(f"username secret missing or empty: {USERNAME_PATH}", file=sys.stderr)
+                  return 0
+              if not PASSWORD_PATH.is_file() or PASSWORD_PATH.stat().st_size == 0:
+                  print(f"password secret missing or empty: {PASSWORD_PATH}", file=sys.stderr)
+                  return 0
+
+              username = USERNAME_PATH.read_text(encoding="utf-8").strip()
+              password = PASSWORD_PATH.read_text(encoding="utf-8").strip()
+              if not username or not password:
+                  print("simpcity username/password are empty", file=sys.stderr)
+                  return 0
+
+              try:
+                  opener = load_opener()
+                  login(opener, username, password)
+                  urls = fetch_watched_threads(opener)
+              except urllib.error.HTTPError as exc:
+                  print(f"failed to fetch watched threads ({exc.code}): {exc.reason}", file=sys.stderr)
+                  return 0
+              except Exception as exc:
+                  print(f"failed to fetch watched threads: {exc}", file=sys.stderr)
+                  return 0
+
+              if not urls:
+                  print(f"watched threads fetch returned no URLs; keeping existing {OUT_PATH}", file=sys.stderr)
+                  return 0
+
+              new_set = set(urls)
+              old_lines = OUT_PATH.read_text(encoding="utf-8").strip().splitlines() if OUT_PATH.exists() else []
+              old_set = set(line.strip() for line in old_lines if line.strip())
+              if new_set == old_set:
+                  return 0
+
+              added = sorted(new_set - old_set)
+              deleted = sorted(old_set - new_set)
+              ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+              with LOG_PATH.open("a", encoding="utf-8") as f:
+                  f.write(f"--- {ts} ---\\n")
+                  if added:
+                      f.write("added:\\n")
+                      for u in added:
+                          f.write(f"  {u}\\n")
+                  if deleted:
+                      f.write("deleted:\\n")
+                      for u in deleted:
+                          f.write(f"  {u}\\n")
+                  f.write("\\n")
+
+              OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+              OUT_PATH.write_text("\\n".join(urls) + "\\n", encoding="utf-8")
+              for path in (OUT_PATH, LOG_PATH):
+                  try:
+                      path.chmod(0o666)
+                  except OSError:
+                      pass
+              return 0
+
+          raise SystemExit(main())
+        '';
+      in {
+        gallery-dl-simpcity-watched-threads-list = {
+          description = "Update SimpCity watched-threads list for gallery-dl urls.txt";
+
+          restartIfChanged = false;
+          serviceConfig = {
+            Type = "oneshot";
+            User = cfg.user;
+            Group = cfg.group;
+            SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+            RuntimeDirectory = "gallery-dl";
+            RuntimeDirectoryMode = "0750";
+          };
+
+          script = ''
+            exec ${pkgs.python3}/bin/python -c ${escapeShellArg pythonScript}
           '';
         };
       }));
@@ -731,6 +974,17 @@ in {
             OnCalendar = cfg.twitterFollowingList.onCalendar;
             Persistent = true;
             Unit = "gallery-dl-twitter-following-list.service";
+          };
+        };
+      })
+      // (optionalAttrs (cfg.enable && cfg.simpcityWatchedThreadsList != null && cfg.simpcityWatchedThreadsList.enable) {
+        gallery-dl-simpcity-watched-threads-list = {
+          description = "Timer: update SimpCity watched-threads list for gallery-dl";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnCalendar = cfg.simpcityWatchedThreadsList.onCalendar;
+            Persistent = true;
+            Unit = "gallery-dl-simpcity-watched-threads-list.service";
           };
         };
       });
