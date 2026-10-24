@@ -317,7 +317,7 @@ in {
           -v ${configPath}:/app/config.yml:ro \
           -v ${cfg.configDir}/secrets.yml:/app/secrets.yml:ro \
           --network host \
-          ghcr.io/configarr/configarr:latest
+          ghcr.io/raydak-labs/configarr:latest
 
         echo "Configarr sync completed"
       '';
