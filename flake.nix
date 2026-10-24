@@ -60,12 +60,12 @@
         inherit (prev) lib;
         # Use upstream Telethon source directly; nixpkgs patch list can lag behind upstream tags.
         telethonFixed = prev.python3Packages.telethon.overridePythonAttrs (oldAttrs: rec {
-          version = "1.42.0";
+          version = "1.45.0";
           src = prev.fetchFromCodeberg {
             owner = "Lonami";
             repo = "Telethon";
             tag = "v${version}";
-            hash = "sha256-NMHJkSTGR3/tck0k97EfVN9f85PAWst+EZ6G7Tgrt5s=";
+            hash = "sha256-glKzh5l1/xvC6wa2sdE5050yeW0xYGBAHe2KLHS36hU=";
           };
           patches = [];
           # New nixpkgs Python builds need setuptools explicitly for pyproject backend.
