@@ -282,8 +282,8 @@ in {
     settingsJsonPath = (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
     # Memories: fetch and normalize layout so Nextcloud sees appinfo/ at root (store install often fails).
     memoriesUnpacked = pkgs.fetchNextcloudApp {
-      url = "https://github.com/pulsejet/memories/releases/download/v7.8.2/memories.tar.gz";
-      hash = "sha256-2inyllJ00BgoQV5SaZkweSy87BPENonOLaEpm1sz5no=";
+      url = "https://github.com/pulsejet/memories/releases/download/v8.1.0/memories.tar.gz";
+      hash = "sha256-wIjDS/UafHC4oSPkqh13k8qfiPESeBI2c0TTSelYoj0=";
       license = "agpl3Only";
       unpack = true;
     };
@@ -346,6 +346,10 @@ in {
     # Memories (exiftool/ffmpeg): ensure PATH so proc_open() can run exiftool when occ or cron runs.
     # mkForce overrides the systemd module's default PATH for these services.
     systemd.services.nextcloud-setup.environment.PATH = mkForce nextcloudPath;
+    # DB is reached via TCP, so upstream adds no ordering; without this the
+    # setup/upgrade races a restarting MySQL during switch and fails.
+    systemd.services.nextcloud-setup.after = lib.optional config.services.mysql.enable "mysql.service";
+    systemd.services.nextcloud-setup.wants = lib.optional config.services.mysql.enable "mysql.service";
     systemd.services.phpfpm-nextcloud.environment.PATH = mkForce nextcloudPath;
     systemd.services.nextcloud-cron.environment.PATH = mkForce nextcloudPath;
     systemd.services.nextcloud-update-db.environment.PATH = mkForce nextcloudPath;
@@ -415,7 +419,7 @@ in {
         if mysqlFromFleet
         then mysqlConn.passwordFile
         else cfg.database.mysql.passwordFile;
-      nextcloudPkg = pkgs.nextcloud32;
+      nextcloudPkg = pkgs.nextcloud33;
     in {
       enable = true;
       package = nextcloudPkg;
@@ -423,14 +427,16 @@ in {
       home = "/var/lib/nextcloud"; # Config directory
       datadir = "/var/lib/nextcloud";
       config = {
-        adminuser = "admin";
-        adminpassFile = "/run/secrets/nextcloud/admin-password";
         dbtype = cfg.database.type;
         dbhost = "${mysqlHost}:${toString mysqlPort}";
         dbname = mysqlDatabase;
         dbuser = mysqlUser;
         dbpassFile = mysqlPasswordFile;
       };
+
+      # Mitigation for PHP session upload progress issues (CVE-2026-109619 path,
+      # CVE-2026-115560); Nextcloud does not use this feature.
+      phpOptions."session.upload_progress.enabled" = "0";
 
       # Reverse-proxy awareness (prevents login redirect loops behind nginx/TLS).
       # Our fleet reverse proxy terminates TLS and forwards to Nextcloud via HTTP.

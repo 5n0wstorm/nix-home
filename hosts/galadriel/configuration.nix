@@ -308,7 +308,7 @@ in {
     instances.twitter = {
       enable = true;
       onCalendar = "*-*-* *:0/30:00";
-      pruneEmptyDownloads = true;
+      pruneEmptyDownloads = false;
 
       workingDir = "${archiveBase}/twitter";
       useDownloadArchiveFile = false;
@@ -334,7 +334,7 @@ in {
       enable = true;
       onCalendar = "hourly";
       renderedConfigFileName = "config-dm.json";
-      pruneEmptyDownloads = true;
+      pruneEmptyDownloads = false;
 
       workingDir = "${archiveBase}/twitter";
       useDownloadArchiveFile = false;
@@ -382,14 +382,20 @@ in {
 
       workingDir = "${archiveBase}/simpcity";
       useDownloadArchiveFile = false;
+      pruneEmptyDownloads = false;
       config = {
         extractor = {
           "base-directory" = archiveBase;
           archive = "@ARCHIVE_URL@";
           simpcity = {
-            username = "@SIMPCITY_USERNAME@";
-            password = "@SIMPCITY_PASSWORD@";
+            cookies = "${archiveBase}/simpcity/cookies.txt";
+            "cookies-update" = false;
             "order-posts" = "asc";
+            parent = true;
+            "parent-session" = true;
+            referer = "https://simpcity.cr/";
+            browser = "chrome/138:windows";
+            "sleep-request" = "2.0-4.0";
             directory = [
               "{category}"
               ''{thread[section]}''
@@ -400,27 +406,78 @@ in {
           };
           "simpcity>*" = {
             directory = [];
+            "parent-session" = true;
+            referer = "https://simpcity.cr/";
+          };
+        };
+        downloader = {
+          http = {
+            headers = {
+              Referer = "https://simpcity.cr/";
+            };
           };
         };
       };
       configSubstitutions = {
         "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
-        "@SIMPCITY_USERNAME@" = config.sops.secrets."gallery-dl/simpcity/username".path;
-        "@SIMPCITY_PASSWORD@" = config.sops.secrets."gallery-dl/simpcity/password".path;
       };
 
       urlFile = "${archiveBase}/simpcity/urls.txt";
 
-      args = ["--write-metadata"];
+      impersonateWarmupUrl = null;
+      impersonateCookiesPath = "${archiveBase}/simpcity/cookies.txt";
+      challengeSolverUrl = null;
+      skipIfChallengeCookiesExpired = true;
+
+      argsBeforeMtime = [
+        "--cookies"
+        "${archiveBase}/simpcity/cookies.txt"
+      ];
+      args = ["--write-metadata" "--abort" "1"];
     };
 
     simpcityWatchedThreadsList = {
       urlFile = "${archiveBase}/simpcity/urls.txt";
       urlLogFile = "${archiveBase}/simpcity/url-logs.txt";
-      usernamePath = config.sops.secrets."gallery-dl/simpcity/username".path;
-      passwordPath = config.sops.secrets."gallery-dl/simpcity/password".path;
+      cookiesPath = "${archiveBase}/simpcity/cookies.txt";
       watchedThreadsUrl = "https://simpcity.cr/watched/threads";
       onCalendar = "hourly";
+    };
+
+    simpcityDdgRefresh = {
+      enable = true;
+      cookiesPath = "${archiveBase}/simpcity/cookies.txt";
+      solverUrl = "http://127.0.0.1:8191/v1";
+      warmupUrl = "https://simpcity.cr/";
+      # Run a few minutes before the hourly simpcity job to avoid timer races.
+      onCalendar = "*-*-* *:55:00";
+    };
+  };
+
+  # DDoS-Guard JS challenge solver for SimpCity (same WAN IP as the browser;
+  # gallery-dl/curl cannot run the challenge themselves).
+  systemd.services.flaresolverr = {
+    description = "FlareSolverr (localhost DDoS-Guard solver)";
+    wantedBy = ["multi-user.target"];
+    after = ["network-online.target"];
+    wants = ["network-online.target"];
+    serviceConfig = {
+      Type = "simple";
+      DynamicUser = true;
+      StateDirectory = "flaresolverr";
+      WorkingDirectory = "/var/lib/flaresolverr";
+      Restart = "on-failure";
+      RestartSec = "5s";
+      ExecStart = "${pkgs.flaresolverr}/bin/flaresolverr";
+      Environment = [
+        "HOST=127.0.0.1"
+        "PORT=8191"
+        "LOG_LEVEL=info"
+        "HOME=/var/lib/flaresolverr"
+        "XDG_CONFIG_HOME=/var/lib/flaresolverr/.config"
+        "XDG_CACHE_HOME=/var/lib/flaresolverr/.cache"
+        "XDG_DATA_HOME=/var/lib/flaresolverr/.local/share"
+      ];
     };
   };
 
@@ -437,14 +494,18 @@ in {
 
     serviceConfig = {
       Type = "oneshot";
+      RemainAfterExit = true;
       User = "root";
       Group = "root";
     };
 
     script = ''
       set -euo pipefail
+      stamp=/var/lib/data-archive-permissions.stamp
+      if [ -f "$stamp" ]; then exit 0; fi
       find ${archiveBase}/telegram ${archiveBase}/twitter ${archiveBase}/boosty ${archiveBase}/simpcity -type d -exec chmod 2775 {} + 2>/dev/null || true
       find ${archiveBase}/telegram ${archiveBase}/twitter ${archiveBase}/boosty ${archiveBase}/simpcity -type f -exec chmod 664 {} + 2>/dev/null || true
+      touch "$stamp"
     '';
   };
 

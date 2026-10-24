@@ -260,7 +260,7 @@ in {
       settings = mkMerge [
         {
           server = {
-            DOMAIN = cfg.domain;
+            SSH_DOMAIN = cfg.domain;
             ROOT_URL = effectiveRootUrl;
             HTTP_PORT = cfg.port;
             HTTP_ADDR = cfg.listenAddress;

@@ -111,7 +111,7 @@ in {
               telegram/urls.txt telegram/url-logs.txt \
               boosty/urls.txt \
               twitter/urls.txt twitter/url-logs.txt \
-              simpcity/urls.txt simpcity/url-logs.txt; do
+              simpcity/urls.txt simpcity/url-logs.txt simpcity/cookies.txt; do
               touch "${archivePath}/$f"
               chmod 664 "${archivePath}/$f" || true
             done
@@ -135,16 +135,16 @@ in {
         };
       }
       (foldl' (
-        acc: svc:
-          acc
-          // {
-            ${svc} = {
-              after = mkAfter ["hetzner-archive-mount.service"];
-              requires = mkAfter ["hetzner-archive-mount.service"];
-            };
-          }
-      ) {}
-      cfg.afterMountServices)
+          acc: svc:
+            acc
+            // {
+              ${svc} = {
+                after = mkAfter ["hetzner-archive-mount.service"];
+                requires = mkAfter ["hetzner-archive-mount.service"];
+              };
+            }
+        ) {}
+        cfg.afterMountServices)
     ];
   };
 }

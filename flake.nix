@@ -5,6 +5,8 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Fast-moving channel used only for urgent security fixes (see php overlay).
+    nixpkgs-small.url = "github:NixOS/nixpkgs/nixos-unstable-small";
     colmena.url = "github:zhaofengli/colmena";
     nixos-wsl.url = "github:nix-community/NixOS-WSL";
     sops-nix.url = "github:Mic92/sops-nix";
@@ -24,6 +26,7 @@
 
   outputs = {
     nixpkgs,
+    nixpkgs-small,
     colmena,
     nixos-wsl,
     sops-nix,
@@ -40,6 +43,19 @@
     # =========================================================================
 
     overlays = [
+      # PHP CVE-2026-109618 / CVE-2026-109619 (unauthenticated RCE, fixed in
+      # 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12). Pull PHP from nixos-unstable-small
+      # until nixos-unstable catches up; disables itself once it has.
+      (final: prev: let
+        inherit (prev) lib;
+        small = nixpkgs-small.legacyPackages.${prev.stdenv.hostPlatform.system};
+        # Attribute names must not depend on prev's values (infinite recursion).
+        useSmall = lib.versionOlder prev.php84.version "8.4.27";
+      in
+        lib.genAttrs ["php" "php83" "php84" "php85"] (n:
+          if useSmall
+          then small.${n}
+          else prev.${n}))
       (final: prev: let
         inherit (prev) lib;
         # Use upstream Telethon source directly; nixpkgs patch list can lag behind upstream tags.
@@ -52,6 +68,7 @@
             hash = "sha256-NMHJkSTGR3/tck0k97EfVN9f85PAWst+EZ6G7Tgrt5s=";
           };
           patches = [];
+          # New nixpkgs Python builds need setuptools explicitly for pyproject backend.
           nativeBuildInputs =
             (oldAttrs.nativeBuildInputs or [])
             ++ [
@@ -64,13 +81,17 @@
         galleryDlCustom = prev.gallery-dl.overrideAttrs (oldAttrs: {
           src = gallery-dl-src;
           version = "custom-${gallery-dl-src.shortRev or "unknown"}";
-          doCheck = false;
-          pytestCheckPhase = "true";
           # Upstream test data for extractor category matching can drift over time.
           # Keep checks enabled but skip this known flaky mismatch for the custom fork.
           disabledTests =
             (oldAttrs.disabledTests or [])
-            ++ ["test/test_extractor.py::TestExtractorModule::test_categories"];
+            ++ [
+              "test/test_extractor.py::TestExtractorModule::test_categories"
+              "TestExtractorModule.test_categories"
+            ];
+          pytestFlags =
+            (oldAttrs.pytestFlags or [])
+            ++ ["--deselect=test/test_extractor.py::TestExtractorModule::test_categories"];
 
           # Some forks/patchsets include the telegram extractor raising
           # `gallery_dl.exception.MissingDependencyError`, but the exception class

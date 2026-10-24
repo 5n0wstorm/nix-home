@@ -203,8 +203,72 @@ in {
             description = ''
               Before each run, delete 0-byte or partial (*.part) media files under
               `workingDir` and remove matching Postgres archive rows so gallery-dl
-              will retry failed Twitter downloads instead of skipping them forever.
+              will retry failed downloads instead of skipping them forever.
               Requires `@ARCHIVE_URL@` in `configSubstitutions`.
+
+              When `pruneArchivePrefixes` is set, also removes archive rows for
+              those extractor prefixes when no matching file exists under
+              `workingDir` (covers failed downloads that never created a file).
+            '';
+          };
+
+          pruneArchivePrefixes = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = ''
+              Extractor name prefixes for orphan archive cleanup when
+              `pruneEmptyDownloads` is enabled (e.g. `["bunkr" "saint" "simpcity"]`).
+              Archive entries matching `prefix%` are deleted when no file under
+              `workingDir` contains the entry suffix (the part after the last `_`).
+            '';
+            example = ["bunkr" "saint" "simpcity"];
+          };
+
+          httpProxy = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = ''
+              HTTP proxy URL for this instance (e.g. Gluetun on http://127.0.0.1:8888).
+              Used for a curl-impersonate DDoS-Guard warmup and as HTTPS_PROXY for gallery-dl.
+            '';
+            example = "http://127.0.0.1:8888";
+          };
+
+          impersonateWarmupUrl = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = ''
+              If set, hit this URL with curl-impersonate (Chrome TLS) before gallery-dl
+              to refresh DDoS-Guard cookies for the current egress IP.
+            '';
+            example = "https://simpcity.cr/";
+          };
+
+          impersonateCookiesPath = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "Cookie jar updated by impersonateWarmupUrl (Netscape format).";
+            example = "/mnt/hetzner/archive/simpcity/cookies.txt";
+          };
+
+          challengeSolverUrl = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = ''
+              FlareSolverr `/v1` endpoint. When set with impersonateCookiesPath,
+              solve the DDoS-Guard JS challenge in a real browser and merge the
+              resulting cookies into the jar before gallery-dl runs.
+            '';
+            example = "http://127.0.0.1:8191/v1";
+          };
+
+          skipIfChallengeCookiesExpired = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              Skip the run when `__ddg5_` is missing or expired so a stale
+              DDoS-Guard jar does not 403 every URL (and escalate to captcha).
+              Requires impersonateCookiesPath.
             '';
           };
         };
@@ -336,15 +400,10 @@ in {
             description = "Path to the file to write thread URLs (one per line), e.g. the urlFile used by gallery-dl simpcity instance.";
             example = "/data/archive/simpcity/urls.txt";
           };
-          usernamePath = mkOption {
+          cookiesPath = mkOption {
             type = types.str;
-            description = "Path to file containing the SimpCity username.";
-            example = "/run/secrets/gallery-dl/simpcity/username";
-          };
-          passwordPath = mkOption {
-            type = types.str;
-            description = "Path to file containing the SimpCity password.";
-            example = "/run/secrets/gallery-dl/simpcity/password";
+            description = "Path to the Netscape cookies file for the SimpCity account (same as gallery-dl simpcity instance).";
+            example = "/data/archive/simpcity/cookies.txt";
           };
           watchedThreadsUrl = mkOption {
             type = types.str;
@@ -364,17 +423,67 @@ in {
             description = "systemd OnCalendar for the watched-threads updater timer.";
             example = "*-*-* 04:30:00";
           };
+          httpProxy = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "HTTP proxy for watched-threads fetches (Gluetun).";
+            example = "http://127.0.0.1:8888";
+          };
         };
       });
       default = null;
       description = ''
         If set, a systemd service and timer fetch all watched thread URLs from
-        https://simpcity.cr/watched/threads (with username/password) and write them to urlFile.
+        https://simpcity.cr/watched/threads (with cookies) and write them to urlFile.
 
         Sanity check (on the host):
           systemctl start gallery-dl-simpcity-watched-threads-list.service
           cat /data/archive/simpcity/urls.txt
-          head -n 1 /data/archive/simpcity/urls.txt | xargs gallery-dl -u "$(cat /run/secrets/gallery-dl/simpcity/username)" -p "$(cat /run/secrets/gallery-dl/simpcity/password)" --simulate
+          head -n 1 /data/archive/simpcity/urls.txt | xargs gallery-dl --cookies /data/archive/simpcity/cookies.txt --simulate
+      '';
+    };
+
+    simpcityDdgRefresh = mkOption {
+      type = types.nullOr (types.submodule {
+        options = {
+          enable = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Keep a FlareSolverr Chrome session and refresh DDoS-Guard cookies.";
+          };
+          cookiesPath = mkOption {
+            type = types.str;
+            description = "Netscape cookie jar to seed and update.";
+            example = "/mnt/hetzner/archive/simpcity/cookies.txt";
+          };
+          solverUrl = mkOption {
+            type = types.str;
+            default = "http://127.0.0.1:8191/v1";
+            description = "FlareSolverr /v1 endpoint.";
+          };
+          warmupUrl = mkOption {
+            type = types.str;
+            default = "https://simpcity.cr/";
+            description = "Page to open in the persistent Chrome session.";
+          };
+          sessionName = mkOption {
+            type = types.str;
+            default = "simpcity";
+            description = "FlareSolverr session id (reused so Chrome stays warm).";
+          };
+          onCalendar = mkOption {
+            type = types.str;
+            default = "hourly";
+            description = "How often to visit warmupUrl and write back __ddg* cookies.";
+          };
+        };
+      });
+      default = null;
+      description = ''
+        Persistent FlareSolverr session that reopens SimpCity with the current
+        cookie jar. A fresh headless profile cannot mint `__ddg5_`; the same
+        Chrome session can run the JS challenge when that cookie expires.
+        Captcha pages are ignored and cookies.txt is left unchanged.
       '';
     };
   };
@@ -471,6 +580,12 @@ in {
           "--mtime"
           cfg.mtimeMetadataField
         ];
+        ddgRefreshBeforeJob =
+          cfg.simpcityDdgRefresh
+          != null
+          && cfg.simpcityDdgRefresh.enable
+          && inst.impersonateCookiesPath != null
+          && inst.impersonateCookiesPath == cfg.simpcityDdgRefresh.cookiesPath;
         args =
           (optional (effectiveConfigFile != null) "--config")
           ++ (optional (effectiveConfigFile != null) (toString effectiveConfigFile))
@@ -486,19 +601,32 @@ in {
         nameValuePair "gallery-dl-job-${name}" {
           description = "gallery-dl instance job: ${name}";
           # X/Twitter DM extraction may require `node` for passcode recovery.
-          path = [pkgs.nodejs pkgs.postgresql];
+          path = [pkgs.nodejs pkgs.postgresql pkgs.curl-impersonate];
 
           # If a job is running during a switch, don't restart it (avoids blocking rebuilds).
           restartIfChanged = false;
 
-          serviceConfig = {
-            Type = "oneshot";
-            User = cfg.user;
-            Group = cfg.group;
-            SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
-            WorkingDirectory = instanceDir;
-            Nice = 10;
-          };
+          serviceConfig =
+            {
+              Type = "oneshot";
+              User = cfg.user;
+              Group = cfg.group;
+              SupplementaryGroups = optional (sharedMediaCfg.enable or false) archiveGroup;
+              WorkingDirectory = instanceDir;
+              Nice = 10;
+            }
+            // optionalAttrs ddgRefreshBeforeJob {
+              # Refresh DDoS-Guard cookies before the expiry skip check (+ runs as root).
+              ExecStartPre = "+${pkgs.systemd}/bin/systemctl start gallery-dl-simpcity-ddg-refresh.service";
+            }
+            // optionalAttrs (inst.httpProxy != null) {
+              Environment = [
+                "HTTPS_PROXY=${inst.httpProxy}"
+                "HTTP_PROXY=${inst.httpProxy}"
+                "ALL_PROXY=${inst.httpProxy}"
+                "NO_PROXY=127.0.0.1,localhost"
+              ];
+            };
 
           script = let
             subsJson = builtins.toJSON (mapAttrs (_k: v: toString v) inst.configSubstitutions);
@@ -550,26 +678,228 @@ in {
             ${optionalString (inst.pruneEmptyDownloads && archiveUrlFile != null) ''
               # Failed downloads can leave 0-byte files while Postgres archive still
               # marks them complete — gallery-dl then skips them forever.
-              echo "Pruning empty/partial downloads under ${instanceDir}"
-              ARCHIVE_URL=$(tr -d '\n\r' < ${escapeShellArg (toString archiveUrlFile)})
-              find ${escapeShellArg instanceDir} -type f \( -size 0 -o -name '*.part' \) 2>/dev/null | while IFS= read -r f; do
-                base=$(basename "$f")
-                id=$(printf '%s' "$base" | ${pkgs.gnugrep}/bin/grep -oE '^[0-9]+' || true)
-                case "$f" in
-                  *.part)
-                    stem="''${f%.part}"
-                    rm -f "$f" "$stem" "$stem.json"
-                    ;;
-                  *)
-                    rm -f "$f" "$f.json"
-                    ;;
-                esac
-                if [ -n "$id" ]; then
-                  pattern="twitter''${id}_%"
-                  ${pkgs.postgresql}/bin/psql "$ARCHIVE_URL" -v ON_ERROR_STOP=0 \
-                    -c "DELETE FROM archive WHERE entry LIKE '$pattern'" || true
-                fi
-              done
+              if ! (
+                echo "Pruning empty/partial downloads under ${instanceDir}"
+                ARCHIVE_URL=$(tr -d '\n\r' < ${escapeShellArg (toString archiveUrlFile)})
+                while IFS= read -r f; do
+                  base=$(basename "$f")
+                  id=$(printf '%s' "$base" | ${pkgs.gnugrep}/bin/grep -oE '^[0-9]+' || true)
+                  case "$f" in
+                    *.part)
+                      stem="''${f%.part}"
+                      rm -f "$f" "$stem" "$stem.json"
+                      ;;
+                    *)
+                      rm -f "$f" "$f.json"
+                      ;;
+                  esac
+                  if [ -n "$id" ]; then
+                    pattern="twitter''${id}_%"
+                    ${pkgs.postgresql}/bin/psql "$ARCHIVE_URL" -v ON_ERROR_STOP=0 \
+                      -c "DELETE FROM archive WHERE entry LIKE '$pattern'" || true
+                  fi
+                done < <(find ${escapeShellArg instanceDir} -type f \( -size 0 -o -name '*.part' \) 2>/dev/null || true)
+              ); then
+                echo "Pruning empty/partial downloads failed; continuing gallery-dl run"
+              fi
+            ''}
+
+            ${optionalString ((inst.pruneEmptyDownloads || false) && archiveUrlFile != null && inst.pruneArchivePrefixes != []) ''
+              if ! (
+                echo "Pruning orphan archive entries under ${instanceDir} for prefixes: ${lib.concatStringsSep " " inst.pruneArchivePrefixes}"
+                ARCHIVE_URL=$(tr -d '\n\r' < ${escapeShellArg (toString archiveUrlFile)})
+                FILE_INDEX=$(${pkgs.coreutils}/bin/mktemp)
+                ORPHANS=$(${pkgs.coreutils}/bin/mktemp)
+                find ${escapeShellArg instanceDir} -type f 2>/dev/null > "$FILE_INDEX" || true
+                PREFIXES_JSON=${escapeShellArg (builtins.toJSON inst.pruneArchivePrefixes)} \
+                ARCHIVE_URL="$ARCHIVE_URL" \
+                FILE_INDEX="$FILE_INDEX" \
+                ORPHANS="$ORPHANS" \
+                ${pkgs.python3}/bin/python3 - <<'PY'
+              import json
+              import os
+              import subprocess
+
+              prefixes = json.loads(os.environ["PREFIXES_JSON"])
+              archive_url = os.environ["ARCHIVE_URL"]
+              file_index_path = os.environ["FILE_INDEX"]
+              orphans_path = os.environ["ORPHANS"]
+
+              with open(file_index_path, encoding="utf-8") as fh:
+                  files = fh.read()
+
+              def psql_copy(sql, data):
+                  proc = subprocess.run(
+                      ["psql", archive_url, "-v", "ON_ERROR_STOP=1", "-c", sql],
+                      input=data,
+                      text=True,
+                      capture_output=True,
+                  )
+                  if proc.returncode != 0:
+                      raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
+
+              orphans = []
+              for prefix in prefixes:
+                  proc = subprocess.run(
+                      ["psql", archive_url, "-t", "-A", "-c",
+                       f"SELECT entry FROM archive WHERE entry LIKE '{prefix}%'"],
+                      text=True,
+                      capture_output=True,
+                      check=True,
+                  )
+                  for entry in proc.stdout.splitlines():
+                      if not entry:
+                          continue
+                      suffix = entry.rsplit("_", 1)[-1]
+                      if not suffix or suffix == entry:
+                          continue
+                      if suffix not in files:
+                          orphans.append(entry)
+
+              if not orphans:
+                  open(orphans_path, "w", encoding="utf-8").close()
+              else:
+                  with open(orphans_path, "w", encoding="utf-8") as fh:
+                      fh.write("\n".join(orphans))
+                      fh.write("\n")
+                  psql_copy(
+                      "CREATE TEMP TABLE orphan_entries (entry text); "
+                      "COPY orphan_entries FROM STDIN; "
+                      "DELETE FROM archive a USING orphan_entries o WHERE a.entry = o.entry;",
+                      "\n".join(orphans) + "\n",
+                  )
+                  print(f"Pruned {len(orphans)} orphan archive entries")
+              PY
+                rm -f "$FILE_INDEX" "$ORPHANS"
+              ); then
+                echo "Pruning orphan archive entries failed; continuing gallery-dl run"
+              fi
+            ''}
+
+            ${optionalString (inst.skipIfChallengeCookiesExpired && inst.impersonateCookiesPath != null) ''
+              if ! JAR=${escapeShellArg inst.impersonateCookiesPath} \
+              ${pkgs.python3}/bin/python3 - <<'PY'
+              import os
+              import time
+              from pathlib import Path
+
+              jar = Path(os.environ["JAR"])
+              now = int(time.time())
+              ddg5 = None
+              if jar.exists():
+                  for line in jar.read_text(encoding="utf-8", errors="replace").splitlines():
+                      if not line or line.startswith("#"):
+                          continue
+                      parts = line.split("\t")
+                      if len(parts) >= 7 and parts[5] == "__ddg5_":
+                          try:
+                              ddg5 = int(parts[4] or "0")
+                          except ValueError:
+                              ddg5 = 0
+                          break
+              if ddg5 is None:
+                  print("DDoS-Guard cookie __ddg5_ missing; skipping gallery-dl until cookies.txt is refreshed")
+                  raise SystemExit(2)
+              if ddg5 > 0 and ddg5 < now:
+                  print(f"DDoS-Guard cookie __ddg5_ expired ({ddg5} < {now}); skipping gallery-dl until cookies.txt is refreshed")
+                  raise SystemExit(2)
+              PY
+              then
+                exit 0
+              fi
+            ''}
+
+            ${optionalString (inst.challengeSolverUrl != null && inst.impersonateCookiesPath != null && inst.impersonateWarmupUrl != null) ''
+              echo "Solving DDoS-Guard challenge via FlareSolverr"
+              JAR=${escapeShellArg inst.impersonateCookiesPath} \
+              SOLVER=${escapeShellArg inst.challengeSolverUrl} \
+              WARMUP=${escapeShellArg inst.impersonateWarmupUrl} \
+              ${pkgs.python3}/bin/python3 - <<'PY'
+              import json
+              import os
+              import urllib.error
+              import urllib.request
+              from pathlib import Path
+
+              jar = Path(os.environ["JAR"])
+              solver = os.environ["SOLVER"]
+              url = os.environ["WARMUP"]
+              payload = json.dumps({
+                  "cmd": "request.get",
+                  "url": url,
+                  "maxTimeout": 60000,
+              }).encode()
+              req = urllib.request.Request(
+                  solver,
+                  data=payload,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=75) as resp:
+                      data = json.loads(resp.read().decode())
+              except Exception as exc:
+                  print(f"flaresolverr request failed: {exc}")
+                  raise SystemExit(0)
+
+              if data.get("status") != "ok":
+                  print(f"flaresolverr status={data.get('status')} msg={data.get('message')}")
+                  raise SystemExit(0)
+
+              solution = data.get("solution") or {}
+              cookies = solution.get("cookies") or []
+              status = solution.get("status")
+              html = solution.get("response") or ""
+              print(f"flaresolverr page status={status} cookies={len(cookies)} msg={data.get('message')}")
+              if "id=\"XF\"" not in html or "ddg-captcha-page" in html:
+                  print("flaresolverr did not return XenForo HTML (captcha/challenge page); leaving cookies.txt unchanged")
+                  raise SystemExit(0)
+              if not cookies:
+                  raise SystemExit(0)
+
+              existing = []
+              if jar.exists():
+                  existing = jar.read_text(encoding="utf-8", errors="replace").splitlines()
+
+              header = [
+                  "# Netscape HTTP Cookie File",
+                  "# https://curl.haxx.se/rfc/cookie_spec.html",
+                  "# This is a generated file! Do not edit.",
+                  "",
+              ]
+              kept = []
+              seen = set()
+              for line in existing:
+                  if not line or line.startswith("#"):
+                      continue
+                  parts = line.split("\t")
+                  if len(parts) < 7:
+                      continue
+                  name = parts[5]
+                  if name.startswith("__ddg") or name in {"ddg_last_challenge"}:
+                      continue
+                  kept.append(line)
+                  seen.add((parts[0], name))
+
+              added = 0
+              for ck in cookies:
+                  name = ck.get("name") or ""
+                  value = ck.get("value") or ""
+                  domain = ck.get("domain") or ".simpcity.cr"
+                  path = ck.get("path") or "/"
+                  secure = "TRUE" if ck.get("secure") else "FALSE"
+                  expiry = str(int(ck.get("expiry") or 0))
+                  flag = "TRUE" if domain.startswith(".") else "FALSE"
+                  key = (domain, name)
+                  if key in seen and not (name.startswith("__ddg") or name == "ddg_last_challenge"):
+                      continue
+                  kept.append("\t".join([domain, flag, path, secure, expiry, name, value]))
+                  seen.add(key)
+                  added += 1
+
+              jar.write_text("\n".join(header + kept) + "\n", encoding="utf-8")
+              print(f"merged {added} solver cookies into {jar}")
+              PY
             ''}
 
             # Don't fail the unit hard on extractor/runtime errors. These jobs are
@@ -778,156 +1108,14 @@ in {
         swl = cfg.simpcityWatchedThreadsList;
         urlFile = swl.urlFile;
         urlLogFile = swl.urlLogFile;
-        usernamePath = swl.usernamePath;
-        passwordPath = swl.passwordPath;
-        watchedThreadsUrl = swl.watchedThreadsUrl;
-        pythonScript = ''
-          import re
-          import sys
-          import urllib.error
-          import urllib.parse
-          import urllib.request
-          from datetime import datetime, timezone
-          from http.cookiejar import CookieJar
-          from pathlib import Path
-
-          WATCHED_URL = "${watchedThreadsUrl}".rstrip("/")
-          USERNAME_PATH = Path("${usernamePath}")
-          PASSWORD_PATH = Path("${passwordPath}")
-          OUT_PATH = Path("${urlFile}")
-          LOG_PATH = Path("${urlLogFile}")
-          THREAD_RE = re.compile(
-              r'(/(?:index\\.php\\?)?threads/[^"]+)"[^>]+data-xf-init='
-          )
-          TOKEN_RE = re.compile(r'name="_xfToken" value="([^"]+)"')
-          _parsed = urllib.parse.urlsplit(WATCHED_URL)
-          ROOT = f"{_parsed.scheme}://{_parsed.netloc}"
-          USER_AGENT = (
-              "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-              "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-          )
-
-          def normalize_thread_url(path):
-              path = urllib.parse.unquote(path.split("#", 1)[0]).rstrip("/") + "/"
-              return ROOT + path
-
-          def load_opener():
-              jar = CookieJar()
-              opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-              opener.addheaders = [("User-Agent", USER_AGENT)]
-              return opener
-
-          def fetch_page(opener, url, data=None, method=None):
-              req = urllib.request.Request(url, data=data, method=method)
-              with opener.open(req, timeout=120) as resp:
-                  return resp.read().decode("utf-8", errors="replace"), resp.geturl()
-
-          def login(opener, username, password):
-              login_url = f"{ROOT}/login/login"
-              page, _ = fetch_page(opener, login_url)
-              match = TOKEN_RE.search(page)
-              if not match:
-                  raise RuntimeError("missing _xfToken on login page")
-              payload = urllib.parse.urlencode({
-                  "_xfToken": match.group(1),
-                  "login": username,
-                  "password": password,
-                  "remember": "1",
-                  "_xfRedirect": "",
-              }).encode("utf-8")
-              fetch_page(
-                  opener,
-                  login_url,
-                  data=payload,
-                  method="POST",
-              )
-
-          def extract_threads(page):
-              urls = set()
-              for path in THREAD_RE.findall(page):
-                  urls.add(normalize_thread_url(path))
-              return urls
-
-          def fetch_watched_threads(opener):
-              urls = set()
-              page_num = 1
-              while True:
-                  url = WATCHED_URL if page_num == 1 else f"{WATCHED_URL}/page-{page_num}"
-                  page, final_url = fetch_page(opener, url)
-                  if "watched/threads" not in final_url and page_num == 1:
-                      raise RuntimeError(f"unexpected redirect while fetching watched threads: {final_url}")
-                  urls.update(extract_threads(page))
-                  if "pageNav-jump--next" not in page:
-                      break
-                  page_num += 1
-              return sorted(urls)
-
-          def main():
-              if not USERNAME_PATH.is_file() or USERNAME_PATH.stat().st_size == 0:
-                  print(f"username secret missing or empty: {USERNAME_PATH}", file=sys.stderr)
-                  return 0
-              if not PASSWORD_PATH.is_file() or PASSWORD_PATH.stat().st_size == 0:
-                  print(f"password secret missing or empty: {PASSWORD_PATH}", file=sys.stderr)
-                  return 0
-
-              username = USERNAME_PATH.read_text(encoding="utf-8").strip()
-              password = PASSWORD_PATH.read_text(encoding="utf-8").strip()
-              if not username or not password:
-                  print("simpcity username/password are empty", file=sys.stderr)
-                  return 0
-
-              try:
-                  opener = load_opener()
-                  login(opener, username, password)
-                  urls = fetch_watched_threads(opener)
-              except urllib.error.HTTPError as exc:
-                  print(f"failed to fetch watched threads ({exc.code}): {exc.reason}", file=sys.stderr)
-                  return 0
-              except Exception as exc:
-                  print(f"failed to fetch watched threads: {exc}", file=sys.stderr)
-                  return 0
-
-              if not urls:
-                  print(f"watched threads fetch returned no URLs; keeping existing {OUT_PATH}", file=sys.stderr)
-                  return 0
-
-              new_set = set(urls)
-              old_lines = OUT_PATH.read_text(encoding="utf-8").strip().splitlines() if OUT_PATH.exists() else []
-              old_set = set(line.strip() for line in old_lines if line.strip())
-              if new_set == old_set:
-                  return 0
-
-              added = sorted(new_set - old_set)
-              deleted = sorted(old_set - new_set)
-              ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-              with LOG_PATH.open("a", encoding="utf-8") as f:
-                  f.write(f"--- {ts} ---\\n")
-                  if added:
-                      f.write("added:\\n")
-                      for u in added:
-                          f.write(f"  {u}\\n")
-                  if deleted:
-                      f.write("deleted:\\n")
-                      for u in deleted:
-                          f.write(f"  {u}\\n")
-                  f.write("\\n")
-
-              OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-              OUT_PATH.write_text("\\n".join(urls) + "\\n", encoding="utf-8")
-              for path in (OUT_PATH, LOG_PATH):
-                  try:
-                      path.chmod(0o666)
-                  except OSError:
-                      pass
-              return 0
-
-          raise SystemExit(main())
-        '';
+        cookiesPath = swl.cookiesPath;
+        watchedThreadsUrl = lib.removeSuffix "/" swl.watchedThreadsUrl;
       in {
         gallery-dl-simpcity-watched-threads-list = {
           description = "Update SimpCity watched-threads list for gallery-dl urls.txt";
 
           restartIfChanged = false;
+          path = [pkgs.curl pkgs.gnugrep pkgs.gnused pkgs.coreutils pkgs.util-linux pkgs.diffutils];
           serviceConfig = {
             Type = "oneshot";
             User = cfg.user;
@@ -938,7 +1126,232 @@ in {
           };
 
           script = ''
-            exec ${pkgs.python3}/bin/python -c ${escapeShellArg pythonScript}
+            set -euo pipefail
+            lockfile="/run/gallery-dl/simpcity-watched-threads.lock"
+            exec 9>"$lockfile"
+            if ! ${pkgs.util-linux}/bin/flock -n 9; then
+              exit 0
+            fi
+            cookies=${escapeShellArg cookiesPath}
+            out=${escapeShellArg urlFile}
+            logfile=${escapeShellArg urlLogFile}
+            base=${escapeShellArg watchedThreadsUrl}
+            ua="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            if [ ! -s "$cookies" ]; then
+              echo "cookies file missing or empty: ${cookiesPath}" >&2
+              exit 0
+            fi
+            newlist=$(mktemp)
+            raw=$(mktemp)
+            trap 'rm -f "$newlist" "$raw"' EXIT
+            page=1
+            while true; do
+              if [ "$page" -eq 1 ]; then
+                url="$base"
+              else
+                url="$base/page-$page"
+              fi
+              code=$(${pkgs.curl}/bin/curl -sS -L --max-redirs 5 -b "$cookies" -A "$ua" -o "$raw" -w "%{http_code}" "$url" || echo "000")
+              if [ "$code" != "200" ]; then
+                if [ "$page" -gt 1 ]; then
+                  break
+                fi
+                echo "failed to fetch watched threads ($code) from $url" >&2
+                break
+              fi
+              ${pkgs.gnugrep}/bin/grep -oE 'href="/threads/[^"?#]+\.[0-9]+/"' "$raw" \
+                | ${pkgs.gnugrep}/bin/grep -vE 'href="/threads/(community-rules-guidelines|faq)\.[0-9]+/"' \
+                | ${pkgs.gnused}/bin/sed 's#^href="##;s#"$##' \
+                | ${pkgs.gnused}/bin/sed 's#^#https://simpcity.cr#' >> "$newlist"
+              if ! ${pkgs.gnugrep}/bin/grep -q "pageNav-jump--next" "$raw"; then
+                break
+              fi
+              page=$((page + 1))
+            done
+            sort -u "$newlist" -o "$newlist"
+            if [ ! -s "$newlist" ]; then
+              echo "watched threads fetch returned no URLs; keeping existing ${urlFile}" >&2
+              exit 0
+            fi
+            if [[ -f "$out" ]] && ${pkgs.diffutils}/bin/cmp -s "$newlist" "$out"; then
+              exit 0
+            fi
+            ts=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+            added=$(comm -23 "$newlist" <(sort "$out" 2>/dev/null || true))
+            deleted=$(comm -13 "$newlist" <(sort "$out" 2>/dev/null || true))
+            {
+              echo "--- $ts ---"
+              if [[ -n "$added" ]]; then
+                echo "added:"
+                echo "$added" | sed 's/^/  /'
+              fi
+              if [[ -n "$deleted" ]]; then
+                echo "deleted:"
+                echo "$deleted" | sed 's/^/  /'
+              fi
+              echo ""
+            } >> "$logfile"
+            chmod 666 "$logfile" 2>/dev/null || true
+            ${pkgs.coreutils}/bin/cp "$newlist" "$out"
+            chmod 666 "$out" 2>/dev/null || true
+          '';
+        };
+      }))
+      // (optionalAttrs (cfg.enable && cfg.simpcityDdgRefresh != null && cfg.simpcityDdgRefresh.enable) (let
+        rfr = cfg.simpcityDdgRefresh;
+      in {
+        gallery-dl-simpcity-ddg-refresh = {
+          description = "Refresh SimpCity DDoS-Guard cookies via FlareSolverr session";
+          after = ["flaresolverr.service"];
+          wants = ["flaresolverr.service"];
+          restartIfChanged = false;
+          serviceConfig = {
+            Type = "oneshot";
+            User = "root";
+            Group = "root";
+          };
+          script = ''
+            set -euo pipefail
+            JAR=${escapeShellArg rfr.cookiesPath} \
+            SOLVER=${escapeShellArg rfr.solverUrl} \
+            WARMUP=${escapeShellArg rfr.warmupUrl} \
+            SESSION=${escapeShellArg rfr.sessionName} \
+            ${pkgs.python3}/bin/python3 - <<'PY'
+            import json
+            import os
+            import time
+            import urllib.request
+            from pathlib import Path
+
+            jar = Path(os.environ["JAR"])
+            solver = os.environ["SOLVER"]
+            url = os.environ["WARMUP"]
+            session = os.environ["SESSION"]
+
+            def call(payload):
+                req = urllib.request.Request(
+                    solver,
+                    data=json.dumps(payload).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=90) as resp:
+                    return json.loads(resp.read().decode())
+
+            listed = call({"cmd": "sessions.list"})
+            sessions = listed.get("sessions") or listed.get("session") or []
+            if isinstance(sessions, str):
+                sessions = [sessions]
+            if session not in sessions:
+                created = call({"cmd": "sessions.create", "session": session})
+                print(f"session create status={created.get('status')} msg={created.get('message')}")
+
+            cookies = []
+            existing_lines = []
+            if jar.exists():
+                existing_lines = jar.read_text(encoding="utf-8", errors="replace").splitlines()
+            old = {}
+            for line in existing_lines:
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("\t")
+                if len(parts) < 7:
+                    continue
+                name = parts[5]
+                old[name] = parts
+                cookies.append({
+                    "name": name,
+                    "value": parts[6],
+                    "domain": parts[0],
+                    "path": parts[2],
+                })
+
+            data = call({
+                "cmd": "request.get",
+                "session": session,
+                "url": url,
+                "maxTimeout": 60000,
+                "cookies": cookies,
+            })
+            solution = data.get("solution") or {}
+            html = solution.get("response") or ""
+            status = solution.get("status")
+            print(f"flaresolverr status={data.get('status')} page={status} msg={data.get('message')}")
+            if 'id="XF"' not in html or "ddg-captcha-page" in html:
+                print("refresh skipped: no XenForo HTML (captcha/challenge)")
+                raise SystemExit(0)
+
+            now = int(time.time())
+            header = [
+                "# Netscape HTTP Cookie File",
+                "# https://curl.haxx.se/rfc/cookie_spec.html",
+                "# This is a generated file! Do not edit.",
+                "",
+            ]
+            kept = []
+            seen = set()
+            for line in existing_lines:
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("\t")
+                if len(parts) < 7:
+                    continue
+                name = parts[5]
+                if name.startswith("__ddg") or name == "ddg_last_challenge":
+                    continue
+                kept.append(line)
+                seen.add((parts[0], name))
+
+            added = 0
+            rotated = []
+            ddg_expiry = str(now + 3 * 3600)
+            merged_ddg = set()
+            for ck in solution.get("cookies") or []:
+                name = ck.get("name") or ""
+                if not (name.startswith("__ddg") or name == "ddg_last_challenge"):
+                    continue
+                value = ck.get("value") or ""
+                domain = ck.get("domain") or ".simpcity.cr"
+                path = ck.get("path") or "/"
+                secure = "TRUE" if ck.get("secure") else "FALSE"
+                expiry = ck.get("expiry")
+                if not expiry:
+                    prev = old.get(name)
+                    if prev and prev[6] == value:
+                        try:
+                            old_exp = int(prev[4] or "0")
+                        except ValueError:
+                            old_exp = 0
+                        expiry = ddg_expiry if old_exp < now else prev[4]
+                    else:
+                        expiry = ddg_expiry
+                else:
+                    try:
+                        if int(expiry) < now:
+                            expiry = ddg_expiry
+                    except ValueError:
+                        expiry = ddg_expiry
+                expiry = str(int(expiry))
+                flag = "TRUE" if domain.startswith(".") else "FALSE"
+                kept.append("\t".join([domain, flag, path, secure, expiry, name, value]))
+                seen.add((domain, name))
+                merged_ddg.add(name)
+                added += 1
+                prev = old.get(name)
+                if prev is None or prev[6] != value:
+                    rotated.append(name)
+                elif name == "__ddg5_" and int(expiry) >= now:
+                    rotated.append("__ddg5_(extended)")
+
+            # FlareSolverr often omits __ddg5_ from solution cookies even when XenForo loads.
+            if "__ddg5_" in old and "__ddg5_" not in merged_ddg:
+                prev = old["__ddg5_"]
+                kept.append("\t".join([prev[0], prev[1], prev[2], prev[3], ddg_expiry, "__ddg5_", prev[6]]))
+                rotated.append("__ddg5_(extended)")
+
+            jar.write_text("\n".join(header + kept) + "\n", encoding="utf-8")
+            print(f"merged {added} ddg cookies; rotated={rotated or ['none']}")
+            PY
           '';
         };
       }));
@@ -985,6 +1398,17 @@ in {
             OnCalendar = cfg.simpcityWatchedThreadsList.onCalendar;
             Persistent = true;
             Unit = "gallery-dl-simpcity-watched-threads-list.service";
+          };
+        };
+      })
+      // (optionalAttrs (cfg.enable && cfg.simpcityDdgRefresh != null && cfg.simpcityDdgRefresh.enable) {
+        gallery-dl-simpcity-ddg-refresh = {
+          description = "Timer: refresh SimpCity DDoS-Guard cookies";
+          wantedBy = ["timers.target"];
+          timerConfig = {
+            OnCalendar = cfg.simpcityDdgRefresh.onCalendar;
+            Persistent = true;
+            Unit = "gallery-dl-simpcity-ddg-refresh.service";
           };
         };
       });
