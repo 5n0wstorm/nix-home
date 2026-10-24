@@ -118,6 +118,11 @@ in {
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
+            # Unmount on stop/shutdown (ordered before network-online.target is
+            # torn down). Replaces a separate unit RequiredBy=umount.target, which
+            # also had Conflicts=shutdown.target and made every `systemctl reboot`
+            # fail with "Transaction contains conflicting jobs".
+            ExecStop = "-${pkgs.bash}/bin/sh -c '${pkgs.util-linux}/bin/umount ${cfg.mountPoint} || ${pkgs.util-linux}/bin/umount -l ${cfg.mountPoint}'";
           };
 
           path = [pkgs.cifs-utils pkgs.coreutils pkgs.util-linux];
@@ -151,22 +156,6 @@ in {
             else
               echo "remount failed; will retry on next timer run" >&2
               exit 1
-            fi
-          '';
-        };
-
-        hetzner-archive-mount-pre-stop = {
-          description = "Unmount Hetzner Storage Box on shutdown";
-          requiredBy = ["umount.target"];
-          before = ["umount.target"];
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-          };
-          path = [pkgs.util-linux];
-          script = ''
-            if ${pkgs.util-linux}/bin/mountpoint -q ${cfg.mountPoint}; then
-              umount ${cfg.mountPoint} || true
             fi
           '';
         };
