@@ -322,7 +322,7 @@ with lib;
       fi
 
       echo "Syncing with remote before push..."
-      git pull --rebase "$push_remote" main
+      git pull --rebase --autostash "$push_remote" main
 
       echo "Pushing changes to remote repository..."
       if git push "$push_remote" main; then
