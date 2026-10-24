@@ -424,7 +424,7 @@ in {
         if mysqlFromFleet
         then mysqlConn.passwordFile
         else cfg.database.mysql.passwordFile;
-      nextcloudPkg = pkgs.nextcloud34;
+      nextcloudPkg = pkgs.nextcloud35;
     in {
       enable = true;
       package = nextcloudPkg;
