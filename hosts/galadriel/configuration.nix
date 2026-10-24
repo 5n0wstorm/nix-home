@@ -290,12 +290,10 @@ in {
         extractor = {
           "base-directory" = "${archiveBase}";
           archive = "@ARCHIVE_URL@";
-          twitter.messages.pin = "@TWITTER_DM_PIN@";
         };
       };
       configSubstitutions = {
         "@ARCHIVE_URL@" = config.sops.secrets."gallery-dl/archive-url".path;
-        "@TWITTER_DM_PIN@" = config.sops.secrets."gallery-dl/twitter-messages-pin".path;
       };
 
       # one URL per line
@@ -343,6 +341,9 @@ in {
           "base-directory" = "${archiveBase}";
           archive = "@ARCHIVE_URL@";
           twitter.messages.pin = "@TWITTER_DM_PIN@";
+          # The twitter job (every 30 min) owns cookies.txt; writing it back from
+          # here too races at :00 ("cookies: Failed to write ... cookies.txt.tmp").
+          "cookies-update" = false;
         };
       };
       configSubstitutions = {
