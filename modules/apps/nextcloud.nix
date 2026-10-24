@@ -282,8 +282,8 @@ in {
     settingsJsonPath = (pkgs.formats.json {}).generate "nextcloud-settings.json" config.services.nextcloud.settings;
     # Memories: fetch and normalize layout so Nextcloud sees appinfo/ at root (store install often fails).
     memoriesUnpacked = pkgs.fetchNextcloudApp {
-      url = "https://github.com/pulsejet/memories/releases/download/v8.1.0/memories.tar.gz";
-      hash = "sha256-wIjDS/UafHC4oSPkqh13k8qfiPESeBI2c0TTSelYoj0=";
+      url = "https://github.com/pulsejet/memories/releases/download/v10.2.0/memories.tar.gz";
+      hash = "sha256-ufBwEVrcRVDSkVEimKFQgUf0fxDU57GhUmxFCPnhTLs=";
       license = "agpl3Only";
       unpack = true;
     };
@@ -350,6 +350,11 @@ in {
     # setup/upgrade races a restarting MySQL during switch and fails.
     systemd.services.nextcloud-setup.after = lib.optional config.services.mysql.enable "mysql.service";
     systemd.services.nextcloud-setup.wants = lib.optional config.services.mysql.enable "mysql.service";
+    # Keep `occ upgrade` from pulling newer app-store copies of Nix-managed
+    # extraApps into custom_apps mid-upgrade (both get loaded -> "Cannot
+    # redeclare class ComposerAutoloaderInit..."). Web UI app store unaffected.
+    systemd.services.nextcloud-setup.environment.NC_appstoreenabled = "0";
+    systemd.services.nextcloud-update-db.environment.NC_appstoreenabled = "0";
     systemd.services.phpfpm-nextcloud.environment.PATH = mkForce nextcloudPath;
     systemd.services.nextcloud-cron.environment.PATH = mkForce nextcloudPath;
     systemd.services.nextcloud-update-db.environment.PATH = mkForce nextcloudPath;
@@ -419,7 +424,7 @@ in {
         if mysqlFromFleet
         then mysqlConn.passwordFile
         else cfg.database.mysql.passwordFile;
-      nextcloudPkg = pkgs.nextcloud33;
+      nextcloudPkg = pkgs.nextcloud34;
     in {
       enable = true;
       package = nextcloudPkg;
@@ -638,20 +643,17 @@ in {
     };
 
     # --------------------------------------------------------------------------
-    # WORKAROUND: nixpkgs store-apps + stale nextcloud-settings.json path
+    # OVERRIDE CONFIG: keep upstream symlink + one-time Memories cleanup
     # --------------------------------------------------------------------------
     #
-    # 1) On some nixpkgs revisions, override.config.php contains an apps_paths
-    #    entry for ${finalPackage}/store-apps which does not exist, causing
-    #    "App directory .../store-apps not found!". We drop that line.
-    #
-    # 2) The path to nextcloud-settings.json is baked in at build time. After
-    #    a remote deploy the override config in /var/lib can reference an old
-    #    store path that is not on the target ("decoding ... failed"). Replace
-    #    any nextcloud-settings.json path with the path from our etc symlink
-    #    so the file that exists is used.
+    # Upstream installs override.config.php as a tmpfiles `L+` symlink to a
+    # generated file. This unit used to `sed -i` it (drop store-apps, rewrite the
+    # settings JSON path), which replaced the symlink with a frozen copy: after a
+    # Nextcloud major upgrade it kept the old package's apps_paths and occ broke
+    # ("Call to undefined method ..."). The store-apps entry is overridden by our
+    # apps_paths setting anyway, so just restore the upstream symlink.
     systemd.services.nextcloud-fix-override-config = {
-      description = "Patch Nextcloud override.config.php (store-apps, settings path, one-time Memories cleanup)";
+      description = "Restore Nextcloud override.config.php symlink (one-time Memories cleanup)";
       wantedBy = [
         "phpfpm-nextcloud.service"
         "nextcloud-setup.service"
@@ -680,23 +682,9 @@ in {
           touch "$marker"
         fi
 
-        cfg="/var/lib/nextcloud/config/override.config.php"
-        if [ ! -f "$cfg" ]; then
-          exit 0
-        fi
-
-        # Drop any apps_paths entries referencing store-apps.
-        ${pkgs.gnused}/bin/sed -i "/store-apps/d" "$cfg"
-
-        # If the override config references a nextcloud-settings.json path that
-        # does not exist (e.g. stale path after remote deploy), replace it with
-        # the path from our /etc symlink so decoding succeeds.
-        if [ -e /etc/nextcloud-settings.json ]; then
-          good_path="$(${pkgs.coreutils}/bin/readlink -f /etc/nextcloud-settings.json)"
-          if [ -n "$good_path" ] && [ -f "$good_path" ]; then
-            ${pkgs.gnused}/bin/sed -i "s|/nix/store/[a-z0-9]*-nextcloud-settings\.json|$good_path|g" "$cfg"
-          fi
-        fi
+        # Re-create the upstream `L+` symlink (replaces a frozen copy, if any).
+        ${config.systemd.package}/bin/systemd-tmpfiles --create \
+          --prefix=/var/lib/nextcloud/config/override.config.php
       '';
     };
 

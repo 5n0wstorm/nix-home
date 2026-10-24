@@ -314,8 +314,8 @@ in {
 
         ${pkgs.podman}/bin/podman run --rm \
           --name configarr \
-          -v ${configPath}:/app/config.yml:ro \
-          -v ${cfg.configDir}/secrets.yml:/app/secrets.yml:ro \
+          -v ${configPath}:/app/config/config.yml:ro \
+          -v ${cfg.configDir}/secrets.yml:/app/config/secrets.yml:ro \
           --network host \
           ghcr.io/raydak-labs/configarr:latest
 
