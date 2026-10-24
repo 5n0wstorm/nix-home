@@ -7,6 +7,44 @@
 with lib; let
   cfg = config.fleet.system.hetznerArchiveMount;
   archivePath = "${cfg.mountPoint}/${cfg.archiveSubdir}";
+
+  # Shared by the mount unit and the watchdog (idempotent: mounts only if needed).
+  mountScript = pkgs.writeShellScript "hetzner-archive-mount" ''
+    export PATH=${lib.makeBinPath [pkgs.cifs-utils pkgs.coreutils pkgs.util-linux]}:$PATH
+    set -euo pipefail
+    SHARE=$(tr -d '\n\r' < ${cfg.smbShareFile})
+    USER=$(tr -d '\n\r' < ${cfg.smbUsernameFile})
+    PASS=$(tr -d '\n\r' < ${cfg.smbPasswordFile})
+
+    mkdir -p ${cfg.mountPoint}
+
+    if ! ${pkgs.util-linux}/bin/mountpoint -q ${cfg.mountPoint}; then
+      mount.cifs "$SHARE" ${cfg.mountPoint} \
+        -o "${cfg.smbMountOptions},username=$USER,password=$PASS"
+    fi
+
+    mkdir -p ${archivePath}
+    chmod 2775 ${archivePath}
+
+    # Downloader + gallery-dl layout (CIFS — created after mount, not via tmpfiles)
+    for dir in \
+      telegram boosty twitter simpcity \
+      torrents/incomplete torrents/complete \
+      usenet/incomplete \
+      usenet/complete/books usenet/complete/movies usenet/complete/music usenet/complete/tv \
+      media/books media/movies media/music media/tv; do
+      mkdir -p "${archivePath}/$dir"
+    done
+
+    for f in \
+      telegram/urls.txt telegram/url-logs.txt \
+      boosty/urls.txt \
+      twitter/urls.txt twitter/url-logs.txt \
+      simpcity/urls.txt simpcity/url-logs.txt simpcity/cookies.txt; do
+      touch "${archivePath}/$f"
+      chmod 664 "${archivePath}/$f" || true
+    done
+  '';
 in {
   options.fleet.system.hetznerArchiveMount = {
     enable = mkEnableOption "Persistent CIFS mount of the Hetzner Storage Box archive tree";
@@ -73,6 +111,9 @@ in {
           after = ["network-online.target" "sops-nix.service"];
           wants = ["network-online.target"];
           before = cfg.afterMountServices;
+          # Restarting would restart every Requires= dependent (long gallery-dl
+          # runs); the watchdog handles remounts, so never restart on switch.
+          restartIfChanged = false;
 
           serviceConfig = {
             Type = "oneshot";
@@ -81,40 +122,36 @@ in {
 
           path = [pkgs.cifs-utils pkgs.coreutils pkgs.util-linux];
 
+          script = "${mountScript}";
+        };
+
+        # ----------------------------------------------------------------------
+        # WATCHDOG - remount when the CIFS session goes stale ("Host is down")
+        # ----------------------------------------------------------------------
+        # Remounts in place instead of restarting hetzner-archive-mount.service,
+        # which would stop every unit in afterMountServices (Requires=).
+        hetzner-archive-watchdog = {
+          description = "Remount Hetzner Storage Box if the CIFS mount is stale";
+          after = ["hetzner-archive-mount.service"];
+          # Only while the mount unit is up (not during boot/shutdown).
+          requisite = ["hetzner-archive-mount.service"];
+          serviceConfig.Type = "oneshot";
+          path = [pkgs.coreutils pkgs.util-linux];
           script = ''
-            set -euo pipefail
-            SHARE=$(tr -d '\n\r' < ${cfg.smbShareFile})
-            USER=$(tr -d '\n\r' < ${cfg.smbUsernameFile})
-            PASS=$(tr -d '\n\r' < ${cfg.smbPasswordFile})
-
-            mkdir -p ${cfg.mountPoint}
-
-            if ! ${pkgs.util-linux}/bin/mountpoint -q ${cfg.mountPoint}; then
-              mount.cifs "$SHARE" ${cfg.mountPoint} \
-                -o "${cfg.smbMountOptions},username=$USER,password=$PASS"
+            set -uo pipefail
+            if timeout 20 stat -t ${archivePath} >/dev/null 2>&1 \
+              && timeout 20 ls ${archivePath} >/dev/null 2>&1; then
+              exit 0
             fi
-
-            mkdir -p ${archivePath}
-            chmod 2775 ${archivePath}
-
-            # Downloader + gallery-dl layout (CIFS — created after mount, not via tmpfiles)
-            for dir in \
-              telegram boosty twitter simpcity \
-              torrents/incomplete torrents/complete \
-              usenet/incomplete \
-              usenet/complete/books usenet/complete/movies usenet/complete/music usenet/complete/tv \
-              media/books media/movies media/music media/tv; do
-              mkdir -p "${archivePath}/$dir"
-            done
-
-            for f in \
-              telegram/urls.txt telegram/url-logs.txt \
-              boosty/urls.txt \
-              twitter/urls.txt twitter/url-logs.txt \
-              simpcity/urls.txt simpcity/url-logs.txt simpcity/cookies.txt; do
-              touch "${archivePath}/$f"
-              chmod 664 "${archivePath}/$f" || true
-            done
+            echo "${archivePath} not accessible; remounting ${cfg.mountPoint}"
+            umount -f -l ${cfg.mountPoint} 2>/dev/null || true
+            ${mountScript}
+            if timeout 20 stat -t ${archivePath} >/dev/null 2>&1; then
+              echo "remount OK"
+            else
+              echo "remount failed; will retry on next timer run" >&2
+              exit 1
+            fi
           '';
         };
 
@@ -146,5 +183,14 @@ in {
         ) {}
         cfg.afterMountServices)
     ];
+
+    systemd.timers.hetzner-archive-watchdog = {
+      description = "Periodically check the Hetzner Storage Box mount";
+      wantedBy = ["timers.target"];
+      timerConfig = {
+        OnBootSec = "5min";
+        OnUnitActiveSec = "2min";
+      };
+    };
   };
 }
