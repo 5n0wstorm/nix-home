@@ -722,6 +722,9 @@ in {
 
   fleet.apps.mysql = {
     enable = true;
+    # Current LTS (nixpkgs default is still 11.4). Run `mariadb-upgrade` after
+    # switching major/minor series; the upstream unit does not.
+    package = pkgs.mariadb_118;
     bindAddress = "127.0.0.1";
     port = 3306;
 
